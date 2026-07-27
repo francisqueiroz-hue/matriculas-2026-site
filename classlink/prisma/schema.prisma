@@ -29,17 +29,45 @@ enum AttendanceStatus {
   JUSTIFIED
 }
 
+enum ComunicadoTipo {
+  AUTORIZACAO_PASSEIO
+  CONFIRMACAO_REUNIAO
+  CIRCULAR
+}
+
+enum RespostaTipo {
+  AUTORIZADO
+  NAO_AUTORIZADO
+  CONFIRMADO
+  NAO_COMPARECERA
+  LIDO
+  PENDENTE_EXPIRADO // gerado automaticamente pelo job de expiração, nunca pelo cliente
+}
+
+enum BoletoStatus {
+  PENDENTE
+  PAGO
+  VENCIDO
+  ERRO // falha na emissão junto ao Banco Inter
+}
+
 model School {
   id        String   @id @default(cuid())
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users    User[]
-  classes  Class[]
-  students Student[]
-  posts    Post[]
-  events   Event[]
+  // Configuração de cobrança (Módulo Boleto — Banco Inter)
+  diaVencimentoPadrao Int? // dia do mês usado como vencimento quando o aluno não tem um específico
+  diaEmissaoBoletos   Int? // dia do mês em que o job de emissão deve rodar
+
+  users       User[]
+  classes     Class[]
+  students    Student[]
+  posts       Post[]
+  events      Event[]
+  comunicados Comunicado[]
+  boletos     Boleto[]
 }
 
 model User {
@@ -54,6 +82,12 @@ model User {
   deletedAt    DateTime? // exclusão lógica (LGPD) antes de expurgo definitivo
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  // Dados de cobrança (Módulo Boleto — Banco Inter). Preenchidos apenas pelo próprio
+  // responsável, só quando necessário para emissão de boleto (CPF e endereço são
+  // exigidos pelo registro bancário do boleto) — nunca coletados no cadastro padrão.
+  cpf              String?
+  enderecoCobranca Json?
 
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   schoolId String
@@ -73,6 +107,9 @@ model User {
   conversationsA   Conversation[] @relation("ConversationStaff")
   conversationsB   Conversation[] @relation("ConversationGuardian")
   attendanceMarked Attendance[]   @relation("AttendanceMarkedBy")
+
+  comunicadosCriados  Comunicado[]         @relation("ComunicadoAuthor")
+  respostasComunicado RespostaComunicado[] @relation("RespostaResponsavel")
 
   @@index([schoolId])
 }
@@ -109,10 +146,11 @@ model Class {
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   schoolId String
 
-  teachers ClassTeacher[]
-  students Student[]
-  posts    Post[]
-  events   Event[]
+  teachers    ClassTeacher[]
+  students    Student[]
+  posts       Post[]
+  events      Event[]
+  comunicados Comunicado[]
 
   @@index([schoolId])
 }
@@ -142,8 +180,14 @@ model Student {
   class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
   classId String
 
-  guardians   GuardianStudent[]
-  attendances Attendance[]
+  // Módulo financeiro simplificado (Módulo Boleto — Banco Inter)
+  mensalidadeValor Decimal? @db.Decimal(10, 2)
+  diaVencimento    Int? // sobrepõe School.diaVencimentoPadrao quando definido
+
+  guardians           GuardianStudent[]
+  attendances         Attendance[]
+  respostasComunicado RespostaComunicado[]
+  boletos             Boleto[]
 
   @@index([schoolId])
   @@index([classId])
@@ -249,6 +293,96 @@ model Event {
 
   @@index([schoolId])
   @@index([classId])
+}
+
+model Comunicado {
+  id            String         @id @default(cuid())
+  tipo          ComunicadoTipo
+  titulo        String
+  descricao     String
+  audience      PostAudience // "toda_escola" ou turma específica (reaproveita o mesmo enum do mural)
+  prazoResposta DateTime?
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId String?
+
+  criadoPor   User   @relation("ComunicadoAuthor", fields: [criadoPorId], references: [id], onDelete: Cascade)
+  criadoPorId String
+
+  dataCriacao DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  respostas RespostaComunicado[]
+
+  @@index([schoolId])
+  @@index([classId])
+}
+
+model RespostaComunicado {
+  id               String       @id @default(cuid())
+  comunicado       Comunicado   @relation(fields: [comunicadoId], references: [id], onDelete: Cascade)
+  comunicadoId     String
+  responsavel      User         @relation("RespostaResponsavel", fields: [responsavelId], references: [id], onDelete: Cascade)
+  responsavelId    String
+  aluno            Student      @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  alunoId          String
+  resposta         RespostaTipo
+  // Timestamp e IP sempre atribuídos pelo servidor no momento da requisição — nunca aceitos do cliente.
+  dataHoraResposta DateTime
+  ipOrigem         String?
+
+  historico RespostaComunicadoLog[]
+
+  // Um responsável só pode ter uma resposta vigente por comunicado/aluno; reenvios atualizam
+  // este registro e a resposta anterior é preservada em RespostaComunicadoLog.
+  @@unique([comunicadoId, responsavelId, alunoId])
+  @@index([comunicadoId])
+  @@index([responsavelId])
+}
+
+// Histórico imutável das respostas substituídas (auditoria de autorizações — LGPD/segurança jurídica).
+model RespostaComunicadoLog {
+  id                       String             @id @default(cuid())
+  respostaComunicado       RespostaComunicado @relation(fields: [respostaComunicadoId], references: [id], onDelete: Cascade)
+  respostaComunicadoId     String
+  respostaAnterior         RespostaTipo
+  dataHoraRespostaAnterior DateTime
+  ipOrigemAnterior         String?
+  substituidaEm            DateTime           @default(now())
+
+  @@index([respostaComunicadoId])
+}
+
+// Boleto mensal emitido via API do Banco Inter. Não persistimos o PDF em si —
+// ele é buscado sob demanda na API do Inter usando codigoSolicitacao (evita
+// guardar documento bancário em repouso além do necessário).
+model Boleto {
+  id            String       @id @default(cuid())
+  student       Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId     String
+  school        School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId      String
+  mesReferencia String // formato "AAAA-MM"
+  valor         Decimal      @db.Decimal(10, 2)
+  vencimento    DateTime
+  status        BoletoStatus @default(PENDENTE)
+
+  codigoSolicitacao String? @unique // identificador retornado pelo Inter na emissão
+  nossoNumero       String?
+  linhaDigitavel    String?
+  pixCopiaCola      String?
+  erroDetalhe       String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  pagoEm    DateTime?
+
+  @@unique([studentId, mesReferencia])
+  @@index([schoolId])
+  @@index([status])
 }
 
 model Attendance {

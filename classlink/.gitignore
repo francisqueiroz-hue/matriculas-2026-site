@@ -24,6 +24,11 @@
 .DS_Store
 *.pem
 
+# certificados mTLS (Banco Inter) — nunca versionar
+/certs
+*.crt
+*.key
+
 # debug
 npm-debug.log*
 yarn-debug.log*

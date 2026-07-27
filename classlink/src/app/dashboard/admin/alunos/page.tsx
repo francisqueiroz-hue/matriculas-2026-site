@@ -14,6 +14,8 @@ interface StudentItem {
   name: string;
   class: { id: string; name: string };
   guardians: { guardian: { id: string; name: string; email: string } }[];
+  mensalidadeValor: string | null;
+  diaVencimento: number | null;
 }
 
 function AlunosContent() {
@@ -24,6 +26,7 @@ function AlunosContent() {
   const [error, setError] = useState<string | null>(null);
   const [guardianForms, setGuardianForms] = useState<Record<string, { email: string; guardianName: string; relation: string }>>({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
+  const [billingForms, setBillingForms] = useState<Record<string, { mensalidadeValor: string; diaVencimento: string }>>({});
 
   function load() {
     apiJson<{ students: StudentItem[] }>("/api/admin/students").then((data) => setStudents(data.students));
@@ -78,6 +81,33 @@ function AlunosContent() {
     if (!confirm("Revogar vínculo com este responsável?")) return;
     await apiJson(`/api/admin/students/${studentId}/guardians/${guardianId}`, { method: "DELETE" });
     load();
+  }
+
+  function billingForm(student: StudentItem) {
+    return (
+      billingForms[student.id] ?? {
+        mensalidadeValor: student.mensalidadeValor ?? "",
+        diaVencimento: student.diaVencimento ? String(student.diaVencimento) : "",
+      }
+    );
+  }
+
+  async function handleSalvarMensalidade(studentId: string, e: React.FormEvent) {
+    e.preventDefault();
+    const form = billingForm(students!.find((s) => s.id === studentId)!);
+    try {
+      await apiJson(`/api/admin/students/${studentId}/billing`, {
+        method: "PUT",
+        body: JSON.stringify({
+          mensalidadeValor: form.mensalidadeValor ? Number(form.mensalidadeValor) : null,
+          diaVencimento: form.diaVencimento ? Number(form.diaVencimento) : null,
+        }),
+      });
+      setFeedback((prev) => ({ ...prev, [studentId]: "Mensalidade atualizada." }));
+      load();
+    } catch (err) {
+      setFeedback((prev) => ({ ...prev, [studentId]: err instanceof Error ? err.message : "Erro ao salvar mensalidade" }));
+    }
   }
 
   return (
@@ -170,6 +200,39 @@ function AlunosContent() {
                 />
                 <button type="submit" className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950">
                   Vincular responsável
+                </button>
+              </form>
+
+              <form onSubmit={(e) => handleSalvarMensalidade(s.id, e)} className="mt-3 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <label className="text-xs text-slate-500">
+                  Mensalidade (R$)
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={billingForm(s).mensalidadeValor}
+                    onChange={(e) =>
+                      setBillingForms((prev) => ({ ...prev, [s.id]: { ...billingForm(s), mensalidadeValor: e.target.value } }))
+                    }
+                    className="mt-1 block w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                </label>
+                <label className="text-xs text-slate-500">
+                  Dia de vencimento
+                  <input
+                    type="number"
+                    min={1}
+                    max={28}
+                    placeholder="padrão da escola"
+                    value={billingForm(s).diaVencimento}
+                    onChange={(e) =>
+                      setBillingForms((prev) => ({ ...prev, [s.id]: { ...billingForm(s), diaVencimento: e.target.value } }))
+                    }
+                    className="mt-1 block w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                </label>
+                <button type="submit" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">
+                  Salvar mensalidade
                 </button>
               </form>
               {feedback[s.id] && <p className="mt-1 text-xs text-slate-500">{feedback[s.id]}</p>}

@@ -58,3 +58,43 @@ export const createEventSchema = z.object({
 export const sendMessageSchema = z.object({
   body: z.string().min(1).max(4000),
 });
+
+export const createComunicadoSchema = z.object({
+  tipo: z.enum(["AUTORIZACAO_PASSEIO", "CONFIRMACAO_REUNIAO", "CIRCULAR"]),
+  titulo: z.string().min(1).max(200),
+  descricao: z.string().min(1).max(5000),
+  audience: z.enum(["SCHOOL", "CLASS"]),
+  classId: z.string().optional(),
+  prazoResposta: z.string().datetime().optional(),
+});
+
+export const responderComunicadoSchema = z.object({
+  alunoId: z.string().min(1),
+  resposta: z.enum(["AUTORIZADO", "NAO_AUTORIZADO", "CONFIRMADO", "NAO_COMPARECERA", "LIDO"]),
+});
+
+export const setMensalidadeSchema = z.object({
+  mensalidadeValor: z.number().min(0).max(1_000_000).nullable(),
+  diaVencimento: z.number().int().min(1).max(28).nullable().optional(),
+});
+
+export const setBillingInfoSchema = z.object({
+  cpf: z
+    .string()
+    .transform((v) => v.replace(/\D/g, ""))
+    .refine((v) => v.length === 11, "CPF deve ter 11 dígitos"),
+  endereco: z.object({
+    cep: z.string().min(8).max(9),
+    logradouro: z.string().min(1).max(200),
+    numero: z.string().min(1).max(20),
+    complemento: z.string().max(100).optional(),
+    bairro: z.string().min(1).max(100),
+    cidade: z.string().min(1).max(100),
+    uf: z.string().length(2),
+  }),
+});
+
+export const setBillingConfigSchema = z.object({
+  diaVencimentoPadrao: z.number().int().min(1).max(28).optional(),
+  diaEmissaoBoletos: z.number().int().min(1).max(28).optional(),
+});

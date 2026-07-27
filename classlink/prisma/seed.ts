@@ -124,6 +124,30 @@ async function main() {
     },
   });
 
+  await prisma.comunicado.upsert({
+    where: { id: "seed-comunicado-1" },
+    update: {},
+    create: {
+      id: "seed-comunicado-1",
+      tipo: "AUTORIZACAO_PASSEIO",
+      titulo: "Autorização — Passeio ao museu",
+      descricao: "Solicitamos autorização para o passeio da turma ao museu de ciências no dia 15.",
+      audience: "CLASS",
+      classId: turmaA.id,
+      prazoResposta: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      schoolId: school.id,
+      criadoPorId: professora.id,
+    },
+  });
+
+  // Configuração de mensalidade (Módulo Financeiro) — o boleto em si só é emitido
+  // quando as credenciais do Banco Inter estiverem configuradas em produção.
+  await prisma.student.update({ where: { id: aluno.id }, data: { mensalidadeValor: 450 } });
+  await prisma.school.update({
+    where: { id: school.id },
+    data: { diaVencimentoPadrao: 10, diaEmissaoBoletos: 1 },
+  });
+
   console.log("Seed concluído.");
   console.log(`Turmas: ${turmaA.name}, ${turmaB.name}`);
   console.log("Login de demonstração (senha para todos: classlink123):");
