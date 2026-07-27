@@ -1,0 +1,190 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { AdminGuard } from "@/components/AdminGuard";
+import { apiJson } from "@/lib/api-client";
+
+interface ClassOption {
+  id: string;
+  name: string;
+}
+
+interface StudentItem {
+  id: string;
+  name: string;
+  class: { id: string; name: string };
+  guardians: { guardian: { id: string; name: string; email: string } }[];
+}
+
+function AlunosContent() {
+  const [students, setStudents] = useState<StudentItem[] | null>(null);
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [name, setName] = useState("");
+  const [classId, setClassId] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [guardianForms, setGuardianForms] = useState<Record<string, { email: string; guardianName: string; relation: string }>>({});
+  const [feedback, setFeedback] = useState<Record<string, string>>({});
+
+  function load() {
+    apiJson<{ students: StudentItem[] }>("/api/admin/students").then((data) => setStudents(data.students));
+    apiJson<{ classes: ClassOption[] }>("/api/admin/classes").then((data) => setClasses(data.classes));
+  }
+  useEffect(load, []);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await apiJson("/api/admin/students", { method: "POST", body: JSON.stringify({ name, classId }) });
+      setName("");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao cadastrar aluno");
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("Remover este aluno?")) return;
+    await apiJson(`/api/admin/students/${id}`, { method: "DELETE" });
+    load();
+  }
+
+  function guardianForm(studentId: string) {
+    return guardianForms[studentId] ?? { email: "", guardianName: "", relation: "" };
+  }
+
+  async function handleLinkGuardian(studentId: string, e: React.FormEvent) {
+    e.preventDefault();
+    const form = guardianForm(studentId);
+    try {
+      const data = await apiJson<{ temporaryPassword?: string }>(`/api/admin/students/${studentId}/guardians`, {
+        method: "POST",
+        body: JSON.stringify({ guardianEmail: form.email, guardianName: form.guardianName, relation: form.relation }),
+      });
+      setFeedback((prev) => ({
+        ...prev,
+        [studentId]: data.temporaryPassword
+          ? `Responsável criado. Senha temporária: ${data.temporaryPassword}`
+          : "Responsável vinculado.",
+      }));
+      setGuardianForms((prev) => ({ ...prev, [studentId]: { email: "", guardianName: "", relation: "" } }));
+      load();
+    } catch (err) {
+      setFeedback((prev) => ({ ...prev, [studentId]: err instanceof Error ? err.message : "Erro ao vincular" }));
+    }
+  }
+
+  async function handleUnlinkGuardian(studentId: string, guardianId: string) {
+    if (!confirm("Revogar vínculo com este responsável?")) return;
+    await apiJson(`/api/admin/students/${studentId}/guardians/${guardianId}`, { method: "DELETE" });
+    load();
+  }
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-xl font-bold">Alunos</h1>
+
+      <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <div>
+          <label className="mb-1 block text-xs font-medium">Nome do aluno</label>
+          <input
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium">Turma</label>
+          <select
+            required
+            value={classId}
+            onChange={(e) => setClassId(e.target.value)}
+            className="rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          >
+            <option value="">Selecione</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+          Cadastrar aluno
+        </button>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </form>
+
+      <ul className="space-y-3">
+        {students?.map((s) => {
+          const form = guardianForm(s.id);
+          return (
+            <li key={s.id} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">
+                  {s.name} <span className="text-xs text-slate-500">({s.class.name})</span>
+                </span>
+                <button onClick={() => handleDelete(s.id)} className="text-xs text-red-600 hover:underline">
+                  Remover
+                </button>
+              </div>
+
+              <ul className="mt-2 space-y-1 text-sm">
+                {s.guardians.map((g) => (
+                  <li key={g.guardian.id} className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                    <span>
+                      {g.guardian.name} ({g.guardian.email})
+                    </span>
+                    <button
+                      onClick={() => handleUnlinkGuardian(s.id, g.guardian.id)}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      Revogar vínculo
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              <form onSubmit={(e) => handleLinkGuardian(s.id, e)} className="mt-3 flex flex-wrap gap-2">
+                <input
+                  required
+                  placeholder="Nome do responsável"
+                  value={form.guardianName}
+                  onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, guardianName: e.target.value } }))}
+                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                />
+                <input
+                  required
+                  type="email"
+                  placeholder="E-mail do responsável"
+                  value={form.email}
+                  onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, email: e.target.value } }))}
+                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                />
+                <input
+                  placeholder="Parentesco (opcional)"
+                  value={form.relation}
+                  onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, relation: e.target.value } }))}
+                  className="w-36 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                />
+                <button type="submit" className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950">
+                  Vincular responsável
+                </button>
+              </form>
+              {feedback[s.id] && <p className="mt-1 text-xs text-slate-500">{feedback[s.id]}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export default function AlunosPage() {
+  return (
+    <AdminGuard>
+      <AlunosContent />
+    </AdminGuard>
+  );
+}
