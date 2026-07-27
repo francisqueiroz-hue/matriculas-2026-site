@@ -4,7 +4,7 @@ import imageCompression from "browser-image-compression";
 import { apiJson } from "@/lib/api-client";
 
 /** Comprime imagens no navegador antes do upload (economiza banda e armazenamento). Vídeos vão sem compressão. */
-export async function uploadMediaFile(file: File): Promise<{ url: string; mediaType: "image" | "video" }> {
+export async function uploadMediaFile(file: File): Promise<{ url: string; path: string; mediaType: "image" | "video" }> {
   let toUpload: File = file;
 
   if (file.type.startsWith("image/")) {
@@ -19,7 +19,7 @@ export async function uploadMediaFile(file: File): Promise<{ url: string; mediaT
   const formData = new FormData();
   formData.append("file", toUpload, file.name);
 
-  return apiJson<{ url: string; mediaType: "image" | "video" }>("/api/upload", {
+  return apiJson<{ url: string; path: string; mediaType: "image" | "video" }>("/api/upload", {
     method: "POST",
     body: formData,
   });

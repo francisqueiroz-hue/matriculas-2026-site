@@ -4,6 +4,17 @@ import { requireRole, requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { createPostSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
+import { getSignedMediaUrl } from "@/lib/firebase-storage";
+
+/** Troca o caminho interno do arquivo por uma URL assinada de leitura (temporária). */
+async function withSignedMedia<T extends { mediaUrl: string | null }>(post: T): Promise<T> {
+  if (!post.mediaUrl) return post;
+  try {
+    return { ...post, mediaUrl: await getSignedMediaUrl(post.mediaUrl) };
+  } catch {
+    return { ...post, mediaUrl: null };
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,8 +57,12 @@ export async function GET(request: NextRequest) {
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
     });
 
+    const postsWithMedia = await Promise.all(
+      posts.map((p) => withSignedMedia({ ...p, readByMe: p.reads.length > 0, reads: undefined })),
+    );
+
     return NextResponse.json({
-      posts: posts.map((p) => ({ ...p, readByMe: p.reads.length > 0, reads: undefined })),
+      posts: postsWithMedia,
       nextCursor: posts.length === 20 ? posts[posts.length - 1].id : null,
     });
   } catch (error) {
@@ -108,7 +123,7 @@ export async function POST(request: NextRequest) {
       { title: `Novo aviso: ${post.title}`, body: post.body.slice(0, 120), url: "/dashboard/mural" },
     ).catch((err) => console.error("push notify failed", err));
 
-    return NextResponse.json({ post }, { status: 201 });
+    return NextResponse.json({ post: await withSignedMedia(post) }, { status: 201 });
   } catch (error) {
     return handleApiError(error);
   }

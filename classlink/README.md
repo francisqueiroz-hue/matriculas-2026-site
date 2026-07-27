@@ -12,9 +12,11 @@ resposta) e **emissão automática de boletos via Banco Inter**.
 - **Banco de dados**: PostgreSQL via Prisma ORM (driver adapter `@prisma/adapter-pg`).
 - **Autenticação**: JWT de acesso (curta duração, cookie httpOnly) + refresh token opaco
   rotativo (cookie httpOnly, hash armazenado no banco), senhas com `bcryptjs`.
-- **Mídia**: upload de fotos/vídeos via Cloudinary, com compressão de imagem no navegador
-  antes do envio (`browser-image-compression`).
+- **Mídia**: upload de fotos/vídeos via Firebase Storage (bucket privado, leitura por URL
+  assinada de curta duração), com compressão de imagem no navegador antes do envio
+  (`browser-image-compression`).
 - **Notificações push**: Firebase Cloud Messaging (service worker + `firebase-admin`).
+  Push e Storage usam o mesmo projeto/conta de serviço do Firebase.
 - **Jobs agendados**: rotas de cron protegidas por segredo (`CRON_SECRET`), pensadas para
   o Vercel Cron (`vercel.json`) ou qualquer scheduler externo.
 - **Boletos**: API Inter Empresas (Cobrança), OAuth2 `client_credentials` com mTLS.
@@ -44,7 +46,7 @@ classlink/
 │   │   ├── sw.js/route.ts     # service worker servido dinamicamente
 │   │   └── layout.tsx
 │   ├── components/            # componentes de UI reutilizáveis
-│   ├── lib/                   # auth, prisma client, cloudinary, push, banco-inter...
+│   ├── lib/                   # auth, prisma client, firebase-storage, push, banco-inter...
 │   └── proxy.ts               # proteção de rotas (equivalente ao middleware no Next 16)
 ├── tests/                     # testes automatizados (Vitest)
 ├── public/icons/               # ícones do PWA
@@ -80,10 +82,10 @@ cp .env.example .env
 ```
 
 Preencha pelo menos `DATABASE_URL` e `JWT_ACCESS_SECRET` para rodar o essencial. As
-demais integrações (Cloudinary, Firebase, Banco Inter) são opcionais — sem elas o app
-funciona normalmente e cada funcionalidade correspondente falha de forma amigável
-(upload retorna erro claro, push é ignorado silenciosamente, emissão de boleto marca o
-boleto como `ERRO` com o motivo).
+demais integrações (Firebase, Banco Inter) são opcionais — sem elas o app funciona
+normalmente e cada funcionalidade correspondente falha de forma amigável (upload
+retorna erro claro, push é ignorado silenciosamente, emissão de boleto marca o boleto
+como `ERRO` com o motivo).
 
 Veja a descrição completa de cada variável em [`.env.example`](./.env.example).
 
@@ -115,6 +117,102 @@ Acesse [http://localhost:3000](http://localhost:3000).
 ```bash
 npm test
 ```
+
+## Ativando o Firebase (notificações push + upload de mídia)
+
+Um único projeto Firebase cobre as duas funcionalidades: **notificações push** (mural,
+mensagens, comunicados, boletos) e **upload de fotos/vídeos do mural** (Firebase
+Storage). Sem essas variáveis o app funciona normalmente — só essas duas
+funcionalidades ficam desativadas (erro amigável, nada quebra).
+
+Passo a passo completo, do zero:
+
+### Passo 1 — Criar a conta e o projeto
+
+1. Acesse [console.firebase.google.com](https://console.firebase.google.com) e faça
+   login com uma conta Google (crie uma em [accounts.google.com](https://accounts.google.com)
+   se ainda não tiver — é grátis, sem cartão de crédito).
+2. Clique em **Criar projeto** (ou **Adicionar projeto**).
+3. Dê um nome ao projeto (ex: "ClassLink Escola Modelo") e continue.
+4. Na etapa do Google Analytics, pode **desativar** — não é necessário para o app.
+5. Aguarde o projeto ser criado e clique em **Continuar**.
+
+### Passo 2 — Registrar o app Web e pegar a config pública
+
+1. Na tela inicial do projeto, clique no ícone **Web** (`</>`) para adicionar um app.
+2. Dê um apelido (ex: "ClassLink Web") e clique em **Registrar app**. Não é necessário
+   marcar "Configurar também o Firebase Hosting".
+3. O Firebase mostra um bloco de código com `firebaseConfig` — copie os valores para o
+   `.env`:
+   ```
+   NEXT_PUBLIC_FIREBASE_API_KEY=apiKey
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=authDomain
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=projectId
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=storageBucket
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=messagingSenderId
+   NEXT_PUBLIC_FIREBASE_APP_ID=appId
+   ```
+4. Clique em **Continuar no console** (pode pular os passos de instalar o SDK/rodar o
+   app — o ClassLink já vem pronto).
+
+### Passo 3 — Ativar o Cloud Messaging (push) e pegar a chave VAPID
+
+1. No menu lateral, vá em **Compilação → Cloud Messaging** (ou acesse
+   **Configurações do projeto** ⚙️ → aba **Cloud Messaging**).
+2. Role até **Certificados push da Web** e clique em **Gerar par de chaves**.
+3. Copie o valor gerado para `NEXT_PUBLIC_FIREBASE_VAPID_KEY` no `.env`.
+
+### Passo 4 — Ativar o Firebase Storage
+
+1. No menu lateral, vá em **Compilação → Storage**.
+2. Clique em **Começar** (Get started).
+3. Escolha o **modo de produção** (não o modo de teste — o app não usa o SDK do
+   cliente para acessar o Storage diretamente, então não precisa liberar acesso
+   público; tudo passa pelo backend com a conta de serviço).
+4. Escolha a localização do bucket (qualquer região próxima do Brasil, ex:
+   `southamerica-east1`) e confirme.
+5. Na aba **Rules**, substitua o conteúdo por uma regra que **nega todo acesso direto**
+   (o backend usa a conta de serviço, que ignora essas regras — elas só protegem
+   contra acesso indevido vindo do navegador):
+   ```
+   rules_version = '2';
+   service firebase.storage {
+     match /b/{bucket}/o {
+       match /{allPaths=**} {
+         allow read, write: if false;
+       }
+     }
+   }
+   ```
+   Clique em **Publicar**.
+
+### Passo 5 — Gerar a conta de serviço (credenciais do backend)
+
+1. Vá em **Configurações do projeto** ⚙️ → aba **Contas de serviço**.
+2. Clique em **Gerar nova chave privada** → confirme. Um arquivo `.json` será baixado.
+3. Abra o arquivo e copie os campos para o `.env`:
+   ```
+   FIREBASE_PROJECT_ID=project_id
+   FIREBASE_CLIENT_EMAIL=client_email
+   FIREBASE_PRIVATE_KEY=private_key
+   ```
+   A `private_key` do JSON já vem com `\n` escapado — copie o valor inteiro entre
+   aspas, sem editar as quebras de linha.
+4. **Guarde esse arquivo `.json` em local seguro e nunca o versione no Git** — ele dá
+   acesso total ao seu projeto Firebase.
+
+### Passo 6 — Testar
+
+1. Reinicie o servidor (`npm run dev`) para carregar as novas variáveis.
+2. Publique um aviso no mural com uma foto anexada — se o upload funcionar e a foto
+   aparecer no mural, o Storage está OK.
+3. Acesse o app pelo navegador como responsável e aceite a permissão de notificação —
+   se não der erro no console, o push está registrando o token corretamente.
+
+> O plano gratuito (**Spark**) do Firebase não exige cartão de crédito, não expira, e
+> cobre bastante margem para uma escola pequena/média (5 GB de armazenamento, milhares
+> de notificações/dia). Se a escola crescer muito, o Firebase avisa antes de qualquer
+> cobrança — o plano pago (Blaze) só é necessário acima desses limites.
 
 ## Autorizações e confirmações (Comunicados)
 
@@ -222,6 +320,10 @@ emissão mensal de boleto por aluno e atualização automática do status quando
   origem sempre atribuídos pelo servidor.
 - **Boletos**: o PDF do boleto não é armazenado no servidor — é buscado sob demanda na
   API do Inter a cada visualização.
+- **Fotos e vídeos do mural**: o bucket do Firebase Storage é privado (regras negam
+  qualquer acesso direto do navegador) — a leitura só acontece via URL assinada de
+  curta duração (7 dias), gerada pelo backend a cada carregamento do mural. Não existe
+  link público permanente para as fotos de alunos.
 
 ## Deploy (PWA)
 
@@ -237,9 +339,9 @@ emissão mensal de boleto por aluno e atualização automática do status quando
    deploy ou manualmente) e depois `npm run db:seed` se quiser dados de exemplo.
 4. Faça o deploy na [Vercel](https://vercel.com): conecte o repositório GitHub — a Vercel
    detecta o Next.js automaticamente e já lê o `vercel.json` para agendar os crons.
-5. Crie um projeto no [Firebase](https://console.firebase.google.com) para ativar as
-   notificações push e preencha as chaves `NEXT_PUBLIC_FIREBASE_*`, `FIREBASE_*` e
-   `NEXT_PUBLIC_FIREBASE_VAPID_KEY`.
+5. Siga o passo a passo de [Ativando o Firebase](#ativando-o-firebase-notificações-push--upload-de-mídia)
+   para habilitar push e upload de mídia, preenchendo `NEXT_PUBLIC_FIREBASE_*`,
+   `FIREBASE_*` e `NEXT_PUBLIC_FIREBASE_VAPID_KEY`.
 6. Configure o Banco Inter seguindo o passo a passo acima antes de ativar a emissão em
    produção.
 7. Como o app é um PWA, os responsáveis podem instalá-lo pelo navegador ("Adicionar à

@@ -40,7 +40,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
       let mediaType: "image" | "video" | undefined;
       if (file) {
         const uploaded = await uploadMediaFile(file);
-        mediaUrl = uploaded.url;
+        mediaUrl = uploaded.path;
         mediaType = uploaded.mediaType;
       }
 

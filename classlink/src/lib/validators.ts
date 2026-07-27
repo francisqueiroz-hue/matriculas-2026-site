@@ -43,7 +43,7 @@ export const createPostSchema = z.object({
   body: z.string().min(1).max(5000),
   audience: z.enum(["SCHOOL", "CLASS"]),
   classId: z.string().optional(),
-  mediaUrl: z.string().url().optional(),
+  mediaUrl: z.string().min(1).optional(), // caminho do objeto no Storage, não uma URL pública
   mediaType: z.enum(["image", "video"]).optional(),
 });
 

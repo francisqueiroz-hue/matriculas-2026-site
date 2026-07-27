@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertUploadSize } from "@/lib/cloudinary";
+import { assertUploadSize } from "@/lib/firebase-storage";
 
 describe("validação de tamanho de upload", () => {
   it("aceita imagem dentro do limite (8MB)", () => {
