@@ -65,7 +65,7 @@ export function isBancoInterConfigured() {
 function baseUrl() {
   return process.env.BANCO_INTER_AMBIENTE === "producao"
     ? "https://cdpj.partners.bancointer.com.br"
-    : "https://cdpj-sandbox.partners.bancointer.com.br";
+    : "https://cdpj-sandbox.partners.uatinter.co";
 }
 
 let agentCache: https.Agent | null = null;
