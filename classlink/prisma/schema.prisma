@@ -51,6 +51,12 @@ enum BoletoStatus {
   ERRO // falha na emissão junto ao Banco Inter
 }
 
+enum Trimestre {
+  PRIMEIRO
+  SEGUNDO
+  TERCEIRO
+}
+
 model School {
   id        String   @id @default(cuid())
   name      String
@@ -68,6 +74,7 @@ model School {
   events      Event[]
   comunicados Comunicado[]
   boletos     Boleto[]
+  disciplinas Disciplina[]
 }
 
 model User {
@@ -80,6 +87,9 @@ model User {
   avatarUrl    String?
   active       Boolean   @default(true)
   deletedAt    DateTime? // exclusão lógica (LGPD) antes de expurgo definitivo
+
+  // Permissão extra para STAFF: coordenação pedagógica pode lançar notas (além da direção/ADMIN).
+  isCoordenacao Boolean @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -110,6 +120,7 @@ model User {
 
   comunicadosCriados  Comunicado[]         @relation("ComunicadoAuthor")
   respostasComunicado RespostaComunicado[] @relation("RespostaResponsavel")
+  notasLancadas       Nota[]               @relation("NotaLancadaPor")
 
   @@index([schoolId])
 }
@@ -188,6 +199,7 @@ model Student {
   attendances         Attendance[]
   respostasComunicado RespostaComunicado[]
   boletos             Boleto[]
+  notas               Nota[]
 
   @@index([schoolId])
   @@index([classId])
@@ -383,6 +395,50 @@ model Boleto {
   @@unique([studentId, mesReferencia])
   @@index([schoolId])
   @@index([status])
+}
+
+// Disciplina lecionada na escola (ex.: "Matemática", "Português"). Escopo por escola,
+// não por turma — todas as turmas compartilham o mesmo catálogo de disciplinas.
+model Disciplina {
+  id        String   @id @default(cuid())
+  nome      String
+  createdAt DateTime @default(now())
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  notas Nota[]
+
+  @@unique([schoolId, nome])
+  @@index([schoolId])
+}
+
+// Notas de um aluno em uma disciplina, por trimestre. Lançadas apenas por ADMIN
+// (direção) ou STAFF marcado como coordenação (User.isCoordenacao) — nunca pelo
+// próprio professor da turma nem pelo responsável.
+// Média do trimestre = (trabalho*3 + teste*7 + prova*10) / 20 (pesos definidos pela escola).
+// Média final = média das 3 médias trimestrais. Aprovado quando média final >= 6.
+model Nota {
+  id           String     @id @default(cuid())
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId    String
+  disciplina   Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  disciplinaId String
+  trimestre    Trimestre
+
+  trabalho Decimal? @db.Decimal(4, 2)
+  teste    Decimal? @db.Decimal(4, 2)
+  prova    Decimal? @db.Decimal(4, 2)
+
+  lancadoPor   User   @relation("NotaLancadaPor", fields: [lancadoPorId], references: [id], onDelete: Cascade)
+  lancadoPorId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, disciplinaId, trimestre])
+  @@index([studentId])
+  @@index([disciplinaId])
 }
 
 model Attendance {

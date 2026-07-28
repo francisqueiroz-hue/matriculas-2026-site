@@ -15,6 +15,7 @@ interface UserItem {
   email: string;
   role: "ADMIN" | "STAFF" | "GUARDIAN";
   active: boolean;
+  isCoordenacao: boolean;
   classesTeaching: { class: { id: string; name: string } }[];
 }
 
@@ -30,6 +31,7 @@ function UsuariosContent() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editCoordenacao, setEditCoordenacao] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
   function load() {
@@ -68,16 +70,21 @@ function UsuariosContent() {
     setEditingId(u.id);
     setEditName(u.name);
     setEditPhone("");
+    setEditCoordenacao(u.isCoordenacao);
     setEditError(null);
   }
 
-  async function handleSaveEdit(id: string, e: React.FormEvent) {
+  async function handleSaveEdit(id: string, role: UserItem["role"], e: React.FormEvent) {
     e.preventDefault();
     setEditError(null);
     try {
       await apiJson(`/api/admin/users/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: editName, ...(editPhone ? { phone: editPhone } : {}) }),
+        body: JSON.stringify({
+          name: editName,
+          ...(editPhone ? { phone: editPhone } : {}),
+          ...(role === "STAFF" ? { isCoordenacao: editCoordenacao } : {}),
+        }),
       });
       setEditingId(null);
       load();
@@ -131,7 +138,7 @@ function UsuariosContent() {
         {users?.map((u) =>
           editingId === u.id ? (
             <li key={u.id} className="rounded-xl border border-indigo-300 bg-white p-3 dark:border-indigo-700 dark:bg-slate-900">
-              <form onSubmit={(e) => handleSaveEdit(u.id, e)} className="flex flex-wrap items-end gap-2">
+              <form onSubmit={(e) => handleSaveEdit(u.id, u.role, e)} className="flex flex-wrap items-end gap-2">
                 <label className="text-xs text-slate-500">
                   Nome
                   <input
@@ -149,6 +156,12 @@ function UsuariosContent() {
                     className="mt-1 block rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
                   />
                 </label>
+                {u.role === "STAFF" && (
+                  <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <input type="checkbox" checked={editCoordenacao} onChange={(e) => setEditCoordenacao(e.target.checked)} />
+                    Coordenação (pode lançar notas)
+                  </label>
+                )}
                 <button type="submit" className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">
                   Salvar
                 </button>
@@ -164,6 +177,11 @@ function UsuariosContent() {
               <div>
                 <p className="font-medium">
                   {u.name} <span className="text-xs text-slate-500">({u.role === "ADMIN" ? "admin" : "professor(a)"})</span>{" "}
+                  {u.isCoordenacao && (
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      Coordenação
+                    </span>
+                  )}{" "}
                   {!u.active && <span className="text-xs text-red-500">inativo</span>}
                 </p>
                 <p className="text-xs text-slate-500">

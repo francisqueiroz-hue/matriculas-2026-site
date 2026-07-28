@@ -7,4 +7,5 @@ export interface SessionUser {
   role: Role;
   schoolId: string;
   schoolName: string;
+  isCoordenacao: boolean;
 }

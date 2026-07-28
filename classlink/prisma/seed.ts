@@ -140,6 +140,26 @@ async function main() {
     },
   });
 
+  const NOMES_DISCIPLINAS = [
+    "L. Portuguesa",
+    "Matemática",
+    "Ciências",
+    "Geografia",
+    "História",
+    "Inglês",
+    "Ed. Física",
+    "Ed. Ambiental",
+    "Artes",
+    "Orient. Educ",
+  ];
+  for (const nome of NOMES_DISCIPLINAS) {
+    await prisma.disciplina.upsert({
+      where: { schoolId_nome: { schoolId: school.id, nome } },
+      update: {},
+      create: { nome, schoolId: school.id },
+    });
+  }
+
   // Configuração de mensalidade (Módulo Financeiro) — o boleto em si só é emitido
   // quando as credenciais do Banco Inter estiverem configuradas em produção.
   await prisma.student.update({ where: { id: aluno.id }, data: { mensalidadeValor: 450 } });

@@ -12,7 +12,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const user = await prisma.user.findUnique({
     where: { id: session.sub },
-    select: { id: true, name: true, email: true, role: true, schoolId: true, school: { select: { name: true } } },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      schoolId: true,
+      isCoordenacao: true,
+      school: { select: { name: true } },
+    },
   });
   if (!user) redirect("/login");
 
@@ -25,6 +33,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         role: user.role,
         schoolId: user.schoolId,
         schoolName: user.school.name,
+        isCoordenacao: user.isCoordenacao,
       }}
     >
       <Navbar />

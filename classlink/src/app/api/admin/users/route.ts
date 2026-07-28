@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         role: true,
         phone: true,
         active: true,
+        isCoordenacao: true,
         classesTeaching: { select: { class: { select: { id: true, name: true } } } },
       },
       orderBy: { name: "asc" },

@@ -26,6 +26,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
           ...(body.name ? { name: body.name } : {}),
           ...(body.phone !== undefined ? { phone: body.phone } : {}),
           ...(body.active !== undefined ? { active: body.active } : {}),
+          ...(body.isCoordenacao !== undefined && existing.role === "STAFF" ? { isCoordenacao: body.isCoordenacao } : {}),
         },
       });
     });
