@@ -10,28 +10,42 @@ export async function GET() {
   try {
     const session = await requireSession();
 
-    let visibleClassIds: string[] | null = null;
+    let visibilidadeOR: Array<Record<string, unknown>> | undefined;
     if (session.role === "GUARDIAN") {
       const links = await prisma.guardianStudent.findMany({
         where: { guardianId: session.sub, student: { deletedAt: null } },
-        select: { student: { select: { classId: true } } },
+        select: { studentId: true, student: { select: { classId: true } } },
       });
-      visibleClassIds = [...new Set(links.map((l) => l.student.classId))];
+      const classIds = [...new Set(links.map((l) => l.student.classId))];
+      const studentIds = links.map((l) => l.studentId);
+      // Comunicados individuais (audience STUDENT) só aparecem para o responsável do próprio aluno-alvo,
+      // nunca para os outros responsáveis da mesma turma.
+      visibilidadeOR = [
+        { audience: "SCHOOL" },
+        { audience: "CLASS", classId: { in: classIds } },
+        { audience: "STUDENT", alunoId: { in: studentIds } },
+      ];
     } else if (session.role === "STAFF") {
       const teaching = await prisma.classTeacher.findMany({
         where: { teacherId: session.sub },
         select: { classId: true },
       });
-      visibleClassIds = [...new Set(teaching.map((t) => t.classId))];
+      const classIds = [...new Set(teaching.map((t) => t.classId))];
+      visibilidadeOR = [
+        { audience: "SCHOOL" },
+        { audience: "CLASS", classId: { in: classIds } },
+        { audience: "STUDENT", classId: { in: classIds } },
+      ];
     }
 
     const comunicados = await prisma.comunicado.findMany({
       where: {
         schoolId: session.schoolId,
-        OR: visibleClassIds === null ? undefined : [{ audience: "SCHOOL" }, { audience: "CLASS", classId: { in: visibleClassIds } }],
+        OR: visibilidadeOR,
       },
       include: {
         class: { select: { id: true, name: true } },
+        aluno: { select: { id: true, name: true } },
         criadoPor: { select: { id: true, name: true } },
         respostas:
           session.role === "GUARDIAN"
@@ -69,6 +83,8 @@ export async function POST(request: NextRequest) {
     }
 
     let classId: string | null = null;
+    let alunoId: string | null = null;
+
     if (body.audience === "CLASS") {
       if (!body.classId) return NextResponse.json({ error: "classId obrigatório" }, { status: 400 });
       const cls = await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId } });
@@ -82,6 +98,23 @@ export async function POST(request: NextRequest) {
       classId = body.classId;
     }
 
+    if (body.audience === "STUDENT") {
+      if (!body.alunoId) return NextResponse.json({ error: "alunoId obrigatório" }, { status: 400 });
+      const aluno = await prisma.student.findFirst({
+        where: { id: body.alunoId, schoolId: session.schoolId, deletedAt: null },
+        select: { id: true, classId: true },
+      });
+      if (!aluno) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
+      if (session.role === "STAFF") {
+        const teaches = await prisma.classTeacher.findFirst({
+          where: { classId: aluno.classId, teacherId: session.sub },
+        });
+        if (!teaches) return NextResponse.json({ error: "Você não leciona na turma deste aluno" }, { status: 403 });
+      }
+      alunoId = aluno.id;
+      classId = aluno.classId; // mantém a mesma filtragem de visibilidade por turma usada nos demais casos
+    }
+
     const comunicado = await prisma.comunicado.create({
       data: {
         tipo: body.tipo,
@@ -89,11 +122,12 @@ export async function POST(request: NextRequest) {
         descricao: body.descricao,
         audience: body.audience,
         classId,
+        alunoId,
         prazoResposta: body.prazoResposta ? new Date(body.prazoResposta) : null,
         schoolId: session.schoolId,
         criadoPorId: session.sub,
       },
-      include: { class: { select: { id: true, name: true } } },
+      include: { class: { select: { id: true, name: true } }, aluno: { select: { id: true, name: true } } },
     });
 
     const publicoAlvo = await getPublicoAlvo(comunicado.id);

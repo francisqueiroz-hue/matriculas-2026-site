@@ -10,8 +10,9 @@ interface Comunicado {
   tipo: "AUTORIZACAO_PASSEIO" | "CONFIRMACAO_REUNIAO" | "CIRCULAR";
   titulo: string;
   descricao: string;
-  audience: "SCHOOL" | "CLASS";
+  audience: "SCHOOL" | "CLASS" | "STUDENT";
   class: { id: string; name: string } | null;
+  aluno: { id: string; name: string } | null;
   criadoPor: { id: string; name: string };
   dataCriacao: string;
   prazoResposta: string | null;
@@ -106,7 +107,13 @@ export default function ComunicadoDetailPage() {
       <div>
         <h1 className="text-xl font-bold">{comunicado.titulo}</h1>
         <p className="text-xs text-slate-500">
-          {comunicado.criadoPor.name} · {comunicado.audience === "SCHOOL" ? "Toda a escola" : comunicado.class?.name} ·{" "}
+          {comunicado.criadoPor.name} ·{" "}
+          {comunicado.audience === "SCHOOL"
+            ? "Toda a escola"
+            : comunicado.audience === "STUDENT"
+              ? `Individual — ${comunicado.aluno?.name}`
+              : comunicado.class?.name}{" "}
+          ·{" "}
           {new Date(comunicado.dataCriacao).toLocaleString("pt-BR")}
           {comunicado.prazoResposta && <> · prazo: {new Date(comunicado.prazoResposta).toLocaleString("pt-BR")}</>}
         </p>

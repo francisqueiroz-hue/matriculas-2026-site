@@ -13,6 +13,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunic
       where: { id, schoolId: session.schoolId },
       include: {
         class: { select: { id: true, name: true } },
+        aluno: { select: { id: true, name: true } },
         criadoPor: { select: { id: true, name: true } },
       },
     });
@@ -26,6 +27,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunic
             student: {
               deletedAt: null,
               ...(comunicado.audience === "CLASS" ? { classId: comunicado.classId ?? undefined } : {}),
+              ...(comunicado.audience === "STUDENT" ? { id: comunicado.alunoId ?? undefined } : {}),
             },
           },
           select: { student: { select: { id: true, name: true } } },

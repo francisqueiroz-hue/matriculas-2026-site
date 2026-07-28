@@ -45,6 +45,9 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/comunic
     if (comunicado.audience === "CLASS" && vinculo.student.classId !== comunicado.classId) {
       return NextResponse.json({ error: "Este comunicado não é destinado à turma deste aluno" }, { status: 403 });
     }
+    if (comunicado.audience === "STUDENT" && comunicado.alunoId !== body.alunoId) {
+      return NextResponse.json({ error: "Este comunicado não é destinado a este aluno" }, { status: 403 });
+    }
 
     const dataHoraResposta = new Date();
     const ipOrigem = getClientIp(request);

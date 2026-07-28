@@ -8,6 +8,10 @@ interface ClassOption {
   id: string;
   name: string;
 }
+interface StudentOption {
+  id: string;
+  name: string;
+}
 
 const TIPOS = [
   { value: "AUTORIZACAO_PASSEIO", label: "Autorização de passeio" },
@@ -18,11 +22,13 @@ const TIPOS = [
 export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
   const user = useCurrentUser();
   const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [students, setStudents] = useState<StudentOption[]>([]);
   const [tipo, setTipo] = useState("CIRCULAR");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [audience, setAudience] = useState<"SCHOOL" | "CLASS">(user.role === "STAFF" ? "CLASS" : "SCHOOL");
+  const [audience, setAudience] = useState<"SCHOOL" | "CLASS" | "STUDENT">(user.role === "STAFF" ? "CLASS" : "SCHOOL");
   const [classId, setClassId] = useState("");
+  const [alunoId, setAlunoId] = useState("");
   const [prazoResposta, setPrazoResposta] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +42,13 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
       .catch(() => {});
   }, [user.role]);
 
+  useEffect(() => {
+    if (audience !== "STUDENT" || !classId) return;
+    apiJson<{ students: StudentOption[] }>(`/api/admin/students?classId=${classId}`)
+      .then((data) => setStudents(data.students))
+      .catch(() => {});
+  }, [audience, classId]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -48,7 +61,8 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
           titulo,
           descricao,
           audience,
-          classId: audience === "CLASS" ? classId : undefined,
+          classId: audience === "CLASS" || audience === "STUDENT" ? classId : undefined,
+          alunoId: audience === "STUDENT" ? alunoId : undefined,
           prazoResposta: prazoResposta ? new Date(prazoResposta).toISOString() : undefined,
         }),
       });
@@ -99,28 +113,52 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
       />
 
       <div className="flex flex-wrap items-center gap-3">
-        {user.role === "ADMIN" && (
-          <select
-            value={audience}
-            onChange={(e) => setAudience(e.target.value as "SCHOOL" | "CLASS")}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
-          >
-            <option value="SCHOOL">Toda a escola</option>
-            <option value="CLASS">Turma específica</option>
-          </select>
-        )}
+        <select
+          value={audience}
+          onChange={(e) => {
+            const value = e.target.value as "SCHOOL" | "CLASS" | "STUDENT";
+            setAudience(value);
+            setAlunoId("");
+            if (value === "SCHOOL") setClassId("");
+          }}
+          className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          {user.role === "ADMIN" && <option value="SCHOOL">Toda a escola</option>}
+          <option value="CLASS">Turma específica</option>
+          <option value="STUDENT">Aluno individual (aos responsáveis)</option>
+        </select>
 
-        {audience === "CLASS" && (
+        {(audience === "CLASS" || audience === "STUDENT") && (
           <select
             required
             value={classId}
-            onChange={(e) => setClassId(e.target.value)}
+            onChange={(e) => {
+              setClassId(e.target.value);
+              setAlunoId("");
+            }}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
           >
             <option value="">Selecione a turma</option>
             {classes.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {audience === "STUDENT" && (
+          <select
+            required
+            value={alunoId}
+            onChange={(e) => setAlunoId(e.target.value)}
+            disabled={!classId}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800"
+          >
+            <option value="">Selecione o aluno</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
               </option>
             ))}
           </select>

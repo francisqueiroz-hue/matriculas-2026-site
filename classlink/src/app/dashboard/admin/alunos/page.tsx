@@ -13,7 +13,7 @@ interface StudentItem {
   id: string;
   name: string;
   class: { id: string; name: string };
-  guardians: { guardian: { id: string; name: string; email: string } }[];
+  guardians: { guardian: { id: string; name: string; email: string; phone: string | null } }[];
   mensalidadeValor: string | null;
   diaVencimento: number | null;
 }
@@ -24,9 +24,15 @@ function AlunosContent() {
   const [name, setName] = useState("");
   const [classId, setClassId] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [guardianForms, setGuardianForms] = useState<Record<string, { email: string; guardianName: string; relation: string }>>({});
+  const [guardianForms, setGuardianForms] = useState<
+    Record<string, { email: string; guardianName: string; phone: string; relation: string }>
+  >({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [billingForms, setBillingForms] = useState<Record<string, { mensalidadeValor: string; diaVencimento: string }>>({});
+  const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
+  const [editGuardianName, setEditGuardianName] = useState("");
+  const [editGuardianPhone, setEditGuardianPhone] = useState("");
+  const [editGuardianError, setEditGuardianError] = useState<string | null>(null);
 
   function load() {
     apiJson<{ students: StudentItem[] }>("/api/admin/students").then((data) => setStudents(data.students));
@@ -53,7 +59,7 @@ function AlunosContent() {
   }
 
   function guardianForm(studentId: string) {
-    return guardianForms[studentId] ?? { email: "", guardianName: "", relation: "" };
+    return guardianForms[studentId] ?? { email: "", guardianName: "", phone: "", relation: "" };
   }
 
   async function handleLinkGuardian(studentId: string, e: React.FormEvent) {
@@ -62,7 +68,12 @@ function AlunosContent() {
     try {
       const data = await apiJson<{ temporaryPassword?: string }>(`/api/admin/students/${studentId}/guardians`, {
         method: "POST",
-        body: JSON.stringify({ guardianEmail: form.email, guardianName: form.guardianName, relation: form.relation }),
+        body: JSON.stringify({
+          guardianEmail: form.email,
+          guardianName: form.guardianName,
+          guardianPhone: form.phone || undefined,
+          relation: form.relation,
+        }),
       });
       setFeedback((prev) => ({
         ...prev,
@@ -70,7 +81,7 @@ function AlunosContent() {
           ? `Responsável criado. Senha temporária: ${data.temporaryPassword}`
           : "Responsável vinculado.",
       }));
-      setGuardianForms((prev) => ({ ...prev, [studentId]: { email: "", guardianName: "", relation: "" } }));
+      setGuardianForms((prev) => ({ ...prev, [studentId]: { email: "", guardianName: "", phone: "", relation: "" } }));
       load();
     } catch (err) {
       setFeedback((prev) => ({ ...prev, [studentId]: err instanceof Error ? err.message : "Erro ao vincular" }));
@@ -81,6 +92,29 @@ function AlunosContent() {
     if (!confirm("Revogar vínculo com este responsável?")) return;
     await apiJson(`/api/admin/students/${studentId}/guardians/${guardianId}`, { method: "DELETE" });
     load();
+  }
+
+  function startEditGuardian(guardian: { id: string; name: string; phone: string | null }) {
+    setEditingGuardianId(guardian.id);
+    setEditGuardianName(guardian.name);
+    setEditGuardianPhone(guardian.phone ?? "");
+    setEditGuardianError(null);
+  }
+
+  async function handleSaveGuardian(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingGuardianId) return;
+    setEditGuardianError(null);
+    try {
+      await apiJson(`/api/admin/users/${editingGuardianId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: editGuardianName, phone: editGuardianPhone }),
+      });
+      setEditingGuardianId(null);
+      load();
+    } catch (err) {
+      setEditGuardianError(err instanceof Error ? err.message : "Erro ao salvar");
+    }
   }
 
   function billingForm(student: StudentItem) {
@@ -161,19 +195,57 @@ function AlunosContent() {
               </div>
 
               <ul className="mt-2 space-y-1 text-sm">
-                {s.guardians.map((g) => (
-                  <li key={g.guardian.id} className="flex items-center justify-between text-slate-600 dark:text-slate-300">
-                    <span>
-                      {g.guardian.name} ({g.guardian.email})
-                    </span>
-                    <button
-                      onClick={() => handleUnlinkGuardian(s.id, g.guardian.id)}
-                      className="text-xs text-red-600 hover:underline"
-                    >
-                      Revogar vínculo
-                    </button>
-                  </li>
-                ))}
+                {s.guardians.map((g) =>
+                  editingGuardianId === g.guardian.id ? (
+                    <li key={g.guardian.id} className="rounded-md border border-indigo-200 p-2 dark:border-indigo-800">
+                      <form onSubmit={handleSaveGuardian} className="flex flex-wrap items-end gap-2">
+                        <label className="text-xs text-slate-500">
+                          Nome
+                          <input
+                            required
+                            value={editGuardianName}
+                            onChange={(e) => setEditGuardianName(e.target.value)}
+                            className="mt-1 block rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+                          />
+                        </label>
+                        <label className="text-xs text-slate-500">
+                          Telefone
+                          <input
+                            value={editGuardianPhone}
+                            onChange={(e) => setEditGuardianPhone(e.target.value)}
+                            placeholder="(00) 00000-0000"
+                            className="mt-1 block rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+                          />
+                        </label>
+                        <button type="submit" className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700">
+                          Salvar
+                        </button>
+                        <button type="button" onClick={() => setEditingGuardianId(null)} className="text-xs text-slate-500 hover:underline">
+                          Cancelar
+                        </button>
+                      </form>
+                      {editGuardianError && <p className="mt-1 text-xs text-red-600">{editGuardianError}</p>}
+                    </li>
+                  ) : (
+                    <li key={g.guardian.id} className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                      <span>
+                        {g.guardian.name} ({g.guardian.email}
+                        {g.guardian.phone ? ` · ${g.guardian.phone}` : ""})
+                      </span>
+                      <span className="flex items-center gap-3">
+                        <button onClick={() => startEditGuardian(g.guardian)} className="text-xs text-indigo-600 hover:underline">
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleUnlinkGuardian(s.id, g.guardian.id)}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Revogar vínculo
+                        </button>
+                      </span>
+                    </li>
+                  ),
+                )}
               </ul>
 
               <form onSubmit={(e) => handleLinkGuardian(s.id, e)} className="mt-3 flex flex-wrap gap-2">
@@ -191,6 +263,12 @@ function AlunosContent() {
                   value={form.email}
                   onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, email: e.target.value } }))}
                   className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                />
+                <input
+                  placeholder="Telefone (opcional)"
+                  value={form.phone}
+                  onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, phone: e.target.value } }))}
+                  className="w-40 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
                 />
                 <input
                   placeholder="Parentesco (opcional)"
