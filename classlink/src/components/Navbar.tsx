@@ -4,35 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiFetch } from "@/lib/api-client";
-
-const baseLinks = [
-  { href: "/dashboard/mural", label: "Mural" },
-  { href: "/dashboard/comunicados", label: "Comunicados" },
-  { href: "/dashboard/mensagens", label: "Mensagens" },
-  { href: "/dashboard/agenda", label: "Agenda" },
-];
-
-const guardianLinks = [{ href: "/dashboard/financeiro", label: "Financeiro" }];
-
-const adminLinks = [
-  { href: "/dashboard/admin", label: "Painel" },
-  { href: "/dashboard/admin/turmas", label: "Turmas" },
-  { href: "/dashboard/admin/alunos", label: "Alunos" },
-  { href: "/dashboard/admin/usuarios", label: "Usuários" },
-  { href: "/dashboard/admin/financeiro", label: "Financeiro" },
-];
+import { getNavLinks } from "@/lib/nav-links";
 
 export function Navbar() {
   const user = useCurrentUser();
   const pathname = usePathname();
   const router = useRouter();
 
-  const links =
-    user.role === "ADMIN"
-      ? [...baseLinks, ...adminLinks]
-      : user.role === "GUARDIAN"
-        ? [...baseLinks, ...guardianLinks]
-        : baseLinks;
+  const links = getNavLinks(user);
 
   async function handleLogout() {
     await apiFetch("/api/auth/logout", { method: "POST" });

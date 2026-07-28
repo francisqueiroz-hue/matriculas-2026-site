@@ -36,6 +36,7 @@ export const updateUserSchema = z.object({
   phone: z.string().max(30).optional(),
   active: z.boolean().optional(),
   classIds: z.array(z.string()).optional(),
+  isCoordenacao: z.boolean().optional(),
 });
 
 export const createPostSchema = z.object({
@@ -97,4 +98,17 @@ export const setBillingInfoSchema = z.object({
 export const setBillingConfigSchema = z.object({
   diaVencimentoPadrao: z.number().int().min(1).max(28).optional(),
   diaEmissaoBoletos: z.number().int().min(1).max(28).optional(),
+});
+
+export const createDisciplinaSchema = z.object({
+  nome: z.string().min(1).max(100),
+});
+
+const notaValor = z.number().min(0).max(10).nullable();
+
+export const setNotaSchema = z.object({
+  trimestre: z.enum(["PRIMEIRO", "SEGUNDO", "TERCEIRO"]),
+  trabalho: notaValor.optional(),
+  teste: notaValor.optional(),
+  prova: notaValor.optional(),
 });
