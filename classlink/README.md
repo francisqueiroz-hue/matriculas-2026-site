@@ -1,8 +1,8 @@
 # ClassLink — Comunicação Escola-Família
 
 Aplicativo web (PWA) para comunicação entre escola e responsáveis, inspirado no ClassApp.
-Inclui: mural de avisos, mensagens diretas (com envio opcional por **WhatsApp/e-mail**
-via Chatwoot), agenda escolar, painel administrativo com métricas de engajamento,
+Inclui: mural de avisos, mensagens diretas (com envio opcional por **WhatsApp/e-mail**),
+agenda escolar, painel administrativo com métricas de engajamento,
 **autorizações e confirmações digitais** (comunicados com resposta), lançamento de
 **notas por trimestre** e **emissão automática de boletos via Banco Inter**.
 
@@ -21,9 +21,8 @@ via Chatwoot), agenda escolar, painel administrativo com métricas de engajament
 - **Jobs agendados**: rotas de cron protegidas por segredo (`CRON_SECRET`), pensadas para
   o Vercel Cron (`vercel.json`) ou qualquer scheduler externo.
 - **Boletos**: API Inter Empresas (Cobrança), OAuth2 `client_credentials` com mTLS.
-- **Mensagens por WhatsApp/e-mail**: [Chatwoot](https://www.chatwoot.com) (API), com
-  sincronização por polling na tela de conversa — funciona no plano gratuito, sem
-  depender do webhook (recurso pago no Chatwoot Cloud).
+- **Mensagens por WhatsApp/e-mail**: WhatsApp Cloud API (Meta, oficial) + Mailgun
+  (envio e recebimento de e-mail), cada canal recebendo respostas via webhook próprio.
 - **PWA**: `manifest.json` + service worker próprio (cache de app-shell), instalável via
   "Adicionar à tela inicial".
 - **Testes**: Vitest (autenticação, upload, comunicados, cálculo de vencimento, payload
@@ -304,79 +303,86 @@ emissão mensal de boleto por aluno e atualização automática do status quando
   `POST` diário para essas rotas, enviando o header
   `Authorization: Bearer SEU_CRON_SECRET`.
 
-## Mensagens por WhatsApp e e-mail (Chatwoot)
+## Mensagens por WhatsApp e e-mail
 
 A tela **Mensagens** conversa nativamente dentro do app, mas a equipe também pode enviar
 uma mensagem por **WhatsApp** ou **e-mail** direto de uma conversa — e a resposta do
 responsável (por qualquer um dos dois canais) volta automaticamente para a mesma
-conversa no ClassLink, com atualização quase em tempo real (a tela busca mensagens
-novas a cada poucos segundos).
+conversa no ClassLink. Cada canal fala com seu próprio provedor:
 
-Quem cuida de falar de fato com o WhatsApp/e-mail é o **[Chatwoot](https://www.chatwoot.com)**
-— uma plataforma de atendimento open source. O ClassLink só conversa com a API do
-Chatwoot; a conexão com o WhatsApp Business e a caixa de e-mail em si é configurada
-dentro do próprio Chatwoot.
+- **WhatsApp**: WhatsApp Cloud API, direto da Meta (sem intermediário).
+- **E-mail**: Mailgun, que envia e também roteia as respostas de volta.
 
 ### Como funciona
 
 1. Ao escolher "Enviar por: WhatsApp" ou "Enviar por: E-mail" numa conversa, o ClassLink
-   cria (ou reaproveita) um contato e uma conversa no Chatwoot para aquele responsável e
-   envia a mensagem por lá.
-2. Quando o responsável responde — pelo WhatsApp ou respondendo o e-mail — o ClassLink
-   busca as mensagens novas dessa conversa direto na API do Chatwoot toda vez que a tela
-   de conversa é aberta/atualizada (a cada poucos segundos, enquanto estiver aberta) e
-   grava as que ainda não existem. **Webhooks são um recurso pago no Chatwoot Cloud**
-   (a partir do plano Startups), então o ClassLink usa esse polling como caminho padrão
-   — funciona no plano gratuito. Se sua conta tiver webhooks disponíveis, `/api/webhooks/
-   chatwoot` também existe e entrega a mesma coisa de forma mais instantânea (os dois
-   convivem sem conflito: cada mensagem só é gravada uma vez, seja por qual caminho
-   chegar primeiro).
+   chama a API do respectivo provedor.
+2. Quando o responsável responde — pelo WhatsApp ou respondendo o e-mail — o provedor
+   chama um webhook do ClassLink (`/api/webhooks/whatsapp` ou `/api/webhooks/email`),
+   que grava a resposta na conversa e notifica a equipe. A tela de conversa aberta
+   também atualiza sozinha a cada poucos segundos, então a resposta aparece quase na
+   hora sem precisar recarregar a página.
 3. Cada mensagem mostra de qual canal veio ("via WhatsApp", "via E-mail" ou nenhuma
    marcação quando foi só pelo app).
 
-### Configurando o Chatwoot
+### Configurando o WhatsApp (Meta Cloud API)
 
-1. Crie uma conta em [chatwoot.com](https://www.chatwoot.com) (nuvem, tem plano
-   gratuito) ou suba a versão self-hosted. Anote a **URL da instância** e o **id da
-   conta** (aparece na URL do painel, ex: `.../app/accounts/1/...` → id `1`).
-2. Em **Perfil (canto inferior esquerdo) → Configurações de acesso**, gere um **token de
-   acesso** do agente que vai enviar as mensagens.
-3. Crie um **inbox de WhatsApp**: Configurações → Inboxes → Adicionar inbox → WhatsApp.
-   O Chatwoot pede as mesmas credenciais da **WhatsApp Cloud API da Meta** (Meta
-   Business Manager → WhatsApp → Introdução): número de telefone comercial verificado,
-   `Phone Number ID` e token permanente. Essa verificação da Meta é o passo que mais
-   demora — pode levar dias e costuma pedir documentos reais da escola.
-4. Crie um **inbox de E-mail**: Configurações → Inboxes → Adicionar inbox → E-mail. O
-   Chatwoot gera um endereço próprio (ex: `suporte@suaempresa.chatwoot.com`) ou você
-   pode configurar um domínio próprio com encaminhamento — qualquer uma das duas
-   opções funciona, o ClassLink só precisa do **id do inbox**.
-5. Pegue o **id de cada inbox**: abra o inbox em Configurações → Inboxes → (o inbox) →
-   Configurações, o id aparece na URL da página.
+1. Acesse [business.facebook.com](https://business.facebook.com) e crie/entre numa
+   **Conta Comercial Meta**.
+2. Em [developers.facebook.com](https://developers.facebook.com), crie um **App** do
+   tipo "Business" e adicione o produto **WhatsApp**.
+3. Em WhatsApp → Introdução, você recebe um **número de teste** gratuito (dá pra
+   começar testando com ele) e o **Token de acesso temporário**. Para produção de
+   verdade, registre o **número de telefone comercial da escola** (WhatsApp → Números
+   de telefone) — esse é o passo que exige verificação da empresa pela Meta e pode
+   levar alguns dias, às vezes pedindo documentos reais da escola (CNPJ, etc.).
+4. Gere um **token permanente**: crie um Utilizador de Sistema em Configurações da
+   Empresa → Utilizadores → Utilizadores do sistema, atribua o app do WhatsApp a ele, e
+   gere um token sem prazo de expiração (o token temporário do passo 3 expira em 24h).
+5. Anote o **Phone Number ID** (WhatsApp → Configuração da API).
 6. Preencha no `.env`:
    ```
-   CHATWOOT_BASE_URL="https://app.chatwoot.com"
-   CHATWOOT_ACCOUNT_ID="1"
-   CHATWOOT_API_ACCESS_TOKEN="..."
-   CHATWOOT_INBOX_ID_WHATSAPP="..."
-   CHATWOOT_INBOX_ID_EMAIL="..."
-   CHATWOOT_WEBHOOK_SECRET="gere-uma-string-aleatoria"
+   WHATSAPP_API_TOKEN="..."
+   WHATSAPP_PHONE_NUMBER_ID="..."
+   WHATSAPP_VERIFY_TOKEN="escolha-uma-string-qualquer"
+   WHATSAPP_APP_SECRET="..."   # Configurações do App → Básico → Chave Secreta do Aplicativo
    ```
-7. **Opcional** (só funciona em planos pagos do Chatwoot Cloud — pule se estiver no
-   plano gratuito, o polling do passo 2 já cobre isso): cadastre o webhook em
-   Configurações → Integrações → Webhooks → Adicionar webhook, URL
-   `https://SEU_DOMINIO/api/webhooks/chatwoot?secret=CHATWOOT_WEBHOOK_SECRET` (o
-   `secret` é seu, não do Chatwoot — a versão open source não assina o payload do
-   webhook, então a segurança depende dessa URL ser secreta), evento **Message
-   created**.
+7. Cadastre o webhook: no painel do App → WhatsApp → Configuração, campo **Webhook**,
+   informe a URL `https://SEU_DOMINIO/api/webhooks/whatsapp`, cole o mesmo valor de
+   `WHATSAPP_VERIFY_TOKEN` no campo de verificação, e clique em Verificar — a Meta
+   chama a URL uma vez para confirmar antes de aceitar. Depois, inscreva-se no campo
+   **messages**.
 
-> ⚠️ Fora de uma janela de 24h desde a última mensagem recebida do contato, o WhatsApp
+> ⚠️ Fora de uma janela de 24h desde a última mensagem recebida do contato, a Cloud API
 > só permite enviar "modelos de mensagem" pré-aprovados pela Meta, não texto livre —
-> isso é uma regra do WhatsApp, não do Chatwoot ou do ClassLink. Para o primeiro contato
-> com uma família, pode ser necessário aprovar um modelo no Meta Business Manager.
+> para falar com uma família pela primeira vez, pode ser necessário aprovar um modelo em
+> WhatsApp Manager → Modelos de mensagem.
 
-> ⚠️ Assim como a API do Banco Inter, a API do Chatwoot pode mudar de versão — confira
-> a [documentação oficial](https://www.chatwoot.com/developers/api) antes de ir para
-> produção. Toda a integração fica isolada em `src/lib/chatwoot.ts`.
+### Configurando o e-mail (Mailgun)
+
+1. Crie uma conta em [mailgun.com](https://www.mailgun.com) (tem plano gratuito).
+2. Adicione e verifique um **domínio** (Sending → Domains → Add New Domain) — siga as
+   instruções para adicionar os registros DNS (MX, TXT) indicados pelo Mailgun no
+   provedor onde o domínio da escola está registrado.
+3. Pegue a **API Key** em Settings → API Keys ("Private API key").
+4. Configure o **recebimento**: Receiving → Create route. Em "Expression Type" escolha
+   **Match Recipient**, com o filtro `conversa-.*@SEU_DOMINIO` (regex); em "Actions",
+   marque **Forward** e informe `https://SEU_DOMINIO_CLASSLINK/api/webhooks/email`.
+5. Pegue a **chave de assinatura do webhook** em Settings → Webhooks → "HTTP webhook
+   signing key".
+6. Preencha no `.env`:
+   ```
+   MAILGUN_API_KEY="..."
+   MAILGUN_DOMAIN="mail.suaescola.com.br"
+   MAILGUN_REGION=""            # "eu" só se sua conta for da região Europa
+   EMAIL_FROM="escola@mail.suaescola.com.br"
+   MAILGUN_WEBHOOK_SIGNING_KEY="..."
+   ```
+
+> ⚠️ As APIs da Meta e do Mailgun podem mudar de versão — confira a documentação oficial
+> ([WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api),
+> [Mailgun](https://documentation.mailgun.com)) antes de ir para produção. Cada
+> integração fica isolada em `src/lib/whatsapp.ts` e `src/lib/email.ts`.
 
 ## LGPD
 
@@ -402,11 +408,11 @@ dentro do próprio Chatwoot.
   qualquer acesso direto do navegador) — a leitura só acontece via URL assinada de
   curta duração (7 dias), gerada pelo backend a cada carregamento do mural. Não existe
   link público permanente para as fotos de alunos.
-- **Chatwoot (WhatsApp/e-mail)**: nome, telefone e e-mail do responsável só são
-  compartilhados com o Chatwoot no momento em que a equipe manda a primeira mensagem
-  por WhatsApp ou e-mail para aquele responsável específico — não há sincronização em
-  massa de contatos. Trate o Chatwoot como operador de dados (LGPD art. 5º, VII) e
-  inclua-o no seu registro de tratamento/política de privacidade caso ative esse canal.
+- **WhatsApp/e-mail**: o telefone/e-mail do responsável só é enviado à Meta (WhatsApp)
+  ou ao Mailgun no momento em que a equipe manda uma mensagem por aquele canal para
+  aquele responsável específico — não há sincronização em massa de contatos. Trate
+  esses provedores como operadores de dados (LGPD art. 5º, VII) e inclua-os no seu
+  registro de tratamento/política de privacidade caso ative esses canais.
 
 ## Deploy (PWA)
 
