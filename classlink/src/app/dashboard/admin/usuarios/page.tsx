@@ -27,6 +27,10 @@ function UsuariosContent() {
   const [role, setRole] = useState<"ADMIN" | "STAFF">("STAFF");
   const [classIds, setClassIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
 
   function load() {
     apiJson<{ users: UserItem[] }>("/api/admin/users").then((data) =>
@@ -58,6 +62,28 @@ function UsuariosContent() {
     if (!confirm("Desativar este usuário?")) return;
     await apiJson(`/api/admin/users/${id}`, { method: "DELETE" });
     load();
+  }
+
+  function startEdit(u: UserItem) {
+    setEditingId(u.id);
+    setEditName(u.name);
+    setEditPhone("");
+    setEditError(null);
+  }
+
+  async function handleSaveEdit(id: string, e: React.FormEvent) {
+    e.preventDefault();
+    setEditError(null);
+    try {
+      await apiJson(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: editName, ...(editPhone ? { phone: editPhone } : {}) }),
+      });
+      setEditingId(null);
+      load();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Erro ao salvar");
+    }
   }
 
   return (
@@ -102,25 +128,62 @@ function UsuariosContent() {
       </form>
 
       <ul className="space-y-2">
-        {users?.map((u) => (
-          <li key={u.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-            <div>
-              <p className="font-medium">
-                {u.name} <span className="text-xs text-slate-500">({u.role === "ADMIN" ? "admin" : "professor(a)"})</span>{" "}
-                {!u.active && <span className="text-xs text-red-500">inativo</span>}
-              </p>
-              <p className="text-xs text-slate-500">
-                {u.email}
-                {u.classesTeaching.length > 0 && ` · ${u.classesTeaching.map((c) => c.class.name).join(", ")}`}
-              </p>
-            </div>
-            {u.active && (
-              <button onClick={() => handleDeactivate(u.id)} className="text-xs text-red-600 hover:underline">
-                Desativar
-              </button>
-            )}
-          </li>
-        ))}
+        {users?.map((u) =>
+          editingId === u.id ? (
+            <li key={u.id} className="rounded-xl border border-indigo-300 bg-white p-3 dark:border-indigo-700 dark:bg-slate-900">
+              <form onSubmit={(e) => handleSaveEdit(u.id, e)} className="flex flex-wrap items-end gap-2">
+                <label className="text-xs text-slate-500">
+                  Nome
+                  <input
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="mt-1 block rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                </label>
+                <label className="text-xs text-slate-500">
+                  Telefone (opcional)
+                  <input
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="mt-1 block rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  />
+                </label>
+                <button type="submit" className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">
+                  Salvar
+                </button>
+                <button type="button" onClick={() => setEditingId(null)} className="text-sm text-slate-500 hover:underline">
+                  Cancelar
+                </button>
+              </form>
+              {editError && <p className="mt-1 text-xs text-red-600">{editError}</p>}
+              <p className="mt-1 text-xs text-slate-400">O e-mail de login não pode ser alterado por aqui.</p>
+            </li>
+          ) : (
+            <li key={u.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <div>
+                <p className="font-medium">
+                  {u.name} <span className="text-xs text-slate-500">({u.role === "ADMIN" ? "admin" : "professor(a)"})</span>{" "}
+                  {!u.active && <span className="text-xs text-red-500">inativo</span>}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {u.email}
+                  {u.classesTeaching.length > 0 && ` · ${u.classesTeaching.map((c) => c.class.name).join(", ")}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={() => startEdit(u)} className="text-xs text-indigo-600 hover:underline">
+                  Editar
+                </button>
+                {u.active && (
+                  <button onClick={() => handleDeactivate(u.id)} className="text-xs text-red-600 hover:underline">
+                    Desativar
+                  </button>
+                )}
+              </div>
+            </li>
+          ),
+        )}
       </ul>
     </div>
   );

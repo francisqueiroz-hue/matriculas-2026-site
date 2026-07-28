@@ -30,8 +30,12 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen flex-1 items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="mb-1 text-2xl font-bold text-indigo-600">ClassLink</h1>
-        <p className="mb-6 text-sm text-slate-500">Comunicação entre escola e família</p>
+        <div className="mb-4 flex items-center justify-center gap-4">
+          <img src="/logos/logo-espaco-kids.png" alt="Espaço Kids" className="h-16 w-auto object-contain" />
+          <span className="h-12 w-px bg-slate-200 dark:bg-slate-800" />
+          <img src="/logos/logo-instituto-fokus.png" alt="Instituto Fokus" className="h-16 w-auto object-contain" />
+        </div>
+        <p className="mb-6 text-center text-sm text-slate-500">Comunicação entre escola e família</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
