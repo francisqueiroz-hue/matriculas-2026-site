@@ -274,17 +274,9 @@ model Conversation {
   guardianId String
   createdAt  DateTime @default(now())
 
-  // Mapeamento para o Chatwoot (integração WhatsApp/E-mail — ver src/lib/chatwoot.ts).
-  // Um mesmo contato do Chatwoot pode ter conversas diferentes por canal (inbox).
-  chatwootContactId          Int?
-  chatwootConversationIdWpp  Int?
-  chatwootConversationIdMail Int?
-
   messages Message[]
 
   @@unique([staffId, guardianId])
-  @@index([chatwootConversationIdWpp])
-  @@index([chatwootConversationIdMail])
 }
 
 model Message {
