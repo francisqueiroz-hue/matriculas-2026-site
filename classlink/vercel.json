@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/expirar-comunicados", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/emitir-boletos", "schedule": "0 4 * * *" }
+  ]
+}

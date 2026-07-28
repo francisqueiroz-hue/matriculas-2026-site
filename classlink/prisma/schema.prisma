@@ -1,0 +1,400 @@
+// ClassLink — schema do banco de dados
+// Modelo de dados pensado para minimizar coleta de dados de menores (LGPD):
+// os dados do aluno ficam restritos ao essencial (nome, turma, data de nascimento opcional)
+// e o vínculo com responsáveis é explícito e revogável.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN // diretor/gestor escolar
+  STAFF // professor/funcionário
+  GUARDIAN // responsável (pai/mãe/tutor)
+}
+
+enum PostAudience {
+  SCHOOL // mural geral da escola
+  CLASS // mural de uma turma específica
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  JUSTIFIED
+}
+
+enum ComunicadoTipo {
+  AUTORIZACAO_PASSEIO
+  CONFIRMACAO_REUNIAO
+  CIRCULAR
+}
+
+enum RespostaTipo {
+  AUTORIZADO
+  NAO_AUTORIZADO
+  CONFIRMADO
+  NAO_COMPARECERA
+  LIDO
+  PENDENTE_EXPIRADO // gerado automaticamente pelo job de expiração, nunca pelo cliente
+}
+
+enum BoletoStatus {
+  PENDENTE
+  PAGO
+  VENCIDO
+  ERRO // falha na emissão junto ao Banco Inter
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Configuração de cobrança (Módulo Boleto — Banco Inter)
+  diaVencimentoPadrao Int? // dia do mês usado como vencimento quando o aluno não tem um específico
+  diaEmissaoBoletos   Int? // dia do mês em que o job de emissão deve rodar
+
+  users       User[]
+  classes     Class[]
+  students    Student[]
+  posts       Post[]
+  events      Event[]
+  comunicados Comunicado[]
+  boletos     Boleto[]
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role
+  phone        String?
+  avatarUrl    String?
+  active       Boolean   @default(true)
+  deletedAt    DateTime? // exclusão lógica (LGPD) antes de expurgo definitivo
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Dados de cobrança (Módulo Boleto — Banco Inter). Preenchidos apenas pelo próprio
+  // responsável, só quando necessário para emissão de boleto (CPF e endereço são
+  // exigidos pelo registro bancário do boleto) — nunca coletados no cadastro padrão.
+  cpf              String?
+  enderecoCobranca Json?
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  // Professor/Funcionário: turmas em que leciona
+  classesTeaching ClassTeacher[]
+
+  // Responsável: alunos vinculados
+  studentLinks GuardianStudent[]
+
+  postsAuthored    Post[]         @relation("PostAuthor")
+  postReads        PostRead[]
+  eventsCreated    Event[]        @relation("EventAuthor")
+  refreshTokens    RefreshToken[]
+  pushTokens       PushToken[]
+  messagesSent     Message[]      @relation("MessageSender")
+  conversationsA   Conversation[] @relation("ConversationStaff")
+  conversationsB   Conversation[] @relation("ConversationGuardian")
+  attendanceMarked Attendance[]   @relation("AttendanceMarkedBy")
+
+  comunicadosCriados  Comunicado[]         @relation("ComunicadoAuthor")
+  respostasComunicado RespostaComunicado[] @relation("RespostaResponsavel")
+
+  @@index([schoolId])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Class {
+  id        String   @id @default(cuid())
+  name      String
+  year      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  teachers    ClassTeacher[]
+  students    Student[]
+  posts       Post[]
+  events      Event[]
+  comunicados Comunicado[]
+
+  @@index([schoolId])
+}
+
+model ClassTeacher {
+  id        String @id @default(cuid())
+  class     Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId   String
+  teacher   User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId String
+
+  @@unique([classId, teacherId])
+  @@index([teacherId])
+}
+
+model Student {
+  id        String    @id @default(cuid())
+  name      String
+  birthDate DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId String
+
+  // Módulo financeiro simplificado (Módulo Boleto — Banco Inter)
+  mensalidadeValor Decimal? @db.Decimal(10, 2)
+  diaVencimento    Int? // sobrepõe School.diaVencimentoPadrao quando definido
+
+  guardians           GuardianStudent[]
+  attendances         Attendance[]
+  respostasComunicado RespostaComunicado[]
+  boletos             Boleto[]
+
+  @@index([schoolId])
+  @@index([classId])
+}
+
+// Vínculo explícito e revogável entre responsável e aluno
+model GuardianStudent {
+  id         String   @id @default(cuid())
+  guardian   User     @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  guardianId String
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId  String
+  relation   String? // ex: "mãe", "pai", "tutor legal"
+  createdAt  DateTime @default(now())
+
+  @@unique([guardianId, studentId])
+  @@index([studentId])
+}
+
+model Post {
+  id        String       @id @default(cuid())
+  title     String
+  body      String
+  mediaUrl  String?
+  mediaType String? // "image" | "video"
+  audience  PostAudience
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId String?
+
+  author   User   @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  authorId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reads PostRead[]
+
+  @@index([schoolId])
+  @@index([classId])
+}
+
+// Confirmação de leitura ("visto por")
+model PostRead {
+  id     String   @id @default(cuid())
+  post   Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  readAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+model Conversation {
+  id         String   @id @default(cuid())
+  staff      User     @relation("ConversationStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  staffId    String
+  guardian   User     @relation("ConversationGuardian", fields: [guardianId], references: [id], onDelete: Cascade)
+  guardianId String
+  createdAt  DateTime @default(now())
+
+  messages Message[]
+
+  @@unique([staffId, guardianId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId       String
+  body           String
+  createdAt      DateTime     @default(now())
+  readAt         DateTime?
+
+  @@index([conversationId])
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime?
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId String?
+
+  author   User   @relation("EventAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  authorId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([classId])
+}
+
+model Comunicado {
+  id            String         @id @default(cuid())
+  tipo          ComunicadoTipo
+  titulo        String
+  descricao     String
+  audience      PostAudience // "toda_escola" ou turma específica (reaproveita o mesmo enum do mural)
+  prazoResposta DateTime?
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId String?
+
+  criadoPor   User   @relation("ComunicadoAuthor", fields: [criadoPorId], references: [id], onDelete: Cascade)
+  criadoPorId String
+
+  dataCriacao DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  respostas RespostaComunicado[]
+
+  @@index([schoolId])
+  @@index([classId])
+}
+
+model RespostaComunicado {
+  id               String       @id @default(cuid())
+  comunicado       Comunicado   @relation(fields: [comunicadoId], references: [id], onDelete: Cascade)
+  comunicadoId     String
+  responsavel      User         @relation("RespostaResponsavel", fields: [responsavelId], references: [id], onDelete: Cascade)
+  responsavelId    String
+  aluno            Student      @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  alunoId          String
+  resposta         RespostaTipo
+  // Timestamp e IP sempre atribuídos pelo servidor no momento da requisição — nunca aceitos do cliente.
+  dataHoraResposta DateTime
+  ipOrigem         String?
+
+  historico RespostaComunicadoLog[]
+
+  // Um responsável só pode ter uma resposta vigente por comunicado/aluno; reenvios atualizam
+  // este registro e a resposta anterior é preservada em RespostaComunicadoLog.
+  @@unique([comunicadoId, responsavelId, alunoId])
+  @@index([comunicadoId])
+  @@index([responsavelId])
+}
+
+// Histórico imutável das respostas substituídas (auditoria de autorizações — LGPD/segurança jurídica).
+model RespostaComunicadoLog {
+  id                       String             @id @default(cuid())
+  respostaComunicado       RespostaComunicado @relation(fields: [respostaComunicadoId], references: [id], onDelete: Cascade)
+  respostaComunicadoId     String
+  respostaAnterior         RespostaTipo
+  dataHoraRespostaAnterior DateTime
+  ipOrigemAnterior         String?
+  substituidaEm            DateTime           @default(now())
+
+  @@index([respostaComunicadoId])
+}
+
+// Boleto mensal emitido via API do Banco Inter. Não persistimos o PDF em si —
+// ele é buscado sob demanda na API do Inter usando codigoSolicitacao (evita
+// guardar documento bancário em repouso além do necessário).
+model Boleto {
+  id            String       @id @default(cuid())
+  student       Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId     String
+  school        School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId      String
+  mesReferencia String // formato "AAAA-MM"
+  valor         Decimal      @db.Decimal(10, 2)
+  vencimento    DateTime
+  status        BoletoStatus @default(PENDENTE)
+
+  codigoSolicitacao String? @unique // identificador retornado pelo Inter na emissão
+  nossoNumero       String?
+  linhaDigitavel    String?
+  pixCopiaCola      String?
+  erroDetalhe       String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  pagoEm    DateTime?
+
+  @@unique([studentId, mesReferencia])
+  @@index([schoolId])
+  @@index([status])
+}
+
+model Attendance {
+  id         String           @id @default(cuid())
+  student    Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId  String
+  date       DateTime
+  status     AttendanceStatus
+  markedBy   User             @relation("AttendanceMarkedBy", fields: [markedById], references: [id], onDelete: Cascade)
+  markedById String
+  createdAt  DateTime         @default(now())
+
+  @@unique([studentId, date])
+  @@index([studentId])
+}
