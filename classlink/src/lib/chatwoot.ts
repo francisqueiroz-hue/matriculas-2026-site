@@ -130,3 +130,22 @@ export async function sendChatwootMessage(input: {
 
   return { contactId, conversationId, externalId: String(mensagem.id) };
 }
+
+export interface ChatwootIncomingMessage {
+  externalId: string;
+  content: string;
+}
+
+/**
+ * Busca as mensagens recebidas do responsável (message_type "incoming") numa conversa do
+ * Chatwoot. Usado para sincronizar por polling em vez de depender de webhook — o plano
+ * gratuito do Chatwoot Cloud não inclui webhooks, só os planos pagos.
+ */
+export async function fetchChatwootIncomingMessages(chatwootConversationId: number): Promise<ChatwootIncomingMessage[]> {
+  const data = await chatwootFetch(`/conversations/${chatwootConversationId}/messages`);
+  const mensagens: { id: number; content: string | null; message_type: number | string }[] = data?.payload ?? data ?? [];
+
+  return mensagens
+    .filter((m) => (m.message_type === "incoming" || m.message_type === 0) && m.content)
+    .map((m) => ({ externalId: String(m.id), content: m.content as string }));
+}

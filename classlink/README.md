@@ -21,8 +21,9 @@ via Chatwoot), agenda escolar, painel administrativo com métricas de engajament
 - **Jobs agendados**: rotas de cron protegidas por segredo (`CRON_SECRET`), pensadas para
   o Vercel Cron (`vercel.json`) ou qualquer scheduler externo.
 - **Boletos**: API Inter Empresas (Cobrança), OAuth2 `client_credentials` com mTLS.
-- **Mensagens por WhatsApp/e-mail**: [Chatwoot](https://www.chatwoot.com) (API + webhook),
-  com atualização quase em tempo real via polling na tela de conversa.
+- **Mensagens por WhatsApp/e-mail**: [Chatwoot](https://www.chatwoot.com) (API), com
+  sincronização por polling na tela de conversa — funciona no plano gratuito, sem
+  depender do webhook (recurso pago no Chatwoot Cloud).
 - **PWA**: `manifest.json` + service worker próprio (cache de app-shell), instalável via
   "Adicionar à tela inicial".
 - **Testes**: Vitest (autenticação, upload, comunicados, cálculo de vencimento, payload
@@ -321,9 +322,15 @@ dentro do próprio Chatwoot.
 1. Ao escolher "Enviar por: WhatsApp" ou "Enviar por: E-mail" numa conversa, o ClassLink
    cria (ou reaproveita) um contato e uma conversa no Chatwoot para aquele responsável e
    envia a mensagem por lá.
-2. Quando o responsável responde — pelo WhatsApp ou respondendo o e-mail — o Chatwoot
-   dispara um webhook para `/api/webhooks/chatwoot`, que grava a resposta na conversa
-   correspondente do ClassLink e notifica a equipe.
+2. Quando o responsável responde — pelo WhatsApp ou respondendo o e-mail — o ClassLink
+   busca as mensagens novas dessa conversa direto na API do Chatwoot toda vez que a tela
+   de conversa é aberta/atualizada (a cada poucos segundos, enquanto estiver aberta) e
+   grava as que ainda não existem. **Webhooks são um recurso pago no Chatwoot Cloud**
+   (a partir do plano Startups), então o ClassLink usa esse polling como caminho padrão
+   — funciona no plano gratuito. Se sua conta tiver webhooks disponíveis, `/api/webhooks/
+   chatwoot` também existe e entrega a mesma coisa de forma mais instantânea (os dois
+   convivem sem conflito: cada mensagem só é gravada uma vez, seja por qual caminho
+   chegar primeiro).
 3. Cada mensagem mostra de qual canal veio ("via WhatsApp", "via E-mail" ou nenhuma
    marcação quando foi só pelo app).
 
@@ -354,7 +361,9 @@ dentro do próprio Chatwoot.
    CHATWOOT_INBOX_ID_EMAIL="..."
    CHATWOOT_WEBHOOK_SECRET="gere-uma-string-aleatoria"
    ```
-7. Cadastre o webhook: Configurações → Integrações → Webhooks → Adicionar webhook, URL
+7. **Opcional** (só funciona em planos pagos do Chatwoot Cloud — pule se estiver no
+   plano gratuito, o polling do passo 2 já cobre isso): cadastre o webhook em
+   Configurações → Integrações → Webhooks → Adicionar webhook, URL
    `https://SEU_DOMINIO/api/webhooks/chatwoot?secret=CHATWOOT_WEBHOOK_SECRET` (o
    `secret` é seu, não do Chatwoot — a versão open source não assina o payload do
    webhook, então a segurança depende dessa URL ser secreta), evento **Message

@@ -5,13 +5,63 @@ import { handleApiError } from "@/lib/http";
 import { assertConversationParticipant } from "@/lib/messaging";
 import { sendMessageSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
-import { isChatwootChannelConfigured, normalizePhoneBR, sendChatwootMessage } from "@/lib/chatwoot";
+import {
+  fetchChatwootIncomingMessages,
+  isChatwootChannelConfigured,
+  isChatwootConfigured,
+  normalizePhoneBR,
+  sendChatwootMessage,
+} from "@/lib/chatwoot";
+
+/**
+ * Busca mensagens novas do responsável no Chatwoot e grava as que ainda não existem.
+ * Substitui o webhook (recurso pago no Chatwoot Cloud) por polling: como esta rota já é
+ * chamada a cada poucos segundos pela tela de conversa aberta, isso basta para dar a
+ * sensação de tempo real sem depender de plano pago nem de um cron externo.
+ */
+async function sincronizarChatwoot(conversation: {
+  id: string;
+  guardianId: string;
+  chatwootConversationIdWpp: number | null;
+  chatwootConversationIdMail: number | null;
+}) {
+  if (!isChatwootConfigured()) return;
+
+  const canais: [number | null, "WHATSAPP" | "EMAIL"][] = [
+    [conversation.chatwootConversationIdWpp, "WHATSAPP"],
+    [conversation.chatwootConversationIdMail, "EMAIL"],
+  ];
+
+  for (const [chatwootConversationId, canal] of canais) {
+    if (!chatwootConversationId) continue;
+    try {
+      const recebidas = await fetchChatwootIncomingMessages(chatwootConversationId);
+      for (const msg of recebidas) {
+        const existente = await prisma.message.findUnique({ where: { externalId: msg.externalId } });
+        if (existente) continue;
+        await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            senderId: conversation.guardianId,
+            body: msg.content,
+            channel: canal,
+            externalId: msg.externalId,
+          },
+        });
+      }
+    } catch (error) {
+      console.error(`Falha ao sincronizar mensagens do Chatwoot (${canal})`, error);
+    }
+  }
+}
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
   try {
     const session = await requireSession();
     const { id } = await ctx.params;
-    await assertConversationParticipant(id, session.sub);
+    const participante = await assertConversationParticipant(id, session.sub);
+
+    await sincronizarChatwoot(participante);
 
     const [conversation, messages] = await Promise.all([
       prisma.conversation.findUniqueOrThrow({
