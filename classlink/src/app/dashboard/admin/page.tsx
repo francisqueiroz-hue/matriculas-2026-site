@@ -19,6 +19,25 @@ interface Metrics {
   messaging: { staffMessages: number; guardianReplies: number; responseRate: number };
 }
 
+interface ComunicadosMetrics {
+  periodoDias: number;
+  totalComunicados: number;
+  totalRespostas: number;
+  totalPendentes: number;
+  totalPublicoAlvo: number;
+  tempoMedioMinutos: number | null;
+}
+
+const PERIODOS = [7, 30, 90] as const;
+
+function formatDuracao(minutos: number): string {
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  if (horas < 24) return `${horas}h ${minutos % 60}min`;
+  const dias = Math.floor(horas / 24);
+  return `${dias}d ${horas % 24}h`;
+}
+
 function StatCard({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
@@ -30,10 +49,16 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
 
 export default function AdminMetricsPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [comunicadosMetrics, setComunicadosMetrics] = useState<ComunicadosMetrics | null>(null);
+  const [periodo, setPeriodo] = useState<(typeof PERIODOS)[number]>(30);
 
   useEffect(() => {
     apiJson<Metrics>("/api/admin/metrics").then(setMetrics);
   }, []);
+
+  useEffect(() => {
+    apiJson<ComunicadosMetrics>(`/api/admin/comunicados-metrics?dias=${periodo}`).then(setComunicadosMetrics);
+  }, [periodo]);
 
   return (
     <AdminGuard>
@@ -47,6 +72,43 @@ export default function AdminMetricsPage() {
               <StatCard label="Responsáveis" value={metrics.totals.totalGuardians} />
               <StatCard label="Equipe" value={metrics.totals.totalStaff} />
               <StatCard label="Taxa de resposta" value={`${metrics.messaging.responseRate}%`} />
+            </div>
+
+            <div>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-semibold">Comunicados</h2>
+                <div className="flex gap-1 rounded-md border border-slate-200 p-0.5 dark:border-slate-800">
+                  {PERIODOS.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPeriodo(p)}
+                      className={`rounded px-2.5 py-1 text-xs font-medium ${
+                        periodo === p
+                          ? "bg-indigo-600 text-white"
+                          : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      Últimos {p} dias
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {comunicadosMetrics === null && <p className="text-sm text-slate-500">Carregando...</p>}
+              {comunicadosMetrics && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <StatCard
+                    label="Tempo médio de resposta"
+                    value={comunicadosMetrics.tempoMedioMinutos !== null ? formatDuracao(comunicadosMetrics.tempoMedioMinutos) : "—"}
+                  />
+                  <StatCard label="Comunicados publicados" value={comunicadosMetrics.totalComunicados} />
+                  <StatCard label="Respostas recebidas" value={comunicadosMetrics.totalRespostas} />
+                  <StatCard label="Pendentes" value={comunicadosMetrics.totalPendentes} />
+                </div>
+              )}
+              {comunicadosMetrics && comunicadosMetrics.totalComunicados === 0 && (
+                <p className="mt-2 text-sm text-slate-500">Nenhum comunicado publicado neste período.</p>
+              )}
             </div>
 
             <div>
