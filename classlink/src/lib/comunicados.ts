@@ -12,7 +12,7 @@ export const RESPOSTAS_PERMITIDAS: Record<ComunicadoTipo, RespostaTipo[]> = {
 export async function getPublicoAlvo(comunicadoId: string) {
   const comunicado = await prisma.comunicado.findUniqueOrThrow({
     where: { id: comunicadoId },
-    select: { schoolId: true, audience: true, classId: true },
+    select: { schoolId: true, audience: true, classId: true, alunoId: true },
   });
 
   const links = await prisma.guardianStudent.findMany({
@@ -21,6 +21,7 @@ export async function getPublicoAlvo(comunicadoId: string) {
       student: {
         deletedAt: null,
         ...(comunicado.audience === "CLASS" ? { classId: comunicado.classId ?? undefined } : {}),
+        ...(comunicado.audience === "STUDENT" ? { id: comunicado.alunoId ?? undefined } : {}),
       },
     },
     select: {

@@ -18,6 +18,7 @@ export const updateStudentSchema = createStudentSchema.partial();
 export const linkGuardianSchema = z.object({
   guardianEmail: z.string().email(),
   guardianName: z.string().min(1).max(150),
+  guardianPhone: z.string().max(30).optional(),
   relation: z.string().max(50).optional(),
   password: z.string().min(8).optional(),
 });
@@ -64,8 +65,9 @@ export const createComunicadoSchema = z.object({
   tipo: z.enum(["AUTORIZACAO_PASSEIO", "CONFIRMACAO_REUNIAO", "CIRCULAR"]),
   titulo: z.string().min(1).max(200),
   descricao: z.string().min(1).max(5000),
-  audience: z.enum(["SCHOOL", "CLASS"]),
+  audience: z.enum(["SCHOOL", "CLASS", "STUDENT"]),
   classId: z.string().optional(),
+  alunoId: z.string().optional(), // obrigatório quando audience = STUDENT; sempre direcionado aos responsáveis do aluno
   prazoResposta: z.string().datetime().optional(),
 });
 

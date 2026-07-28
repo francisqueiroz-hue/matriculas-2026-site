@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       where: { schoolId: session.schoolId, deletedAt: null, ...(classId ? { classId } : {}) },
       include: {
         class: { select: { id: true, name: true, year: true } },
-        guardians: { include: { guardian: { select: { id: true, name: true, email: true } } } },
+        guardians: { include: { guardian: { select: { id: true, name: true, email: true, phone: true } } } },
       },
       orderBy: { name: "asc" },
     });

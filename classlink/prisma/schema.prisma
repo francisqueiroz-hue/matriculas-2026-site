@@ -20,6 +20,7 @@ enum Role {
 enum PostAudience {
   SCHOOL // mural geral da escola
   CLASS // mural de uma turma específica
+  STUDENT // apenas para Comunicado: direcionado a um aluno específico (aos seus responsáveis)
 }
 
 enum AttendanceStatus {
@@ -195,11 +196,12 @@ model Student {
   mensalidadeValor Decimal? @db.Decimal(10, 2)
   diaVencimento    Int? // sobrepõe School.diaVencimentoPadrao quando definido
 
-  guardians           GuardianStudent[]
-  attendances         Attendance[]
-  respostasComunicado RespostaComunicado[]
-  boletos             Boleto[]
-  notas               Nota[]
+  guardians              GuardianStudent[]
+  attendances            Attendance[]
+  respostasComunicado    RespostaComunicado[]
+  boletos                Boleto[]
+  notas                  Nota[]
+  comunicadosIndividuais Comunicado[]
 
   @@index([schoolId])
   @@index([classId])
@@ -321,6 +323,10 @@ model Comunicado {
   class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
   classId String?
 
+  // Somente quando audience = STUDENT: aluno específico (sempre direcionado aos responsáveis dele, nunca ao próprio aluno).
+  aluno   Student? @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  alunoId String?
+
   criadoPor   User   @relation("ComunicadoAuthor", fields: [criadoPorId], references: [id], onDelete: Cascade)
   criadoPorId String
 
@@ -331,6 +337,7 @@ model Comunicado {
 
   @@index([schoolId])
   @@index([classId])
+  @@index([alunoId])
 }
 
 model RespostaComunicado {

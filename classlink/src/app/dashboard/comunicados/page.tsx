@@ -11,8 +11,9 @@ interface ComunicadoItem {
   tipo: "AUTORIZACAO_PASSEIO" | "CONFIRMACAO_REUNIAO" | "CIRCULAR";
   titulo: string;
   descricao: string;
-  audience: "SCHOOL" | "CLASS";
+  audience: "SCHOOL" | "CLASS" | "STUDENT";
   class: { id: string; name: string } | null;
+  aluno: { id: string; name: string } | null;
   criadoPor: { id: string; name: string };
   dataCriacao: string;
   prazoResposta: string | null;
@@ -64,7 +65,9 @@ export default function ComunicadosPage() {
                   </span>
                   <h3 className="mt-1 font-semibold">{c.titulo}</h3>
                   <p className="text-xs text-slate-500">
-                    {c.criadoPor.name} · {c.audience === "SCHOOL" ? "Toda a escola" : c.class?.name} ·{" "}
+                    {c.criadoPor.name} ·{" "}
+                    {c.audience === "SCHOOL" ? "Toda a escola" : c.audience === "STUDENT" ? `Individual — ${c.aluno?.name}` : c.class?.name}{" "}
+                    ·{" "}
                     {new Date(c.dataCriacao).toLocaleString("pt-BR")}
                     {c.prazoResposta && (
                       <> · prazo: {new Date(c.prazoResposta).toLocaleString("pt-BR")}{expirado && " (expirado)"}</>

@@ -25,6 +25,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
         data: {
           email: body.guardianEmail.toLowerCase(),
           name: body.guardianName,
+          phone: body.guardianPhone,
           role: "GUARDIAN",
           schoolId: session.schoolId,
           passwordHash: await hashPassword(temporaryPassword),
