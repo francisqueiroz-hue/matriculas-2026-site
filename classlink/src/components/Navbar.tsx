@@ -43,11 +43,11 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-        <div className="flex items-center gap-6">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <img src="/logos/logo-espaco-kids.png" alt="Espaço Kids" className="h-9 w-auto object-contain" />
-            <span className="h-7 w-px bg-slate-200 dark:bg-slate-800" />
-            <img src="/logos/logo-instituto-fokus.png" alt="Instituto Fokus" className="h-9 w-auto object-contain" />
+        <div className="flex items-center gap-10">
+          <Link href="/dashboard" className="flex items-center gap-3 pr-2">
+            <img src="/logos/logo-espaco-kids.png" alt="Espaço Kids" className="h-10 w-auto object-contain" />
+            <span className="h-8 w-px bg-slate-200 dark:bg-slate-800" />
+            <img src="/logos/logo-instituto-fokus.png" alt="Instituto Fokus" className="h-10 w-auto object-contain" />
           </Link>
           <nav className="hidden gap-1 sm:flex">
             {links.map((link) => (

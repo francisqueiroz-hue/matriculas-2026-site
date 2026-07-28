@@ -1,1 +1,7 @@
 @import "tailwindcss";
+
+/* O app usa sempre o tema claro (fundo branco), independentemente do
+   modo escuro do sistema/navegador do usuário. As classes `dark:` só
+   seriam aplicadas dentro de um ancestral com a classe `.dark`, que
+   nunca é adicionada. */
+@custom-variant dark (&:where(.dark, .dark *));
