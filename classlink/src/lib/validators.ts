@@ -59,6 +59,7 @@ export const createEventSchema = z.object({
 
 export const sendMessageSchema = z.object({
   body: z.string().min(1).max(4000),
+  channel: z.enum(["APP", "WHATSAPP", "EMAIL"]).optional(),
 });
 
 export const createComunicadoSchema = z.object({

@@ -58,6 +58,12 @@ enum Trimestre {
   TERCEIRO
 }
 
+enum MessageChannel {
+  APP // enviada/lida só dentro do ClassLink
+  WHATSAPP
+  EMAIL
+}
+
 model School {
   id        String   @id @default(cuid())
   name      String
@@ -268,22 +274,36 @@ model Conversation {
   guardianId String
   createdAt  DateTime @default(now())
 
+  // Mapeamento para o Chatwoot (integração WhatsApp/E-mail — ver src/lib/chatwoot.ts).
+  // Um mesmo contato do Chatwoot pode ter conversas diferentes por canal (inbox).
+  chatwootContactId          Int?
+  chatwootConversationIdWpp  Int?
+  chatwootConversationIdMail Int?
+
   messages Message[]
 
   @@unique([staffId, guardianId])
+  @@index([chatwootConversationIdWpp])
+  @@index([chatwootConversationIdMail])
 }
 
 model Message {
-  id             String       @id @default(cuid())
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  id             String         @id @default(cuid())
+  conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   conversationId String
-  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  sender         User           @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   senderId       String
   body           String
-  createdAt      DateTime     @default(now())
+  channel        MessageChannel @default(APP)
+  // id da mensagem no WhatsApp (wamid) ou Message-Id do e-mail — usado para
+  // deduplicar webhooks (evita gravar a mesma mensagem duas vezes em reentregas)
+  // e para resolver a conversa de uma resposta via WhatsApp (context.id).
+  externalId     String?        @unique
+  createdAt      DateTime       @default(now())
   readAt         DateTime?
 
   @@index([conversationId])
+  @@index([externalId])
 }
 
 model Event {
