@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { assertConversationParticipant } from "@/lib/messaging";
 import { sendMessageSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
+import { isChatwootChannelConfigured, normalizePhoneBR, sendChatwootMessage } from "@/lib/chatwoot";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
   try {
@@ -17,7 +18,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
         where: { id },
         include: {
           staff: { select: { id: true, name: true, role: true } },
-          guardian: { select: { id: true, name: true } },
+          guardian: { select: { id: true, name: true, phone: true, email: true } },
         },
       }),
       prisma.message.findMany({
@@ -43,19 +44,56 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     const session = await requireSession();
     const { id } = await ctx.params;
     const conversation = await assertConversationParticipant(id, session.sub);
-    const { body } = sendMessageSchema.parse(await request.json());
+    const { body, channel } = sendMessageSchema.parse(await request.json());
+
+    // WhatsApp/e-mail só fazem sentido enviados pela equipe ao responsável — o responsável
+    // já está na conversa via app, e essas mensagens sempre partem de quem está na tela do ClassLink.
+    const canalEfetivo = channel && channel !== "APP" && session.sub === conversation.staffId ? channel : "APP";
+
+    let externalId: string | undefined;
+    if (canalEfetivo === "WHATSAPP" || canalEfetivo === "EMAIL") {
+      if (!isChatwootChannelConfigured(canalEfetivo)) {
+        return NextResponse.json({ error: `Integração com ${canalEfetivo === "WHATSAPP" ? "WhatsApp" : "e-mail"} não configurada` }, { status: 400 });
+      }
+      const guardian = await prisma.user.findUniqueOrThrow({
+        where: { id: conversation.guardianId },
+        select: { id: true, name: true, phone: true, email: true },
+      });
+
+      let sourceId: string;
+      if (canalEfetivo === "WHATSAPP") {
+        const phone = guardian.phone ? normalizePhoneBR(guardian.phone) : null;
+        if (!phone) return NextResponse.json({ error: "Responsável não tem telefone cadastrado" }, { status: 400 });
+        sourceId = phone;
+      } else {
+        sourceId = guardian.email;
+      }
+
+      const sent = await sendChatwootMessage({ canal: canalEfetivo, guardian, sourceId, content: body });
+      externalId = sent.externalId;
+
+      await prisma.conversation.update({
+        where: { id },
+        data:
+          canalEfetivo === "WHATSAPP"
+            ? { chatwootContactId: sent.contactId, chatwootConversationIdWpp: sent.conversationId }
+            : { chatwootContactId: sent.contactId, chatwootConversationIdMail: sent.conversationId },
+      });
+    }
 
     const message = await prisma.message.create({
-      data: { conversationId: id, senderId: session.sub, body },
+      data: { conversationId: id, senderId: session.sub, body, channel: canalEfetivo, externalId },
       include: { sender: { select: { id: true, name: true, role: true } } },
     });
 
     const recipientId = conversation.staffId === session.sub ? conversation.guardianId : conversation.staffId;
-    void notifyUsers([recipientId], {
-      title: `Nova mensagem de ${message.sender.name}`,
-      body: body.slice(0, 120),
-      url: `/dashboard/mensagens/${id}`,
-    }).catch((err) => console.error("push notify failed", err));
+    if (canalEfetivo === "APP") {
+      void notifyUsers([recipientId], {
+        title: `Nova mensagem de ${message.sender.name}`,
+        body: body.slice(0, 120),
+        url: `/dashboard/mensagens/${id}`,
+      }).catch((err) => console.error("push notify failed", err));
+    }
 
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {

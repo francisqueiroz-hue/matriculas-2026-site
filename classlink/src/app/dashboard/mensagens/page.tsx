@@ -33,7 +33,11 @@ export default function MensagensPage() {
     );
   }
 
-  useEffect(loadConversations, []);
+  useEffect(() => {
+    loadConversations();
+    const interval = setInterval(loadConversations, 8000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function startConversation(counterpartUserId: string) {
     setStarting(true);

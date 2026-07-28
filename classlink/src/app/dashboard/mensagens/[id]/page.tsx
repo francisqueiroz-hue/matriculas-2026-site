@@ -5,15 +5,22 @@ import { useParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 
+type Canal = "APP" | "WHATSAPP" | "EMAIL";
+
 interface Message {
   id: string;
   body: string;
+  channel: Canal;
   createdAt: string;
   sender: { id: string; name: string; role: string };
 }
 
 interface ConversationData {
-  conversation: { id: string; staff: { id: string; name: string }; guardian: { id: string; name: string } };
+  conversation: {
+    id: string;
+    staff: { id: string; name: string };
+    guardian: { id: string; name: string; phone: string | null; email: string };
+  };
   messages: Message[];
 }
 
@@ -27,12 +34,16 @@ const ITENS_REQUISICAO = [
   "Troca de roupa",
 ];
 
+const CANAL_LABEL: Record<Canal, string> = { APP: "ClassLink", WHATSAPP: "WhatsApp", EMAIL: "E-mail" };
+
 export default function ConversationPage() {
   const { id } = useParams<{ id: string }>();
   const user = useCurrentUser();
   const [data, setData] = useState<ConversationData | null>(null);
   const [text, setText] = useState("");
+  const [canalEnvio, setCanalEnvio] = useState<Canal>("APP");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [showRequisicao, setShowRequisicao] = useState(false);
   const [itensSelecionados, setItensSelecionados] = useState<string[]>([]);
   const [itemOutro, setItemOutro] = useState("");
@@ -42,19 +53,30 @@ export default function ConversationPage() {
     apiJson<ConversationData>(`/api/messages/conversations/${id}`).then(setData);
   }
 
-  useEffect(load, [id]);
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 4000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [data?.messages.length]);
 
-  async function enviarMensagem(body: string) {
+  async function enviarMensagem(body: string, channel: Canal = "APP") {
     setSending(true);
+    setSendError(null);
     try {
       const res = await apiJson<{ message: Message }>(`/api/messages/conversations/${id}`, {
         method: "POST",
-        body: JSON.stringify({ body }),
+        body: JSON.stringify({ body, channel }),
       });
       setData((prev) => (prev ? { ...prev, messages: [...prev.messages, res.message] } : prev));
+      return true;
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : "Erro ao enviar mensagem");
+      return false;
     } finally {
       setSending(false);
     }
@@ -63,8 +85,7 @@ export default function ConversationPage() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
-    await enviarMensagem(text);
-    setText("");
+    if (await enviarMensagem(text, canalEnvio)) setText("");
   }
 
   function toggleItem(item: string) {
@@ -76,16 +97,18 @@ export default function ConversationPage() {
     const itens = [...itensSelecionados, ...(itemOutro.trim() ? [itemOutro.trim()] : [])];
     if (itens.length === 0) return;
     const corpo = `📋 Requisição de itens pessoais:\n${itens.map((i) => `- ${i}`).join("\n")}\n\nPor favor, providencie o quanto antes. Obrigado!`;
-    await enviarMensagem(corpo);
-    setItensSelecionados([]);
-    setItemOutro("");
-    setShowRequisicao(false);
+    if (await enviarMensagem(corpo, canalEnvio)) {
+      setItensSelecionados([]);
+      setItemOutro("");
+      setShowRequisicao(false);
+    }
   }
 
   if (!data) return <p className="text-sm text-slate-500">Carregando conversa...</p>;
 
   const souStaff = user.id === data.conversation.staff.id;
   const counterpart = souStaff ? data.conversation.guardian.name : data.conversation.staff.name;
+  const guardianTemTelefone = Boolean(data.conversation.guardian.phone);
 
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col">
@@ -153,8 +176,9 @@ export default function ConversationPage() {
                 }`}
               >
                 <p className="whitespace-pre-wrap">{m.body}</p>
-                <p className={`mt-1 text-[10px] ${mine ? "text-indigo-100" : "text-slate-400"}`}>
+                <p className={`mt-1 flex items-center gap-1 text-[10px] ${mine ? "text-indigo-100" : "text-slate-400"}`}>
                   {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  {m.channel !== "APP" && <span>· via {CANAL_LABEL[m.channel]}</span>}
                 </p>
               </div>
             </div>
@@ -163,13 +187,28 @@ export default function ConversationPage() {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSend} className="mt-3 flex gap-2">
+      {sendError && <p className="mt-2 text-xs text-red-600">{sendError}</p>}
+
+      <form onSubmit={handleSend} className="mt-3 flex flex-wrap gap-2">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Escreva uma mensagem..."
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
         />
+        {souStaff && (
+          <select
+            value={canalEnvio}
+            onChange={(e) => setCanalEnvio(e.target.value as Canal)}
+            className="rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          >
+            <option value="APP">Enviar por: ClassLink</option>
+            <option value="WHATSAPP" disabled={!guardianTemTelefone}>
+              Enviar por: WhatsApp{!guardianTemTelefone ? " (sem telefone)" : ""}
+            </option>
+            <option value="EMAIL">Enviar por: E-mail</option>
+          </select>
+        )}
         <button
           type="submit"
           disabled={sending}
