@@ -38,6 +38,12 @@ export const updateUserSchema = z.object({
   active: z.boolean().optional(),
   classIds: z.array(z.string()).optional(),
   isCoordenacao: z.boolean().optional(),
+  resetPassword: z.boolean().optional(),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
 });
 
 export const createPostSchema = z.object({

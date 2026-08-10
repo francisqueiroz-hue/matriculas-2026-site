@@ -13,6 +13,32 @@ export default function ContaPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwLoading, setPwLoading] = useState(false);
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError(null);
+    setPwSuccess(false);
+    setPwLoading(true);
+    try {
+      await apiJson("/api/account/change-password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setPwSuccess(true);
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : "Erro ao trocar senha");
+    } finally {
+      setPwLoading(false);
+    }
+  }
+
   async function handleDelete(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -34,6 +60,38 @@ export default function ContaPage() {
         <h1 className="text-xl font-bold">Minha conta</h1>
         <p className="mt-1 text-sm text-slate-500">{user.name} · {user.email}</p>
         <p className="text-sm text-slate-500">{user.schoolName}</p>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="font-semibold">Trocar senha</h2>
+        <form onSubmit={handleChangePassword} className="mt-3 space-y-2">
+          <input
+            type="password"
+            required
+            placeholder="Senha atual"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          />
+          <input
+            type="password"
+            required
+            minLength={8}
+            placeholder="Nova senha (mín. 8 caracteres)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          />
+          {pwError && <p className="text-sm text-red-600">{pwError}</p>}
+          {pwSuccess && <p className="text-sm text-green-600">Senha alterada com sucesso.</p>}
+          <button
+            type="submit"
+            disabled={pwLoading}
+            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {pwLoading ? "Salvando..." : "Salvar nova senha"}
+          </button>
+        </form>
       </div>
 
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/40">

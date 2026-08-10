@@ -33,6 +33,7 @@ function UsuariosContent() {
   const [editPhone, setEditPhone] = useState("");
   const [editCoordenacao, setEditCoordenacao] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, string>>({});
 
   function load() {
     apiJson<{ users: UserItem[] }>("/api/admin/users").then((data) =>
@@ -64,6 +65,19 @@ function UsuariosContent() {
     if (!confirm("Desativar este usuário?")) return;
     await apiJson(`/api/admin/users/${id}`, { method: "DELETE" });
     load();
+  }
+
+  async function handleResetPassword(id: string) {
+    if (!confirm("Gerar uma nova senha temporária para este usuário? A senha atual deixará de funcionar.")) return;
+    try {
+      const data = await apiJson<{ temporaryPassword?: string }>(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ resetPassword: true }),
+      });
+      setFeedback((prev) => ({ ...prev, [id]: `Nova senha temporária: ${data.temporaryPassword}` }));
+    } catch (err) {
+      setFeedback((prev) => ({ ...prev, [id]: err instanceof Error ? err.message : "Erro ao redefinir senha" }));
+    }
   }
 
   function startEdit(u: UserItem) {
@@ -173,32 +187,38 @@ function UsuariosContent() {
               <p className="mt-1 text-xs text-slate-400">O e-mail de login não pode ser alterado por aqui.</p>
             </li>
           ) : (
-            <li key={u.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-              <div>
-                <p className="font-medium">
-                  {u.name} <span className="text-xs text-slate-500">({u.role === "ADMIN" ? "admin" : "professor(a)"})</span>{" "}
-                  {u.isCoordenacao && (
-                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                      Coordenação
-                    </span>
-                  )}{" "}
-                  {!u.active && <span className="text-xs text-red-500">inativo</span>}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {u.email}
-                  {u.classesTeaching.length > 0 && ` · ${u.classesTeaching.map((c) => c.class.name).join(", ")}`}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button onClick={() => startEdit(u)} className="text-xs text-indigo-600 hover:underline">
-                  Editar
-                </button>
-                {u.active && (
-                  <button onClick={() => handleDeactivate(u.id)} className="text-xs text-red-600 hover:underline">
-                    Desativar
+            <li key={u.id} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">
+                    {u.name} <span className="text-xs text-slate-500">({u.role === "ADMIN" ? "admin" : "professor(a)"})</span>{" "}
+                    {u.isCoordenacao && (
+                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                        Coordenação
+                      </span>
+                    )}{" "}
+                    {!u.active && <span className="text-xs text-red-500">inativo</span>}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {u.email}
+                    {u.classesTeaching.length > 0 && ` · ${u.classesTeaching.map((c) => c.class.name).join(", ")}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => startEdit(u)} className="text-xs text-indigo-600 hover:underline">
+                    Editar
                   </button>
-                )}
+                  <button onClick={() => handleResetPassword(u.id)} className="text-xs text-indigo-600 hover:underline">
+                    Redefinir senha
+                  </button>
+                  {u.active && (
+                    <button onClick={() => handleDeactivate(u.id)} className="text-xs text-red-600 hover:underline">
+                      Desativar
+                    </button>
+                  )}
+                </div>
               </div>
+              {feedback[u.id] && <p className="mt-1 text-xs text-slate-500">{feedback[u.id]}</p>}
             </li>
           ),
         )}
