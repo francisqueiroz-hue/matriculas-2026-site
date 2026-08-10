@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { updateUserSchema } from "@/lib/validators";
+import { hashPassword } from "@/lib/auth";
 
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/users/[id]">) {
   try {
@@ -13,6 +15,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
     const existing = await prisma.user.findFirst({ where: { id, schoolId: session.schoolId } });
     if (!existing) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
 
+    const temporaryPassword = body.resetPassword ? randomBytes(6).toString("hex") : undefined;
+
     const user = await prisma.$transaction(async (tx) => {
       if (body.classIds && existing.role === "STAFF") {
         await tx.classTeacher.deleteMany({ where: { teacherId: id } });
@@ -20,18 +24,23 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
           data: body.classIds.map((classId) => ({ classId, teacherId: id })),
         });
       }
-      return tx.user.update({
+      const updated = await tx.user.update({
         where: { id },
         data: {
           ...(body.name ? { name: body.name } : {}),
           ...(body.phone !== undefined ? { phone: body.phone } : {}),
           ...(body.active !== undefined ? { active: body.active } : {}),
           ...(body.isCoordenacao !== undefined && existing.role === "STAFF" ? { isCoordenacao: body.isCoordenacao } : {}),
+          ...(temporaryPassword ? { passwordHash: await hashPassword(temporaryPassword) } : {}),
         },
       });
+      if (temporaryPassword) {
+        await tx.refreshToken.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+      }
+      return updated;
     });
 
-    return NextResponse.json({ user: { id: user.id, name: user.name, active: user.active } });
+    return NextResponse.json({ user: { id: user.id, name: user.name, active: user.active }, temporaryPassword });
   } catch (error) {
     return handleApiError(error);
   }

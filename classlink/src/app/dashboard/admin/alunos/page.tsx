@@ -94,6 +94,19 @@ function AlunosContent() {
     load();
   }
 
+  async function handleResetGuardianPassword(studentId: string, guardianId: string) {
+    if (!confirm("Gerar uma nova senha temporária para este responsável? A senha atual deixará de funcionar.")) return;
+    try {
+      const data = await apiJson<{ temporaryPassword?: string }>(`/api/admin/users/${guardianId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ resetPassword: true }),
+      });
+      setFeedback((prev) => ({ ...prev, [studentId]: `Nova senha temporária: ${data.temporaryPassword}` }));
+    } catch (err) {
+      setFeedback((prev) => ({ ...prev, [studentId]: err instanceof Error ? err.message : "Erro ao redefinir senha" }));
+    }
+  }
+
   function startEditGuardian(guardian: { id: string; name: string; phone: string | null }) {
     setEditingGuardianId(guardian.id);
     setEditGuardianName(guardian.name);
@@ -235,6 +248,12 @@ function AlunosContent() {
                       <span className="flex items-center gap-3">
                         <button onClick={() => startEditGuardian(g.guardian)} className="text-xs text-indigo-600 hover:underline">
                           Editar
+                        </button>
+                        <button
+                          onClick={() => handleResetGuardianPassword(s.id, g.guardian.id)}
+                          className="text-xs text-indigo-600 hover:underline"
+                        >
+                          Redefinir senha
                         </button>
                         <button
                           onClick={() => handleUnlinkGuardian(s.id, g.guardian.id)}
