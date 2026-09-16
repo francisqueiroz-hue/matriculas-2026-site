@@ -4,7 +4,8 @@ Aplicativo web (PWA) para comunicação entre escola e responsáveis, inspirado 
 Inclui: mural de avisos, mensagens diretas (com envio opcional por **WhatsApp/e-mail**),
 agenda escolar, painel administrativo com métricas de engajamento,
 **autorizações e confirmações digitais** (comunicados com resposta), lançamento de
-**notas por trimestre** e **emissão automática de boletos via Banco Inter**.
+**notas por trimestre**, **controle de frequência** e **emissão automática de boletos via
+Banco Inter**.
 
 ## Stack
 
@@ -25,8 +26,8 @@ agenda escolar, painel administrativo com métricas de engajamento,
   (envio e recebimento de e-mail), cada canal recebendo respostas via webhook próprio.
 - **PWA**: `manifest.json` + service worker próprio (cache de app-shell), instalável via
   "Adicionar à tela inicial".
-- **Testes**: Vitest (autenticação, upload, comunicados, cálculo de vencimento, payload
-  de cobrança do Banco Inter).
+- **Testes**: Vitest (autenticação, upload, comunicados, cálculo de vencimento, cálculo de
+  frequência, payload de cobrança do Banco Inter).
 
 ## Estrutura de pastas
 
@@ -42,6 +43,7 @@ classlink/
 │   │   │                        agenda, financeiro, admin)
 │   │   ├── api/                # rotas de API
 │   │   │   ├── comunicados/     # autorizações/confirmações + respostas
+│   │   │   ├── attendance/      # marcação e histórico de frequência
 │   │   │   ├── billing/         # "meus boletos" do responsável
 │   │   │   ├── admin/billing/   # configuração e resumo financeiro do admin
 │   │   │   ├── cron/            # jobs agendados (expiração, emissão de boletos)
@@ -61,9 +63,9 @@ classlink/
 
 | Perfil | Pode |
 | --- | --- |
-| **Administrador** | Gerenciar turmas, alunos e vínculos de responsáveis; criar contas de equipe; publicar avisos/comunicados para toda a escola ou turmas; ver painel de engajamento; configurar mensalidade e vencimento; acompanhar boletos pagos/pendentes. |
-| **Professor/Funcionário** | Publicar avisos e comunicados nas turmas em que leciona; enviar mensagens diretas aos responsáveis dessas turmas; criar eventos na agenda; ver quem respondeu um comunicado e reenviar lembrete. |
-| **Responsável** | Ver o mural (escola + turma do filho/a), confirmar leitura de avisos, responder comunicados (autorizar passeio, confirmar presença, confirmar leitura) para cada filho vinculado, conversar com a equipe escolar, ver a agenda e seus boletos. |
+| **Administrador** | Gerenciar turmas, alunos e vínculos de responsáveis; criar contas de equipe; publicar avisos/comunicados para toda a escola ou turmas; ver painel de engajamento; configurar mensalidade e vencimento; acompanhar boletos pagos/pendentes; marcar e consultar frequência de qualquer turma. |
+| **Professor/Funcionário** | Publicar avisos e comunicados nas turmas em que leciona; enviar mensagens diretas aos responsáveis dessas turmas; criar eventos na agenda; ver quem respondeu um comunicado e reenviar lembrete; marcar e consultar frequência das turmas em que leciona. |
+| **Responsável** | Ver o mural (escola + turma do filho/a), confirmar leitura de avisos, responder comunicados (autorizar passeio, confirmar presença, confirmar leitura) para cada filho vinculado, conversar com a equipe escolar, ver a agenda, a frequência e os boletos de cada filho. |
 
 ## Rodando localmente
 
@@ -236,6 +238,30 @@ Tela **Comunicados**, disponível para todos os perfis:
   marca automaticamente cada par responsável/aluno sem resposta como
   `PENDENTE_EXPIRADO` (nunca é um valor que o cliente pode enviar manualmente).
 
+## Controle de frequência
+
+Tela **Frequência**, disponível para todos os perfis (o que cada um vê/faz depende do
+perfil, como na tabela acima):
+
+- Administrador e professor marcam a frequência (Presente/Falta/Atraso/Falta
+  justificada) de uma turma num dia — o professor só nas turmas em que leciona, a
+  direção em qualquer turma da escola. Cada marcação é um upsert por aluno/dia
+  (`Attendance`, único por `[studentId, date]`), então reabrir o mesmo dia e turma
+  permite corrigir uma marcação já lançada.
+- Administrador e professor também podem consultar o histórico e o resumo mensal de
+  frequência de um aluno específico (mesma tela).
+- O responsável vê o histórico e o resumo mensal de frequência de cada filho
+  vinculado, com o percentual do mês e um alerta quando esse percentual fica abaixo de
+  75% — o mínimo de frequência exigido pela LDB (Lei nº 9.394/1996, art. 24, VI) para
+  aprovação na educação básica. Atraso conta como presença no percentual; falta
+  justificada conta como ausência no percentual (mas é exibida separadamente) — essa é
+  uma leitura razoável da norma geral, não uma opinião jurídica definitiva; confirme
+  com a assessoria jurídica da escola antes de usar o percentual isoladamente para
+  decidir uma retenção, já que regimentos internos e normas estaduais/municipais podem
+  prever regras adicionais de abono/reposição.
+- Alunos e turmas excluídos (`deletedAt`) preservam o histórico de frequência já
+  lançado, consistente com a exclusão lógica usada no resto do app.
+
 ## Emissão de boletos via Banco Inter
 
 Módulo financeiro simplificado: **não há** conciliação de extrato ou PIX avulso — apenas
@@ -266,11 +292,14 @@ emissão mensal de boleto por aluno e atualização automática do status quando
    (Boletos)** — inclua também `webhook-boleto.write`/`webhook-boleto.read` se quiser
    cadastrar o webhook por lá.
 3. Gere o **certificado digital** da aplicação: o portal disponibiliza para download o
-   certificado (`.crt`) e a chave privada (`.key`) usados na autenticação mTLS. Salve-os
-   fora do controle de versão (ex: `classlink/certs/`, já ignorado pelo `.gitignore`).
+   certificado (`.crt`) e a chave privada (`.key`) usados na autenticação mTLS. Em
+   desenvolvimento local, salve-os fora do controle de versão (ex: `classlink/certs/`,
+   já ignorado pelo `.gitignore`). **Em produção na Vercel** (sem sistema de arquivos
+   persistente), copie o conteúdo de cada arquivo direto para as variáveis de ambiente
+   `BANCO_INTER_CERT`/`BANCO_INTER_KEY` — veja a opção 1 no `.env.example`.
 4. Copie o **Client ID** e o **Client Secret** exibidos na aplicação.
 5. Anote o **número da conta corrente** Inter que vai receber os boletos.
-6. Preencha no `.env`:
+6. Preencha no `.env` (desenvolvimento local, usando os caminhos de arquivo):
    ```
    BANCO_INTER_AMBIENTE="sandbox"        # troque para "producao" quando for para valer
    BANCO_INTER_CLIENT_ID="..."
@@ -280,6 +309,8 @@ emissão mensal de boleto por aluno e atualização automática do status quando
    BANCO_INTER_CONTA_CORRENTE="..."
    BANCO_INTER_WEBHOOK_SECRET="gere-uma-string-aleatoria"
    ```
+   Em produção serverless, substitua as duas últimas linhas do certificado por
+   `BANCO_INTER_CERT`/`BANCO_INTER_KEY` com o conteúdo dos arquivos (veja o passo 3).
 7. Teste primeiro no **ambiente sandbox** do Inter (dados fictícios) antes de apontar
    para produção.
 8. Cadastre o webhook de pagamento chamando `registrarWebhook` (em
@@ -420,10 +451,11 @@ conversa no ClassLink. Cada canal fala com seu próprio provedor:
    [Supabase](https://supabase.com) ou [Railway](https://railway.app).
 2. Configure as variáveis de ambiente na plataforma de deploy (mesmas do `.env.example`).
    Os certificados do Banco Inter não podem ser lidos de um caminho de arquivo em
-   ambientes serverless — grave o conteúdo do `.crt`/`.key` como variáveis de ambiente
-   (ou em um volume/secret da plataforma) e adapte `BANCO_INTER_CERT_PATH`/
-   `BANCO_INTER_KEY_PATH` em `src/lib/banco-inter.ts` para gravá-los em `/tmp` no boot,
-   se necessário.
+   ambientes serverless (a Vercel não tem sistema de arquivos persistente) — grave o
+   conteúdo do `.crt`/`.key` diretamente nas variáveis `BANCO_INTER_CERT`/
+   `BANCO_INTER_KEY` (veja a opção 1 no `.env.example`); `src/lib/banco-inter.ts` já lê
+   o certificado a partir delas quando estiverem preenchidas, sem precisar de arquivo
+   nenhum em disco.
 3. Rode `npx prisma migrate deploy` contra o banco de produção (uma vez, no pipeline de
    deploy ou manualmente) e depois `npm run db:seed` se quiser dados de exemplo.
 4. Faça o deploy na [Vercel](https://vercel.com): conecte o repositório GitHub — a Vercel
@@ -440,8 +472,6 @@ conversa no ClassLink. Cada canal fala com seu próprio provedor:
 
 ## Roadmap (fora do escopo atual)
 
-- Controle de frequência completo pela interface (o modelo `Attendance` já existe no
-  banco, mas ainda não tem tela/API dedicada).
 - Conciliação de extrato bancário ou PIX avulso (deliberadamente fora do escopo do
   módulo financeiro atual).
 - App nativo publicado nas lojas (o app atual é um PWA instalável pelo navegador).

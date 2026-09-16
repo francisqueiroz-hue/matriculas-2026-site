@@ -10,6 +10,7 @@ const baseLinks: NavLink[] = [
   { href: "/dashboard/comunicados", label: "Comunicados" },
   { href: "/dashboard/mensagens", label: "Mensagens" },
   { href: "/dashboard/agenda", label: "Agenda" },
+  { href: "/dashboard/frequencia", label: "Frequência" },
 ];
 
 const guardianLinks: NavLink[] = [

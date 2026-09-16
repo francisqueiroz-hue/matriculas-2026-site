@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
+
+/** Compara o segredo em tempo constante (mesmo padrão usado nos webhooks do WhatsApp/Mailgun). */
+function segredoValido(esperado: string, recebido: string | null): boolean {
+  if (!recebido) return false;
+  const expectedBuf = Buffer.from(esperado);
+  const receivedBuf = Buffer.from(recebido);
+  if (expectedBuf.length !== receivedBuf.length) return false;
+  return timingSafeEqual(expectedBuf, receivedBuf);
+}
 
 // Situações da API do Inter que indicam pagamento confirmado.
 const SITUACOES_PAGO = new Set(["RECEBIDO", "MARCADO_RECEBIDO", "PAGO"]);
@@ -20,7 +30,7 @@ interface EventoWebhook {
 export async function POST(request: NextRequest) {
   try {
     const secret = process.env.BANCO_INTER_WEBHOOK_SECRET;
-    if (!secret || request.nextUrl.searchParams.get("secret") !== secret) {
+    if (!secret || !segredoValido(secret, request.nextUrl.searchParams.get("secret"))) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 

@@ -52,12 +52,19 @@ function env(name: string): string {
   return value;
 }
 
+/** true quando o certificado mTLS foi informado por conteúdo (variável de ambiente) OU por caminho de arquivo. */
+function temCertificadoConfigurado() {
+  return Boolean(
+    (process.env.BANCO_INTER_CERT && process.env.BANCO_INTER_KEY) ||
+      (process.env.BANCO_INTER_CERT_PATH && process.env.BANCO_INTER_KEY_PATH),
+  );
+}
+
 export function isBancoInterConfigured() {
   return Boolean(
     process.env.BANCO_INTER_CLIENT_ID &&
       process.env.BANCO_INTER_CLIENT_SECRET &&
-      process.env.BANCO_INTER_CERT_PATH &&
-      process.env.BANCO_INTER_KEY_PATH &&
+      temCertificadoConfigurado() &&
       process.env.BANCO_INTER_CONTA_CORRENTE,
   );
 }
@@ -68,13 +75,37 @@ function baseUrl() {
     : "https://cdpj-sandbox.partners.uatinter.co";
 }
 
+/**
+ * Lê o certificado/chave mTLS. Prioriza o CONTEÚDO em variável de ambiente
+ * (BANCO_INTER_CERT/BANCO_INTER_KEY) — obrigatório em ambientes serverless como a
+ * Vercel, que não têm sistema de arquivos persistente para gravar os `.crt`/`.key`
+ * baixados do portal do Inter. Mantém o caminho de arquivo (BANCO_INTER_CERT_PATH/
+ * BANCO_INTER_KEY_PATH) como alternativa para desenvolvimento local.
+ *
+ * Aceita o mesmo formato usado para FIREBASE_PRIVATE_KEY: se a variável de ambiente
+ * guardar as quebras de linha escapadas como "\n" (comum em painéis que só aceitam
+ * valor de uma linha), elas são desfeitas antes de montar o Buffer do PEM.
+ */
+function lerCertificadoEChave(): { cert: Buffer; key: Buffer } {
+  const certConteudo = process.env.BANCO_INTER_CERT;
+  const keyConteudo = process.env.BANCO_INTER_KEY;
+  if (certConteudo && keyConteudo) {
+    return {
+      cert: Buffer.from(certConteudo.replace(/\\n/g, "\n")),
+      key: Buffer.from(keyConteudo.replace(/\\n/g, "\n")),
+    };
+  }
+  return {
+    cert: readFileSync(env("BANCO_INTER_CERT_PATH")),
+    key: readFileSync(env("BANCO_INTER_KEY_PATH")),
+  };
+}
+
 let agentCache: https.Agent | null = null;
 function mtlsAgent(): https.Agent {
   if (agentCache) return agentCache;
-  agentCache = new https.Agent({
-    cert: readFileSync(env("BANCO_INTER_CERT_PATH")),
-    key: readFileSync(env("BANCO_INTER_KEY_PATH")),
-  });
+  const { cert, key } = lerCertificadoEChave();
+  agentCache = new https.Agent({ cert, key });
   return agentCache;
 }
 
