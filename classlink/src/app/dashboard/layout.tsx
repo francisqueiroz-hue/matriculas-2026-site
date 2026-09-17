@@ -5,6 +5,7 @@ import { UserProvider } from "@/components/UserContext";
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { PushRegister } from "@/components/PushRegister";
+import { IosInstallBanner } from "@/components/IosInstallBanner";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -40,7 +41,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <PushRegister />
       <div className="flex flex-1">
         <Sidebar />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+          <IosInstallBanner />
+          {children}
+        </main>
       </div>
     </UserProvider>
   );
