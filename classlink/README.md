@@ -63,8 +63,8 @@ classlink/
 
 | Perfil | Pode |
 | --- | --- |
-| **Administrador** | Gerenciar turmas, alunos e vínculos de responsáveis; criar contas de equipe; publicar avisos/comunicados para toda a escola ou turmas; ver painel de engajamento; configurar mensalidade e vencimento; acompanhar boletos pagos/pendentes; marcar e consultar frequência de qualquer turma. |
-| **Professor/Funcionário** | Publicar avisos e comunicados nas turmas em que leciona; enviar mensagens diretas aos responsáveis dessas turmas; criar eventos na agenda; ver quem respondeu um comunicado e reenviar lembrete; marcar e consultar frequência das turmas em que leciona. |
+| **Administrador** | Gerenciar turmas, alunos e vínculos de responsáveis; criar contas de equipe; publicar avisos/comunicados para toda a escola ou turmas; ver painel de engajamento; configurar mensalidade e vencimento; acompanhar boletos pagos/pendentes; marcar e consultar frequência de qualquer turma; conversar com responsáveis e com qualquer outro membro da equipe. |
+| **Professor/Funcionário** | Publicar avisos e comunicados nas turmas em que leciona; enviar mensagens diretas aos responsáveis dessas turmas e a outros membros da equipe (direção e demais professores/funcionários); criar eventos na agenda; ver quem respondeu um comunicado e reenviar lembrete; marcar e consultar frequência das turmas em que leciona. |
 | **Responsável** | Ver o mural (escola + turma do filho/a), confirmar leitura de avisos, responder comunicados (autorizar passeio, confirmar presença, confirmar leitura) para cada filho vinculado, conversar com a equipe escolar, ver a agenda, a frequência e os boletos de cada filho. |
 
 ## Rodando localmente
@@ -414,6 +414,27 @@ conversa no ClassLink. Cada canal fala com seu próprio provedor:
 > ([WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api),
 > [Mailgun](https://documentation.mailgun.com)) antes de ir para produção. Cada
 > integração fica isolada em `src/lib/whatsapp.ts` e `src/lib/email.ts`.
+
+## Mensagens internas da equipe
+
+Além de conversar com responsáveis, administradores e professores/funcionários também
+podem trocar mensagens diretamente entre si — por exemplo, um professor avisando a
+coordenação sobre uma ocorrência, ou a direção combinando algo com toda a equipe
+individualmente. É um canal separado das conversas com família:
+
+- Aparece na mesma tela **Mensagens**, numa lista única e ordenada pela mensagem mais
+  recente, com um rótulo "· equipe" para diferenciar visualmente das conversas com
+  responsáveis.
+- Ao clicar em "Nova conversa", os contatos ficam agrupados em duas seções: **Equipe**
+  (qualquer ADMIN/STAFF ativo da escola, exceto você mesmo) e **Responsáveis**.
+- Não tem envio por WhatsApp/e-mail nem o botão de "Requisição de itens" — esses dois
+  recursos são específicos da comunicação com a família. É só texto, dentro do app.
+- Só ADMIN e STAFF têm acesso; responsáveis não veem nem podem iniciar esse tipo de
+  conversa.
+- Tecnicamente é modelado como uma tabela separada (`TeamConversation`/`TeamMessage`),
+  reaproveitando o mesmo padrão de UI e as mesmas notificações push das conversas com
+  responsáveis, mas sem a lógica de "só posso falar com quem compartilha uma turma" —
+  qualquer membro da equipe pode falar com qualquer outro da mesma escola.
 
 ## LGPD
 

@@ -1,27 +1,46 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 
 type Canal = "APP" | "WHATSAPP" | "EMAIL";
 
-interface Message {
+/** Mensagem já normalizada para exibição, venha ela de uma conversa com responsável (com canal) ou de equipe (sem canal). */
+interface DisplayMessage {
   id: string;
   body: string;
-  channel: Canal;
+  channel: Canal | null;
   createdAt: string;
   sender: { id: string; name: string; role: string };
 }
 
-interface ConversationData {
+interface GuardianConversationResponse {
   conversation: {
     id: string;
     staff: { id: string; name: string };
     guardian: { id: string; name: string; phone: string | null; email: string };
   };
-  messages: Message[];
+  messages: { id: string; body: string; channel: Canal; createdAt: string; sender: { id: string; name: string; role: string } }[];
+}
+
+interface TeamConversationResponse {
+  conversation: {
+    id: string;
+    userA: { id: string; name: string; role: string };
+    userB: { id: string; name: string; role: string };
+  };
+  messages: { id: string; body: string; createdAt: string; sender: { id: string; name: string; role: string } }[];
+}
+
+/** Estado unificado da conversa, independente do tipo (responsável ou equipe). */
+interface ConversationState {
+  counterpart: { id: string; name: string };
+  guardianPhone: string | null;
+  /** Só relevante para conversas com responsável: se o usuário atual é o membro da equipe (habilita canal e requisição). */
+  souStaffNaConversa: boolean;
+  messages: DisplayMessage[];
 }
 
 const ITENS_REQUISICAO = [
@@ -37,9 +56,19 @@ const ITENS_REQUISICAO = [
 const CANAL_LABEL: Record<Canal, string> = { APP: "ClassLink", WHATSAPP: "WhatsApp", EMAIL: "E-mail" };
 
 export default function ConversationPage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-slate-500">Carregando conversa...</p>}>
+      <ConversationPageInner />
+    </Suspense>
+  );
+}
+
+function ConversationPageInner() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const isEquipe = searchParams.get("tipo") === "equipe";
   const user = useCurrentUser();
-  const [data, setData] = useState<ConversationData | null>(null);
+  const [data, setData] = useState<ConversationState | null>(null);
   const [text, setText] = useState("");
   const [canalEnvio, setCanalEnvio] = useState<Canal>("APP");
   const [sending, setSending] = useState(false);
@@ -50,7 +79,27 @@ export default function ConversationPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   function load() {
-    apiJson<ConversationData>(`/api/messages/conversations/${id}`).then(setData);
+    if (isEquipe) {
+      apiJson<TeamConversationResponse>(`/api/team-messages/conversations/${id}`).then((res) => {
+        const counterpart = user.id === res.conversation.userA.id ? res.conversation.userB : res.conversation.userA;
+        setData({
+          counterpart,
+          guardianPhone: null,
+          souStaffNaConversa: false,
+          messages: res.messages.map((m) => ({ ...m, channel: null })),
+        });
+      });
+    } else {
+      apiJson<GuardianConversationResponse>(`/api/messages/conversations/${id}`).then((res) => {
+        const souStaffNaConversa = user.id === res.conversation.staff.id;
+        setData({
+          counterpart: souStaffNaConversa ? res.conversation.guardian : res.conversation.staff,
+          guardianPhone: res.conversation.guardian.phone,
+          souStaffNaConversa,
+          messages: res.messages,
+        });
+      });
+    }
   }
 
   useEffect(() => {
@@ -58,7 +107,7 @@ export default function ConversationPage() {
     const interval = setInterval(load, 4000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, isEquipe]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -68,11 +117,14 @@ export default function ConversationPage() {
     setSending(true);
     setSendError(null);
     try {
-      const res = await apiJson<{ message: Message }>(`/api/messages/conversations/${id}`, {
+      const path = isEquipe ? `/api/team-messages/conversations/${id}` : `/api/messages/conversations/${id}`;
+      const payload = isEquipe ? { body } : { body, channel };
+      const res = await apiJson<{ message: DisplayMessage }>(path, {
         method: "POST",
-        body: JSON.stringify({ body, channel }),
+        body: JSON.stringify(payload),
       });
-      setData((prev) => (prev ? { ...prev, messages: [...prev.messages, res.message] } : prev));
+      const message: DisplayMessage = isEquipe ? { ...res.message, channel: null } : res.message;
+      setData((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev));
       return true;
     } catch (err) {
       setSendError(err instanceof Error ? err.message : "Erro ao enviar mensagem");
@@ -106,15 +158,17 @@ export default function ConversationPage() {
 
   if (!data) return <p className="text-sm text-slate-500">Carregando conversa...</p>;
 
-  const souStaff = user.id === data.conversation.staff.id;
-  const counterpart = souStaff ? data.conversation.guardian.name : data.conversation.staff.name;
-  const guardianTemTelefone = Boolean(data.conversation.guardian.phone);
+  const podeUsarFuncoesDeResponsavel = !isEquipe && data.souStaffNaConversa;
+  const guardianTemTelefone = Boolean(data.guardianPhone);
 
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col">
       <div className="mb-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold">{counterpart}</h1>
-        {souStaff && (
+        <h1 className="text-lg font-bold">
+          {data.counterpart.name}
+          {isEquipe && <span className="ml-2 text-xs font-normal text-slate-400">· equipe</span>}
+        </h1>
+        {podeUsarFuncoesDeResponsavel && (
           <button
             onClick={() => setShowRequisicao((v) => !v)}
             className="flex items-center gap-1 rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950"
@@ -124,7 +178,7 @@ export default function ConversationPage() {
         )}
       </div>
 
-      {showRequisicao && (
+      {showRequisicao && podeUsarFuncoesDeResponsavel && (
         <form
           onSubmit={handleEnviarRequisicao}
           className="mb-3 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900 dark:bg-indigo-950/40"
@@ -178,7 +232,7 @@ export default function ConversationPage() {
                 <p className="whitespace-pre-wrap">{m.body}</p>
                 <p className={`mt-1 flex items-center gap-1 text-[10px] ${mine ? "text-indigo-100" : "text-slate-400"}`}>
                   {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                  {m.channel !== "APP" && <span>· via {CANAL_LABEL[m.channel]}</span>}
+                  {m.channel && m.channel !== "APP" && <span>· via {CANAL_LABEL[m.channel]}</span>}
                 </p>
               </div>
             </div>
@@ -196,7 +250,7 @@ export default function ConversationPage() {
           placeholder="Escreva uma mensagem..."
           className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
         />
-        {souStaff && (
+        {podeUsarFuncoesDeResponsavel && (
           <select
             value={canalEnvio}
             onChange={(e) => setCanalEnvio(e.target.value as Canal)}

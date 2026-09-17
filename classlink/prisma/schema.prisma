@@ -74,14 +74,15 @@ model School {
   diaVencimentoPadrao Int? // dia do mês usado como vencimento quando o aluno não tem um específico
   diaEmissaoBoletos   Int? // dia do mês em que o job de emissão deve rodar
 
-  users       User[]
-  classes     Class[]
-  students    Student[]
-  posts       Post[]
-  events      Event[]
-  comunicados Comunicado[]
-  boletos     Boleto[]
-  disciplinas Disciplina[]
+  users             User[]
+  classes           Class[]
+  students          Student[]
+  posts             Post[]
+  events            Event[]
+  comunicados       Comunicado[]
+  boletos           Boleto[]
+  disciplinas       Disciplina[]
+  teamConversations TeamConversation[]
 }
 
 model User {
@@ -124,6 +125,13 @@ model User {
   conversationsA   Conversation[] @relation("ConversationStaff")
   conversationsB   Conversation[] @relation("ConversationGuardian")
   attendanceMarked Attendance[]   @relation("AttendanceMarkedBy")
+
+  // Mensagens internas entre equipe (ADMIN/STAFF) — separado de Conversation/Message,
+  // que são sempre entre um funcionário e um responsável (inclusive com envio por
+  // WhatsApp/e-mail, que não faz sentido aqui).
+  teamConversationsA TeamConversation[] @relation("TeamConversationUserA")
+  teamConversationsB TeamConversation[] @relation("TeamConversationUserB")
+  teamMessagesSent   TeamMessage[]      @relation("TeamMessageSender")
 
   comunicadosCriados  Comunicado[]         @relation("ComunicadoAuthor")
   respostasComunicado RespostaComunicado[] @relation("RespostaResponsavel")
@@ -472,4 +480,45 @@ model Attendance {
 
   @@unique([studentId, date])
   @@index([studentId])
+}
+
+// Conversa interna entre dois membros da equipe (ADMIN/STAFF) da mesma escola — ex:
+// direção falando com um professor, ou um professor com outro. Deliberadamente separada
+// de Conversation (que é sempre entre um funcionário e um responsável, com opção de
+// envio por WhatsApp/e-mail): aqui os dois participantes são internos, então não há
+// canal externo nem restrição de "atende a mesma turma".
+// userAId é sempre o menor id em ordem lexicográfica entre os dois participantes (a
+// aplicação normaliza isso antes de gravar), para nunca existir a mesma dupla duas vezes
+// em ordem trocada.
+model TeamConversation {
+  id       String @id @default(cuid())
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  userA   User   @relation("TeamConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userAId String
+  userB   User   @relation("TeamConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  userBId String
+
+  createdAt DateTime @default(now())
+
+  messages TeamMessage[]
+
+  @@unique([userAId, userBId])
+  @@index([schoolId])
+  @@index([userAId])
+  @@index([userBId])
+}
+
+model TeamMessage {
+  id             String           @id @default(cuid())
+  conversation   TeamConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId String
+  sender         User             @relation("TeamMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId       String
+  body           String
+  createdAt      DateTime         @default(now())
+  readAt         DateTime?
+
+  @@index([conversationId])
 }
