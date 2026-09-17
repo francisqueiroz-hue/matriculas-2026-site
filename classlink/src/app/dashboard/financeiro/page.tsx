@@ -10,6 +10,8 @@ interface Boleto {
   valor: string;
   vencimento: string;
   status: "PENDENTE" | "PAGO" | "VENCIDO" | "ERRO";
+  /** Só existe quando o boleto foi realmente emitido no Banco Inter (tem PDF/linha digitável/PIX para pagar). */
+  codigoSolicitacao: string | null;
 }
 
 interface BillingInfo {
@@ -144,10 +146,13 @@ export default function FinanceiroPage() {
                 <p className="text-xs text-slate-500">
                   R$ {Number(b.valor).toFixed(2)} · vencimento {new Date(b.vencimento).toLocaleDateString("pt-BR")}
                 </p>
+                {b.status !== "ERRO" && !b.codigoSolicitacao && (
+                  <p className="text-xs text-slate-400">Pagamento online ainda não disponível para este mês</p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_COLOR[b.status]}`}>{STATUS_LABEL[b.status]}</span>
-                {b.status !== "ERRO" && (
+                {b.status !== "ERRO" && b.codigoSolicitacao && (
                   <a
                     href={`/api/billing/boletos/${b.id}/pdf`}
                     target="_blank"

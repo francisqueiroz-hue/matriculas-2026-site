@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
-import { mesReferenciaAtual } from "@/lib/billing";
+import { mesReferenciaAtual, agoraNoFusoDaEscola } from "@/lib/billing";
 
 /** Painel simples: quantos boletos foram pagos vs. pendentes no mês corrente. */
 export async function GET() {
   try {
     const session = await requireRole("ADMIN");
-    const mesReferencia = mesReferenciaAtual();
+    const mesReferencia = mesReferenciaAtual(agoraNoFusoDaEscola());
 
     const boletos = await prisma.boleto.findMany({
       where: { schoolId: session.schoolId, mesReferencia },

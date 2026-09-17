@@ -1,10 +1,27 @@
-import { describe, expect, it } from "vitest";
-import { mesReferenciaAtual, calcularVencimento, formatarDataISO } from "@/lib/billing";
+import { describe, expect, it, vi } from "vitest";
+import { mesReferenciaAtual, calcularVencimento, formatarDataISO, agoraNoFusoDaEscola } from "@/lib/billing";
 
 describe("mesReferenciaAtual", () => {
   it("formata como AAAA-MM com zero à esquerda", () => {
     expect(mesReferenciaAtual(new Date(2026, 0, 15))).toBe("2026-01");
     expect(mesReferenciaAtual(new Date(2026, 10, 3))).toBe("2026-11");
+  });
+});
+
+describe("agoraNoFusoDaEscola", () => {
+  it("usa o dia/mês de Brasília (America/Sao_Paulo), não o de UTC", () => {
+    vi.useFakeTimers();
+    try {
+      // 01/10 02:30 UTC == 30/09 23:30 em Brasília (UTC-3): para a escola, ainda é 30/09.
+      vi.setSystemTime(new Date("2026-10-01T02:30:00.000Z"));
+      const hoje = agoraNoFusoDaEscola();
+      expect(hoje.getDate()).toBe(30);
+      expect(hoje.getMonth()).toBe(8); // setembro (0-indexado)
+      expect(hoje.getFullYear()).toBe(2026);
+      expect(mesReferenciaAtual(hoje)).toBe("2026-09");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

@@ -17,12 +17,23 @@ interface Config {
   diaEmissaoBoletos: number | null;
 }
 
+interface ResultadoGeracao {
+  mesReferencia: string;
+  criados: number;
+  emitidos: number;
+  erros: number;
+  ignorados: number;
+}
+
 function FinanceiroContent() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [diaVencimento, setDiaVencimento] = useState("");
   const [diaEmissao, setDiaEmissao] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [gerando, setGerando] = useState(false);
+  const [resultadoGeracao, setResultadoGeracao] = useState<ResultadoGeracao | null>(null);
+  const [erroGeracao, setErroGeracao] = useState<string | null>(null);
 
   function load() {
     apiJson<Summary>("/api/admin/billing/summary").then(setSummary);
@@ -33,6 +44,21 @@ function FinanceiroContent() {
   }
 
   useEffect(load, []);
+
+  async function gerarBoletosDoMes() {
+    setGerando(true);
+    setErroGeracao(null);
+    setResultadoGeracao(null);
+    try {
+      const resultado = await apiJson<ResultadoGeracao>("/api/admin/billing/gerar-mes", { method: "POST" });
+      setResultadoGeracao(resultado);
+      load();
+    } catch (err) {
+      setErroGeracao(err instanceof Error ? err.message : "Erro ao gerar boletos do mês");
+    } finally {
+      setGerando(false);
+    }
+  }
 
   async function salvarConfig(e: React.FormEvent) {
     e.preventDefault();
@@ -88,10 +114,36 @@ function FinanceiroContent() {
           {saving ? "Salvando..." : "Salvar configuração"}
         </button>
         <p className="text-xs text-slate-500">
-          O valor de mensalidade de cada aluno é definido na tela de Alunos. A emissão mensal roda automaticamente via job
-          agendado (veja README).
+          O valor de mensalidade de cada aluno é definido na tela de Alunos. A geração mensal roda automaticamente via job
+          agendado (veja README), no dia de emissão configurado acima.
         </p>
       </form>
+
+      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-sm font-semibold text-slate-500">Gerar valores deste mês agora</h2>
+        <p className="text-xs text-slate-500">
+          Cria já o registro de valor e vencimento (mês corrente) para os alunos com mensalidade configurada que ainda não
+          têm um boleto neste mês, sem esperar o dia de emissão automática. Se o Banco Inter ainda não estiver configurado,
+          o responsável já passa a ver o valor em “Financeiro” — só a emissão real (boleto/PIX pagável) fica pendente.
+        </p>
+        <button
+          type="button"
+          onClick={gerarBoletosDoMes}
+          disabled={gerando}
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+        >
+          {gerando ? "Gerando..." : "Gerar valores deste mês"}
+        </button>
+        {erroGeracao && <p className="text-xs text-red-600">{erroGeracao}</p>}
+        {resultadoGeracao && (
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            {resultadoGeracao.mesReferencia}: {resultadoGeracao.criados} valor(es) criado(s)
+            {resultadoGeracao.emitidos > 0 && `, ${resultadoGeracao.emitidos} emitido(s) de verdade no Banco Inter`}
+            {resultadoGeracao.erros > 0 && `, ${resultadoGeracao.erros} com erro na emissão`}
+            {resultadoGeracao.ignorados > 0 && ` (${resultadoGeracao.ignorados} já existiam)`}.
+          </p>
+        )}
+      </div>
 
       {summary && (
         <div>

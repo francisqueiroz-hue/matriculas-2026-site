@@ -265,24 +265,44 @@ perfil, como na tabela acima):
 ## Emissão de boletos via Banco Inter
 
 Módulo financeiro simplificado: **não há** conciliação de extrato ou PIX avulso — apenas
-emissão mensal de boleto por aluno e atualização automática do status quando pago.
+geração mensal do valor da mensalidade por aluno, com emissão real de boleto/PIX no Inter
+e atualização automática do status quando pago.
+
+**O valor não depende do Inter estar configurado.** São duas etapas independentes:
+
+1. **Geração do valor** — sempre acontece: cria o registro do mês (valor + vencimento)
+   para cada aluno com mensalidade definida, e é isso que aparece para o responsável em
+   **Financeiro**. Não exige nenhuma credencial do Inter.
+2. **Emissão real** (boleto com linha digitável, PIX copia-e-cola e PDF pagáveis) — só é
+   tentada quando as credenciais do Inter (abaixo) estão configuradas. Sem elas, o
+   responsável já vê o valor e o vencimento, mas ainda sem opção de pagar online — a
+   tela mostra "Pagamento online ainda não disponível para este mês" nesse caso.
+
+Isso significa que dá para usar só a etapa 1 por enquanto (ex: enquanto a integração com
+o Inter não é prioridade) e ligar a etapa 2 depois, sem retrabalho — quando o Inter for
+configurado, os boletos do mês corrente que já existiam só com o valor são completados
+com a emissão real, em vez de duplicados.
 
 ### Como funciona
 
 1. O administrador define, em **Financeiro**, o dia de vencimento padrão e o dia do mês
-   em que os boletos devem ser emitidos; e, na tela **Alunos**, o valor da mensalidade
+   em que os valores devem ser gerados; e, na tela **Alunos**, o valor da mensalidade
    (e opcionalmente um dia de vencimento específico) de cada aluno.
-2. O responsável cadastra CPF e endereço em **Financeiro → Cadastrar dados de cobrança**
-   (exigido pelo registro bancário do boleto — por isso não é coletado no cadastro
-   padrão, só quando o módulo financeiro é usado).
-3. O job `/api/cron/emitir-boletos`, rodando uma vez por dia, verifica se hoje é o dia
+2. O job `/api/cron/emitir-boletos`, rodando uma vez por dia, verifica se hoje é o dia
    configurado para cada escola; para cada aluno com mensalidade definida e sem boleto
-   no mês corrente, chama a API do Inter e grava o resultado (`PENDENTE` ou `ERRO`, com
-   o motivo).
+   no mês corrente, cria o registro de valor e, se o Inter estiver configurado, tenta
+   também a emissão real (gravando `PENDENTE` ou `ERRO`, com o motivo, se essa etapa
+   falhar). Em **Financeiro** (admin) também dá para clicar em **"Gerar valores deste
+   mês"** para criar esses registros na hora, sem esperar o dia configurado — útil para
+   já popular o mês corrente.
+3. O responsável cadastra CPF e endereço em **Financeiro → Cadastrar dados de cobrança**
+   — só é exigido quando a emissão real (etapa 2 acima) for tentada; por isso não é
+   coletado no cadastro padrão, só quando o módulo financeiro é usado.
 4. O Inter chama `POST /api/webhooks/banco-inter` quando o boleto é pago; o status muda
    para `PAGO` e o responsável recebe uma notificação push.
-5. O responsável acessa **Financeiro** para ver todos os boletos e baixar o PDF (buscado
-   sob demanda na API do Inter — o PDF não fica armazenado no servidor).
+5. O responsável acessa **Financeiro** para ver o valor, o vencimento e — quando já
+   emitido de verdade — baixar o PDF (buscado sob demanda na API do Inter; o PDF não
+   fica armazenado no servidor).
 
 ### Obtendo as credenciais no portal do Inter
 
