@@ -133,12 +133,12 @@ export default function GuiaPage() {
           aqui pra ajudar.
         </p>
         <a
-          href="https://wa.me/5521992865778"
+          href="https://wa.me/5521964699441"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white transition hover:bg-indigo-700"
         >
-          (21) 99286-5778
+          (21) 96469-9441
         </a>
       </div>
     </div>
