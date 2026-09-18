@@ -40,7 +40,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/comunicados
         [
           csvEscape(r.aluno.name),
           csvEscape(r.responsavel.name),
-          csvEscape(r.responsavel.email),
+          csvEscape(r.responsavel.email ?? ""),
           csvEscape(RESPOSTA_LABEL[r.resposta] ?? r.resposta),
           csvEscape(r.dataHoraResposta.toLocaleString("pt-BR")),
         ].join(","),

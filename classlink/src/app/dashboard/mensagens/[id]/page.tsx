@@ -20,7 +20,7 @@ interface GuardianConversationResponse {
   conversation: {
     id: string;
     staff: { id: string; name: string };
-    guardian: { id: string; name: string; phone: string | null; email: string };
+    guardian: { id: string; name: string; phone: string | null; email: string | null };
   };
   messages: { id: string; body: string; channel: Canal; createdAt: string; sender: { id: string; name: string; role: string } }[];
 }
@@ -38,6 +38,7 @@ interface TeamConversationResponse {
 interface ConversationState {
   counterpart: { id: string; name: string };
   guardianPhone: string | null;
+  guardianEmail: string | null;
   /** Só relevante para conversas com responsável: se o usuário atual é o membro da equipe (habilita canal e requisição). */
   souStaffNaConversa: boolean;
   messages: DisplayMessage[];
@@ -85,6 +86,7 @@ function ConversationPageInner() {
         setData({
           counterpart,
           guardianPhone: null,
+          guardianEmail: null,
           souStaffNaConversa: false,
           messages: res.messages.map((m) => ({ ...m, channel: null })),
         });
@@ -95,6 +97,7 @@ function ConversationPageInner() {
         setData({
           counterpart: souStaffNaConversa ? res.conversation.guardian : res.conversation.staff,
           guardianPhone: res.conversation.guardian.phone,
+          guardianEmail: res.conversation.guardian.email,
           souStaffNaConversa,
           messages: res.messages,
         });
@@ -160,6 +163,7 @@ function ConversationPageInner() {
 
   const podeUsarFuncoesDeResponsavel = !isEquipe && data.souStaffNaConversa;
   const guardianTemTelefone = Boolean(data.guardianPhone);
+  const guardianTemEmail = Boolean(data.guardianEmail);
 
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col">
@@ -260,7 +264,9 @@ function ConversationPageInner() {
             <option value="WHATSAPP" disabled={!guardianTemTelefone}>
               Enviar por: WhatsApp{!guardianTemTelefone ? " (sem telefone)" : ""}
             </option>
-            <option value="EMAIL">Enviar por: E-mail</option>
+            <option value="EMAIL" disabled={!guardianTemEmail}>
+              Enviar por: E-mail{!guardianTemEmail ? " (sem e-mail)" : ""}
+            </option>
           </select>
         )}
         <button

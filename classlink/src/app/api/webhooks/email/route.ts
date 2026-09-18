@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     const senderRaw = field(form, "sender") || field(form, "from");
     const senderEmail = extractEmailAddress(senderRaw);
-    if (!senderEmail || senderEmail !== conversation.guardian.email.toLowerCase()) {
+    if (!senderEmail || !conversation.guardian.email || senderEmail !== conversation.guardian.email.toLowerCase()) {
       console.warn(`E-mail recebido de remetente não confere com o responsável da conversa ${conversationId}: ${senderRaw}`);
       return NextResponse.json({ ok: true });
     }

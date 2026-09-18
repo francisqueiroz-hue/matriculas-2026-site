@@ -62,6 +62,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     } else if (canalEfetivo === "EMAIL") {
       if (!isEmailConfigured()) return NextResponse.json({ error: "Integração de e-mail não configurada" }, { status: 400 });
       const guardian = await prisma.user.findUniqueOrThrow({ where: { id: conversation.guardianId }, select: { email: true } });
+      if (!guardian.email) return NextResponse.json({ error: "Responsável não tem e-mail cadastrado" }, { status: 400 });
       const sent = await sendEmailMessage({ to: guardian.email, subject: "Nova mensagem do ClassLink", text: body, conversationId: id });
       externalId = sent.externalId;
     }

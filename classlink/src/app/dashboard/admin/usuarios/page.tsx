@@ -12,7 +12,8 @@ interface ClassOption {
 interface UserItem {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   role: "ADMIN" | "STAFF" | "GUARDIAN";
   active: boolean;
   isCoordenacao: boolean;
@@ -200,7 +201,7 @@ function UsuariosContent() {
                     {!u.active && <span className="text-xs text-red-500">inativo</span>}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {u.email}
+                    {u.email ?? u.phone ?? "sem contato"}
                     {u.classesTeaching.length > 0 && ` · ${u.classesTeaching.map((c) => c.class.name).join(", ")}`}
                   </p>
                 </div>
