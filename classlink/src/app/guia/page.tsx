@@ -11,7 +11,7 @@ const AREAS = [
   },
   {
     titulo: "Mensagens",
-    texto: "Fale direto com a coordenação ou a professora, sem precisar de WhatsApp.",
+    texto: "Fale direto com a secretaria ou a professora, sem precisar de WhatsApp.",
     path: "M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 20l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z",
   },
   {
@@ -38,7 +38,7 @@ const PASSOS = [
   },
   {
     titulo: "Entre com seu e-mail e a senha provisória",
-    texto: "A escola te repassa o e-mail cadastrado e uma senha provisória para o primeiro acesso. Se ainda não recebeu a sua, é só pedir à coordenação.",
+    texto: "A escola te repassa o e-mail cadastrado e uma senha provisória para o primeiro acesso. Se ainda não recebeu a sua, é só pedir à secretaria.",
   },
   {
     titulo: "Troque a senha",
@@ -129,7 +129,7 @@ export default function GuiaPage() {
       <div className="rounded-xl bg-indigo-50 p-6 text-center">
         <h2 className="mb-1 font-bold text-slate-900">Ficou com alguma dúvida?</h2>
         <p className="mx-auto mb-4 max-w-xs text-sm text-slate-600">
-          Qualquer dificuldade para entrar ou usar o ClassLink, é só chamar a coordenação. Estamos
+          Qualquer dificuldade para entrar ou usar o ClassLink, é só chamar a secretaria. Estamos
           aqui pra ajudar.
         </p>
         <a
