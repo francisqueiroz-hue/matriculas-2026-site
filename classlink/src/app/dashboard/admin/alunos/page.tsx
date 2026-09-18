@@ -13,7 +13,7 @@ interface StudentItem {
   id: string;
   name: string;
   class: { id: string; name: string };
-  guardians: { guardian: { id: string; name: string; email: string; phone: string | null } }[];
+  guardians: { guardian: { id: string; name: string; email: string | null; phone: string | null } }[];
   mensalidadeValor: string | null;
   diaVencimento: number | null;
 }
@@ -65,11 +65,15 @@ function AlunosContent() {
   async function handleLinkGuardian(studentId: string, e: React.FormEvent) {
     e.preventDefault();
     const form = guardianForm(studentId);
+    if (!form.email && !form.phone) {
+      setFeedback((prev) => ({ ...prev, [studentId]: "Informe pelo menos um e-mail ou telefone do responsável." }));
+      return;
+    }
     try {
       const data = await apiJson<{ temporaryPassword?: string }>(`/api/admin/students/${studentId}/guardians`, {
         method: "POST",
         body: JSON.stringify({
-          guardianEmail: form.email,
+          guardianEmail: form.email || undefined,
           guardianName: form.guardianName,
           guardianPhone: form.phone || undefined,
           relation: form.relation,
@@ -242,8 +246,8 @@ function AlunosContent() {
                   ) : (
                     <li key={g.guardian.id} className="flex items-center justify-between text-slate-600 dark:text-slate-300">
                       <span>
-                        {g.guardian.name} ({g.guardian.email}
-                        {g.guardian.phone ? ` · ${g.guardian.phone}` : ""})
+                        {g.guardian.name} ({g.guardian.email ?? g.guardian.phone ?? "sem contato"}
+                        {g.guardian.email && g.guardian.phone ? ` · ${g.guardian.phone}` : ""})
                       </span>
                       <span className="flex items-center gap-3">
                         <button onClick={() => startEditGuardian(g.guardian)} className="text-xs text-indigo-600 hover:underline">
@@ -276,18 +280,17 @@ function AlunosContent() {
                   className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
                 />
                 <input
-                  required
                   type="email"
-                  placeholder="E-mail do responsável"
+                  placeholder="E-mail do responsável (opcional)"
                   value={form.email}
                   onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, email: e.target.value } }))}
                   className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
                 />
                 <input
-                  placeholder="Telefone (opcional)"
+                  placeholder="Telefone (obrigatório se não tiver e-mail)"
                   value={form.phone}
                   onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, phone: e.target.value } }))}
-                  className="w-40 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                  className="w-56 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
                 />
                 <input
                   placeholder="Parentesco (opcional)"
@@ -299,6 +302,10 @@ function AlunosContent() {
                   Vincular responsável
                 </button>
               </form>
+              <p className="mt-1 text-xs text-slate-400">
+                Informe pelo menos um dos dois — e-mail ou telefone. Sem e-mail, o login é feito pelo telefone; o
+                próprio responsável pode adicionar um e-mail depois, em Minha conta.
+              </p>
 
               <form onSubmit={(e) => handleSalvarMensalidade(s.id, e)} className="mt-3 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
                 <label className="text-xs text-slate-500">

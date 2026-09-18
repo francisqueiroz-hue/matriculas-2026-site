@@ -19,6 +19,24 @@ export default function ContaPage() {
   const [pwSuccess, setPwSuccess] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
 
+  const [newEmail, setNewEmail] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+
+  async function handleAddEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setEmailError(null);
+    setEmailLoading(true);
+    try {
+      await apiJson("/api/account/update-email", { method: "POST", body: JSON.stringify({ email: newEmail }) });
+      router.refresh();
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Erro ao salvar e-mail");
+    } finally {
+      setEmailLoading(false);
+    }
+  }
+
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     setPwError(null);
@@ -58,9 +76,40 @@ export default function ContaPage() {
     <div className="max-w-lg space-y-6">
       <div>
         <h1 className="text-xl font-bold">Minha conta</h1>
-        <p className="mt-1 text-sm text-slate-500">{user.name} · {user.email}</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {user.name}
+          {user.email ? ` · ${user.email}` : ""}
+        </p>
         <p className="text-sm text-slate-500">{user.schoolName}</p>
       </div>
+
+      {!user.email && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="font-semibold">Adicionar e-mail</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Sua conta ainda não tem e-mail cadastrado. Adicione um para receber comunicados também por e-mail e
+            poder recuperar sua senha por lá.
+          </p>
+          <form onSubmit={handleAddEmail} className="mt-3 space-y-2">
+            <input
+              type="email"
+              required
+              placeholder="seuemail@exemplo.com"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+            />
+            {emailError && <p className="text-sm text-red-600">{emailError}</p>}
+            <button
+              type="submit"
+              disabled={emailLoading}
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {emailLoading ? "Salvando..." : "Salvar e-mail"}
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="font-semibold">Trocar senha</h2>

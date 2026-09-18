@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { linkGuardianSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
+import { normalizePhoneBR } from "@/lib/whatsapp";
 
 /** Vincula um responsável (existente ou novo) a um aluno. Vínculo explícito e revogável (LGPD). */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/students/[id]/guardians">) {
@@ -16,23 +17,34 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
     const student = await prisma.student.findFirst({ where: { id: studentId, schoolId: session.schoolId } });
     if (!student) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
 
-    let guardian = await prisma.user.findUnique({ where: { email: body.guardianEmail.toLowerCase() } });
+    const email = body.guardianEmail?.toLowerCase();
+    // Nem toda família tem e-mail — quando não informado, o cadastro é feito só com
+    // telefone (login também funciona por telefone, ver /api/auth/login).
+    const phone = body.guardianPhone ? normalizePhoneBR(body.guardianPhone) ?? body.guardianPhone : undefined;
+
+    let guardian = email
+      ? await prisma.user.findUnique({ where: { email } })
+      : phone
+        ? (
+            await prisma.user.findMany({ where: { role: "GUARDIAN", schoolId: session.schoolId, phone: { not: null } } })
+          ).find((candidate) => candidate.phone && normalizePhoneBR(candidate.phone) === phone) ?? null
+        : null;
     let temporaryPassword: string | undefined;
 
     if (!guardian) {
       temporaryPassword = body.password ?? randomBytes(6).toString("hex");
       guardian = await prisma.user.create({
         data: {
-          email: body.guardianEmail.toLowerCase(),
+          email,
           name: body.guardianName,
-          phone: body.guardianPhone,
+          phone,
           role: "GUARDIAN",
           schoolId: session.schoolId,
           passwordHash: await hashPassword(temporaryPassword),
         },
       });
     } else if (guardian.schoolId !== session.schoolId || guardian.role !== "GUARDIAN") {
-      return NextResponse.json({ error: "E-mail já usado por outro usuário nesta ou noutra escola" }, { status: 409 });
+      return NextResponse.json({ error: "Contato já usado por outro usuário nesta ou noutra escola" }, { status: 409 });
     }
 
     const link = await prisma.guardianStudent.upsert({

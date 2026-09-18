@@ -37,8 +37,8 @@ const PASSOS = [
     texto: "Toque no botão acima pelo navegador do celular (Safari ou Chrome) ou do computador. Não precisa instalar nada da loja de aplicativos.",
   },
   {
-    titulo: "Entre com seu e-mail e a senha provisória",
-    texto: "A escola te repassa o e-mail cadastrado e uma senha provisória para o primeiro acesso. Se ainda não recebeu a sua, é só pedir à secretaria.",
+    titulo: "Entre com seu e-mail (ou telefone) e a senha provisória",
+    texto: "A escola te repassa o contato cadastrado — e-mail ou telefone — e uma senha provisória para o primeiro acesso. Quem não tem e-mail pode entrar com o telefone normalmente, e adicionar um e-mail depois em Minha conta. Se ainda não recebeu sua senha, é só pedir à secretaria.",
   },
   {
     titulo: "Troque a senha",

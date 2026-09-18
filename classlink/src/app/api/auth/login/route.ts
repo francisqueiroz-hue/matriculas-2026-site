@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { resolveLoginIdentifier } from "@/lib/login-identifier";
 import {
   verifyPassword,
   signAccessToken,
@@ -13,7 +14,7 @@ import {
 import { handleApiError } from "@/lib/http";
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  identifier: z.string().min(3),
   password: z.string().min(1),
 });
 
@@ -21,7 +22,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = loginSchema.parse(await request.json());
 
-    const user = await prisma.user.findUnique({ where: { email: body.email.toLowerCase() } });
+    const identifier = resolveLoginIdentifier(body.identifier);
+    if (!identifier) {
+      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
+    }
+
+    const user =
+      identifier.type === "email"
+        ? await prisma.user.findUnique({ where: { email: identifier.value } })
+        : await prisma.user.findFirst({ where: { phone: identifier.value } });
     if (!user || !user.active || user.deletedAt) {
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
     }

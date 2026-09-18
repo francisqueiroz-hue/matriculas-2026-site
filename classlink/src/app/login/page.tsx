@@ -7,7 +7,7 @@ import { apiJson } from "@/lib/api-client";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ function LoginForm() {
     setError(null);
     setLoading(true);
     try {
-      await apiJson("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+      await apiJson("/api/auth/login", { method: "POST", body: JSON.stringify({ identifier, password }) });
       router.push(searchParams.get("next") ?? "/dashboard");
       router.refresh();
     } catch (err) {
@@ -39,14 +39,14 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium">E-mail</label>
+            <label className="mb-1 block text-sm font-medium">E-mail ou telefone</label>
             <input
-              type="email"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800"
-              placeholder="voce@escola.com"
+              placeholder="voce@escola.com ou (21) 90000-0000"
             />
           </div>
           <div>

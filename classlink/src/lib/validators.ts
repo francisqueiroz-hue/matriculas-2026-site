@@ -15,13 +15,18 @@ export const createStudentSchema = z.object({
 
 export const updateStudentSchema = createStudentSchema.partial();
 
-export const linkGuardianSchema = z.object({
-  guardianEmail: z.string().email(),
-  guardianName: z.string().min(1).max(150),
-  guardianPhone: z.string().max(30).optional(),
-  relation: z.string().max(50).optional(),
-  password: z.string().min(8).optional(),
-});
+export const linkGuardianSchema = z
+  .object({
+    guardianEmail: z.string().email().optional(),
+    guardianName: z.string().min(1).max(150),
+    guardianPhone: z.string().max(30).optional(),
+    relation: z.string().max(50).optional(),
+    password: z.string().min(8).optional(),
+  })
+  .refine((data) => Boolean(data.guardianEmail || data.guardianPhone), {
+    message: "Informe pelo menos um e-mail ou telefone do responsável",
+    path: ["guardianEmail"],
+  });
 
 export const createUserSchema = z.object({
   name: z.string().min(1).max(150),
@@ -44,6 +49,10 @@ export const updateUserSchema = z.object({
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: z.string().min(8),
+});
+
+export const updateEmailSchema = z.object({
+  email: z.string().email(),
 });
 
 export const createPostSchema = z.object({
