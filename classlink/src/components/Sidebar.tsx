@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
+import { NavIcon } from "@/components/NavIcon";
 import { apiFetch } from "@/lib/api-client";
 import { getNavLinks, useComunicadosPendentes } from "@/lib/nav-links";
 
@@ -36,7 +37,10 @@ export function Sidebar() {
               pathname === link.href ? "bg-indigo-100 text-indigo-700" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <span>{link.label}</span>
+            <span className="flex items-center gap-2.5">
+              <NavIcon path={link.icon} />
+              {link.label}
+            </span>
             {link.href === "/dashboard/comunicados" && comunicadosPendentes > 0 && (
               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
                 {comunicadosPendentes}
