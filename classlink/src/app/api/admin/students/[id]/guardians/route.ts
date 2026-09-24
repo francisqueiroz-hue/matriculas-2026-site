@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { linkGuardianSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
-import { normalizePhoneBR, sendAccessViaWhatsApp } from "@/lib/whatsapp";
+import { normalizePhoneBR, samePhoneBR, sendAccessViaWhatsApp } from "@/lib/whatsapp";
 import { linkWhatsAppManual, mensagemAcesso, parametrosModeloAcesso } from "@/lib/acesso";
 
 /** Vincula um responsável (existente ou novo) a um aluno. Vínculo explícito e revogável (LGPD). */
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
       : phone
         ? (
             await prisma.user.findMany({ where: { role: "GUARDIAN", schoolId: session.schoolId, phone: { not: null } } })
-          ).find((candidate) => candidate.phone && normalizePhoneBR(candidate.phone) === phone) ?? null
+          ).find((candidate) => candidate.phone && samePhoneBR(candidate.phone, phone)) ?? null
         : null;
     let temporaryPassword: string | undefined;
 

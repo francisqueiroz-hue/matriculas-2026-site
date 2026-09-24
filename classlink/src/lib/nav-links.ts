@@ -56,6 +56,11 @@ const adminLinks: NavLink[] = [
     icon: "M12 12a4 4 0 100-8 4 4 0 000 8z M4 20c1-4 4-6 8-6s7 2 8 6",
   },
   {
+    href: "/dashboard/admin/acessos",
+    label: "Acessos",
+    icon: "M15 7a3 3 0 11-6 0 3 3 0 016 0z M4 20c1-4 4-6 8-6 M16 16l2 2 4-4",
+  },
+  {
     href: "/dashboard/admin/matriculas",
     label: "Matrículas",
     icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2 M9 5a2 2 0 002 2h2a2 2 0 002-2 M9 5a2 2 0 012-2h2a2 2 0 012 2 M9 14l2 2 4-4",

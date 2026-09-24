@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
 import { findGuardianByPhone, verifyWhatsAppSignature } from "@/lib/whatsapp";
+import { ehPedidoDeAcesso } from "@/lib/acesso";
+import { responderNumeroNaoCadastrado, responderPedidoDeAcesso } from "@/lib/pedido-acesso";
 
 /** Handshake de verificação exigido pela Meta ao cadastrar a URL do webhook no Meta Developer Console. */
 export async function GET(request: NextRequest) {
@@ -93,14 +95,29 @@ export async function POST(request: NextRequest) {
       const jaProcessada = await prisma.message.findUnique({ where: { externalId: msg.id } });
       if (jaProcessada) continue;
 
+      const textoRecebido = msg.type === "text" ? (msg.text?.body ?? "") : "";
+      const pediuAcesso = ehPedidoDeAcesso(textoRecebido);
+
       const guardian = await findGuardianByPhone(msg.from);
       if (!guardian) {
         console.warn(`Mensagem WhatsApp recebida de número não cadastrado: ${msg.from}`);
+        if (pediuAcesso) {
+          await responderNumeroNaoCadastrado(msg.from).catch((err) =>
+            console.error("Falha ao responder pedido de acesso de número não cadastrado", err),
+          );
+        }
         continue;
       }
 
       const conversationId = await resolveConversationId(guardian.id, guardian.schoolId, msg.context);
-      if (!conversationId) continue;
+      if (!conversationId) {
+        if (pediuAcesso) {
+          await responderPedidoDeAcesso(guardian, msg.from, `${request.nextUrl.origin}/guia`).catch((err) =>
+            console.error("Falha ao responder pedido de acesso pelo WhatsApp", err),
+          );
+        }
+        continue;
+      }
 
       const corpo = msg.type === "text" ? (msg.text?.body ?? "") : `[Mensagem do tipo "${msg.type}" recebida no WhatsApp — abra o WhatsApp da escola para ver o conteúdo]`;
       if (!corpo) continue;
@@ -108,6 +125,14 @@ export async function POST(request: NextRequest) {
       await prisma.message.create({
         data: { conversationId, senderId: guardian.id, body: corpo, channel: "WHATSAPP", externalId: msg.id },
       });
+
+      // "ACESSO"/"SENHA": responde na hora com link e senha provisória (janela de 24h aberta).
+      if (pediuAcesso) {
+        await responderPedidoDeAcesso(guardian, msg.from, `${request.nextUrl.origin}/guia`).catch((err) =>
+          console.error("Falha ao responder pedido de acesso pelo WhatsApp", err),
+        );
+        continue;
+      }
 
       const conversation = await prisma.conversation.findUniqueOrThrow({ where: { id: conversationId } });
       void notifyUsers([conversation.staffId], {
