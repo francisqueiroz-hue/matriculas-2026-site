@@ -64,6 +64,33 @@ export async function sendEmailMessage(input: {
   return { externalId };
 }
 
+/** Envia um e-mail avulso (não ligado a uma conversa), como o aviso de nova senha temporária. */
+export async function sendPlainEmail(input: { to: string; subject: string; text: string }): Promise<void> {
+  const apiKey = env("MAILGUN_API_KEY");
+  const domain = env("MAILGUN_DOMAIN");
+  const from = env("EMAIL_FROM");
+
+  const form = new URLSearchParams();
+  form.set("from", from);
+  form.set("to", input.to);
+  form.set("subject", input.subject);
+  form.set("text", input.text);
+
+  const response = await fetch(`${apiBase()}/v3/${domain}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: "Basic " + Buffer.from(`api:${apiKey}`).toString("base64"),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form.toString(),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.message ?? "Falha ao enviar e-mail");
+  }
+}
+
 /** Valida a assinatura do webhook (timestamp + token assinados com a chave de assinatura do Mailgun). */
 export function verifyMailgunSignature(timestamp: string, token: string, signature: string): boolean {
   const signingKey = process.env.MAILGUN_WEBHOOK_SIGNING_KEY;

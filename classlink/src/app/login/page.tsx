@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiJson } from "@/lib/api-client";
 
@@ -70,6 +71,9 @@ function LoginForm() {
           >
             {loading ? "Entrando..." : "Entrar"}
           </button>
+          <Link href="/esqueci-senha" className="block text-center text-sm text-indigo-600 hover:underline">
+            Esqueci minha senha
+          </Link>
         </form>
       </div>
     </div>
