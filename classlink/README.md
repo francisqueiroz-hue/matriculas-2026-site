@@ -614,8 +614,12 @@ individualmente. É um canal separado das conversas com família:
    Vercel: o script `vercel-build` roda `scripts/migrate-on-deploy.mjs` (que executa
    `prisma migrate deploy` só quando `VERCEL_ENV=production`) antes do `next build`.
    Deploys de preview nunca migram. Se a migração falhar, o deploy é interrompido e a
-   versão anterior continua no ar. Se o `DATABASE_URL` usar um pooler (ex.: host
-   "-pooler" do Neon ou PgBouncer), cadastre também `DIRECT_URL` com a conexão direta.
+   versão anterior continua no ar. São até 3 tentativas (a 2ª e a 3ª sem o advisory lock
+   do Prisma, que costuma travar via pooler), e o log do build mostra o host do banco
+   (sem senha) e a provável causa em português. No Neon, se o `DATABASE_URL` for o do
+   pooler e não houver `DIRECT_URL`, a migração usa a conexão direta automaticamente;
+   em outros provedores com pooler (PgBouncer, Supabase porta 6543), cadastre
+   `DIRECT_URL` com a conexão direta.
    Fora da Vercel, rode `npx prisma migrate deploy` manualmente. Depois,
    `npm run db:seed` se quiser dados de exemplo.
 4. Faça o deploy na [Vercel](https://vercel.com): conecte o repositório GitHub — a Vercel
