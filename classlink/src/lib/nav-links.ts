@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import type { SessionUser } from "@/lib/types";
+import { apiJson } from "@/lib/api-client";
 
 export interface NavLink {
   href: string;
@@ -34,4 +36,35 @@ export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao">): 
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks];
   if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink];
   return baseLinks;
+}
+
+interface ComunicadoResumo {
+  prazoResposta: string | null;
+  minhasRespostas?: { alunoId: string; resposta: string }[];
+  totalRespostas?: number;
+  totalPublicoAlvo?: number;
+}
+
+/** Quantidade de comunicados que ainda precisam de ação do usuário atual (resposta pendente e não expirada). */
+function countPendentes(comunicados: ComunicadoResumo[], role: string): number {
+  const agora = Date.now();
+  return comunicados.filter((c) => {
+    const expirado = c.prazoResposta ? new Date(c.prazoResposta).getTime() < agora : false;
+    if (expirado) return false;
+    if (role === "GUARDIAN") return (c.minhasRespostas?.length ?? 0) === 0;
+    return typeof c.totalRespostas === "number" && typeof c.totalPublicoAlvo === "number" && c.totalRespostas < c.totalPublicoAlvo;
+  }).length;
+}
+
+/** Contagem de comunicados pendentes de resposta, usada no badge do menu (mobile e desktop). */
+export function useComunicadosPendentes(role: string) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    apiJson<{ comunicados: ComunicadoResumo[] }>("/api/comunicados")
+      .then((data) => setCount(countPendentes(data.comunicados, role)))
+      .catch(() => setCount(0));
+  }, [role]);
+
+  return count;
 }

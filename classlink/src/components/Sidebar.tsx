@@ -1,41 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
-import { apiFetch, apiJson } from "@/lib/api-client";
-import { getNavLinks } from "@/lib/nav-links";
-
-interface ComunicadoResumo {
-  prazoResposta: string | null;
-  minhasRespostas?: { alunoId: string; resposta: string }[];
-  totalRespostas?: number;
-  totalPublicoAlvo?: number;
-}
-
-/** Quantidade de comunicados que ainda precisam de ação do usuário atual (resposta pendente e não expirada). */
-function countPendentes(comunicados: ComunicadoResumo[], role: string): number {
-  const agora = Date.now();
-  return comunicados.filter((c) => {
-    const expirado = c.prazoResposta ? new Date(c.prazoResposta).getTime() < agora : false;
-    if (expirado) return false;
-    if (role === "GUARDIAN") return (c.minhasRespostas?.length ?? 0) === 0;
-    return typeof c.totalRespostas === "number" && typeof c.totalPublicoAlvo === "number" && c.totalRespostas < c.totalPublicoAlvo;
-  }).length;
-}
+import { apiFetch } from "@/lib/api-client";
+import { getNavLinks, useComunicadosPendentes } from "@/lib/nav-links";
 
 export function Sidebar() {
   const user = useCurrentUser();
   const pathname = usePathname();
   const router = useRouter();
-  const [comunicadosPendentes, setComunicadosPendentes] = useState(0);
-
-  useEffect(() => {
-    apiJson<{ comunicados: ComunicadoResumo[] }>("/api/comunicados")
-      .then((data) => setComunicadosPendentes(countPendentes(data.comunicados, user.role)))
-      .catch(() => setComunicadosPendentes(0));
-  }, [user.role]);
+  const comunicadosPendentes = useComunicadosPendentes(user.role);
 
   const links = getNavLinks(user);
 
