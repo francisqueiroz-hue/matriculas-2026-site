@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
-import { EnviarAcessoWhatsApp } from "@/components/EnviarAcessoWhatsApp";
 import { apiJson } from "@/lib/api-client";
 
 type Funcao = "DIRECAO" | "COORDENACAO" | "PROFESSOR" | "AUXILIAR";
@@ -40,8 +39,7 @@ interface UserItem {
 
 interface RespostaAcesso {
   temporaryPassword?: string;
-  notificadoPorWhatsApp?: boolean;
-  whatsappManual?: string | null;
+  envio?: { enviado: boolean; mensagem: string } | null;
 }
 
 /** Cadastros antigos não têm função gravada — deduz pelo perfil. */
@@ -60,10 +58,9 @@ function formatarTelefone(telefone: string | null) {
 }
 
 function textoAcesso(prefixo: string, data: RespostaAcesso) {
-  if (data.notificadoPorWhatsApp) {
-    return `${prefixo} Senha provisória: ${data.temporaryPassword} — enviada pelo WhatsApp oficial da escola; se não chegar, use o botão abaixo.`;
-  }
-  return `${prefixo} Senha provisória: ${data.temporaryPassword}.${data.whatsappManual ? " Envie o acesso pelo botão abaixo." : " Repasse manualmente (sem celular cadastrado)."}`;
+  if (data.envio?.enviado) return `${prefixo} ${data.envio.mensagem}`;
+  const motivo = data.envio?.mensagem ?? "Sem envio pelo WhatsApp da escola.";
+  return `${prefixo} ${motivo} Senha provisória: ${data.temporaryPassword} — entregue pessoalmente ou tente de novo em Acessos.`;
 }
 
 function SeletorTurmas({ classes, value, onChange }: { classes: ClassOption[]; value: string[]; onChange: (ids: string[]) => void }) {
@@ -99,7 +96,7 @@ function UsuariosContent() {
   const [classIds, setClassIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [criado, setCriado] = useState<{ texto: string; link: string | null } | null>(null);
+  const [criado, setCriado] = useState<{ texto: string } | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -110,7 +107,6 @@ function UsuariosContent() {
 
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   // Link wa.me com a mensagem de acesso, para a escola enviar do próprio WhatsApp.
-  const [acessoLinks, setAcessoLinks] = useState<Record<string, string | null>>({});
 
   function load() {
     apiJson<{ users: UserItem[] }>("/api/admin/users").then((data) =>
@@ -140,7 +136,7 @@ function UsuariosContent() {
           classIds: funcao === "DIRECAO" ? undefined : classIds,
         }),
       });
-      setCriado({ texto: textoAcesso(`${data.user.name} cadastrado(a) como ${FUNCAO_LABEL[funcao]}.`, data), link: data.whatsappManual ?? null });
+      setCriado({ texto: textoAcesso(`${data.user.name} cadastrado(a) como ${FUNCAO_LABEL[funcao]}.`, data) });
       setName("");
       setPhone("");
       setEmail("");
@@ -167,7 +163,6 @@ function UsuariosContent() {
         body: JSON.stringify({ resetPassword: true }),
       });
       setFeedback((prev) => ({ ...prev, [id]: textoAcesso("Nova senha gerada.", data) }));
-      setAcessoLinks((prev) => ({ ...prev, [id]: data.whatsappManual ?? null }));
     } catch (err) {
       setFeedback((prev) => ({ ...prev, [id]: err instanceof Error ? err.message : "Erro ao redefinir senha" }));
     }
@@ -254,7 +249,6 @@ function UsuariosContent() {
         {criado && (
           <div className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-900" role="status">
             <p>{criado.texto}</p>
-            <EnviarAcessoWhatsApp href={criado.link} />
           </div>
         )}
       </form>
@@ -335,7 +329,6 @@ function UsuariosContent() {
                 </div>
               </div>
               {feedback[u.id] && <p className="mt-1 text-xs text-slate-500">{feedback[u.id]}</p>}
-              <EnviarAcessoWhatsApp href={acessoLinks[u.id]} />
             </li>
           ),
         )}

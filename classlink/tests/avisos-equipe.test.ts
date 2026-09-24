@@ -27,6 +27,6 @@ describe("parâmetros de modelo aceitos pela Meta", () => {
 
   it("o payload do modelo já sai higienizado", () => {
     const payload = buildTemplatePayload("5521987654321", { name: "aviso", language: "pt_BR" }, ["A\nB"]);
-    expect(payload.template.components[0].parameters[0].text).toBe("A B");
+    expect(payload.template.components[0]).toEqual({ type: "body", parameters: [{ type: "text", text: "A B" }] });
   });
 });

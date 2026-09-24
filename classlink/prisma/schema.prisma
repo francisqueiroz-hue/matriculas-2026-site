@@ -132,9 +132,13 @@ model User {
   // chega mensagem nova no ClassLink. Opt-in pela própria pessoa, em Conta.
   avisosWhatsApp Boolean @default(false)
 
-  funcao    FuncaoEquipe?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  funcao FuncaoEquipe?
+
+  // Última mensagem recebida desta pessoa no WhatsApp da escola. Nas 24h seguintes a Meta
+  // entrega texto livre (senha direto); fora disso, só modelo aprovado (convite).
+  whatsappUltimaMensagemEm DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   // Dados de cobrança (Módulo Boleto — Banco Inter). Preenchidos apenas pelo próprio
   // responsável, só quando necessário para emissão de boleto (CPF e endereço são

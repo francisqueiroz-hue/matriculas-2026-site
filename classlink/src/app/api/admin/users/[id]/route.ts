@@ -5,10 +5,10 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { updateUserSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
-import { normalizePhoneBR, sendAccessViaWhatsApp } from "@/lib/whatsapp";
+import { normalizePhoneBR } from "@/lib/whatsapp";
 import { telefoneEmUso } from "@/lib/usuarios";
 import { perfilDaFuncao } from "@/lib/equipe";
-import { linkWhatsAppManual, mensagemAcesso, parametrosModeloAcesso } from "@/lib/acesso";
+import { descreverEnvio, enviarAcessoPeloApp } from "@/lib/envio-acesso";
 
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/users/[id]">) {
   try {
@@ -72,33 +72,14 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
       return updated;
     });
 
-    // Nova senha: tenta enviar pelo modelo aprovado no WhatsApp e sempre devolve o link
-    // wa.me para a escola repassar do próprio WhatsApp.
-    let notificadoPorWhatsApp = false;
-    let whatsappManual: string | null = null;
-    if (temporaryPassword) {
-      const dados = {
-        nome: user.name,
-        // Famílias caem no guia de primeiro acesso; a equipe, direto no login.
-        url: `${request.nextUrl.origin}${user.role === "GUARDIAN" ? "/guia" : "/login"}`,
-        login: user.email ?? user.phone ?? "",
-        senha: temporaryPassword,
-      };
-      whatsappManual = linkWhatsAppManual(user.phone, mensagemAcesso(dados));
-      if (user.phone) {
-        try {
-          notificadoPorWhatsApp = await sendAccessViaWhatsApp(user.phone, parametrosModeloAcesso(dados));
-        } catch (err) {
-          console.error("Falha ao enviar nova senha por WhatsApp", err);
-        }
-      }
-    }
+    // Nova senha: envia pelo WhatsApp da escola (pelo próprio ClassLink).
+    const envio = temporaryPassword ? await enviarAcessoPeloApp(user.id, request.nextUrl.origin, temporaryPassword) : null;
 
     return NextResponse.json({
       user: { id: user.id, name: user.name, active: user.active },
-      temporaryPassword,
-      notificadoPorWhatsApp,
-      whatsappManual,
+      // A senha só aparece no painel se não deu para enviar (para repassar pessoalmente).
+      temporaryPassword: envio && !envio.enviado ? temporaryPassword : undefined,
+      envio: envio && { enviado: envio.enviado, mensagem: descreverEnvio(envio) },
     });
   } catch (error) {
     return handleApiError(error);

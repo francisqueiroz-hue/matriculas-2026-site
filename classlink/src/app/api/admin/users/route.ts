@@ -5,9 +5,9 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { createUserSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
-import { normalizePhoneBR, sendAccessViaWhatsApp } from "@/lib/whatsapp";
+import { normalizePhoneBR } from "@/lib/whatsapp";
 import { telefoneEmUso } from "@/lib/usuarios";
-import { linkWhatsAppManual, mensagemAcesso, parametrosModeloAcesso } from "@/lib/acesso";
+import { descreverEnvio, enviarAcessoPeloApp } from "@/lib/envio-acesso";
 import { perfilDaFuncao } from "@/lib/equipe";
 
 
@@ -44,8 +44,7 @@ export async function GET(request: NextRequest) {
 /**
  * Cadastra alguém da equipe no mesmo formato dos responsáveis: nome, celular e/ou e-mail e
  * função. Sem senha informada, gera uma provisória e — como no vínculo de responsável —
- * tenta enviar pelo modelo aprovado do WhatsApp e devolve o link wa.me para a escola
- * enviar do próprio WhatsApp.
+ * envia o acesso pelo WhatsApp da escola, pelo próprio ClassLink.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -84,23 +83,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const dados = { nome: user.name, url: `${request.nextUrl.origin}/login`, login: email ?? phone ?? "", senha };
-    const whatsappManual = linkWhatsAppManual(phone, mensagemAcesso(dados));
-    let notificadoPorWhatsApp = false;
-    if (phone) {
-      try {
-        notificadoPorWhatsApp = await sendAccessViaWhatsApp(phone, parametrosModeloAcesso(dados));
-      } catch (err) {
-        console.error("Falha ao enviar acesso da equipe por WhatsApp", err);
-      }
-    }
+    const envio = await enviarAcessoPeloApp(user.id, request.nextUrl.origin, senha);
 
     return NextResponse.json(
       {
         user: { id: user.id, name: user.name, email: user.email, role: user.role, funcao: user.funcao },
-        temporaryPassword: senha,
-        notificadoPorWhatsApp,
-        whatsappManual,
+        // A senha só aparece no painel se não deu para enviar (para repassar pessoalmente).
+        temporaryPassword: envio.enviado ? undefined : senha,
+        envio: { enviado: envio.enviado, mensagem: descreverEnvio(envio) },
       },
       { status: 201 },
     );

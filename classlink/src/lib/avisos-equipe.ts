@@ -1,12 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { getNoticeTemplate, isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTemplateMessage } from "@/lib/whatsapp";
+import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTemplateMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
+import { modeloDisponivel } from "@/lib/whatsapp-modelos";
+import { conversaAberta } from "@/lib/envio-acesso";
 
 /** Uma conversa com várias mensagens seguidas gera no máximo um aviso nesse intervalo. */
 export const INTERVALO_ENTRE_AVISOS_MS = 10 * 60 * 1000;
 const LIMITE_TRECHO = 300;
 
-export function avisosWhatsAppDisponiveis(): boolean {
-  return isWhatsAppConfigured() && getNoticeTemplate() !== null;
+/** Avisos pelo WhatsApp da escola funcionam quando a API está configurada e o modelo de aviso aprovado. */
+export async function avisosWhatsAppDisponiveis(): Promise<boolean> {
+  return isWhatsAppConfigured() && (await modeloDisponivel("aviso")) !== null;
 }
 
 export function trechoAviso(texto: string): string {
@@ -17,6 +20,11 @@ export function trechoAviso(texto: string): string {
 /** Parâmetros do modelo de aviso, na ordem {{1}} remetente, {{2}} trecho, {{3}} link. */
 export function parametrosModeloAviso(remetente: string, texto: string, link: string): string[] {
   return [remetente, trechoAviso(texto), link];
+}
+
+/** Texto livre do aviso, usado quando a pessoa escreveu para a escola nas últimas 24h. */
+export function textoAviso(remetente: string, texto: string, link: string): string {
+  return `Você recebeu uma nova mensagem no ClassLink de ${remetente}:\n\n"${trechoAviso(texto)}"\n\nPara responder, abra: ${link}`;
 }
 
 interface NovaMensagem {
@@ -40,12 +48,11 @@ interface NovaMensagem {
  */
 export async function avisarEquipePorWhatsApp(msg: NovaMensagem): Promise<boolean> {
   try {
-    const template = getNoticeTemplate();
-    if (!isWhatsAppConfigured() || !template) return false;
+    if (!isWhatsAppConfigured()) return false;
 
     const destinatario = await prisma.user.findUnique({
       where: { id: msg.destinatarioId },
-      select: { role: true, phone: true, avisosWhatsApp: true, active: true, deletedAt: true },
+      select: { role: true, phone: true, avisosWhatsApp: true, active: true, deletedAt: true, whatsappUltimaMensagemEm: true },
     });
     if (!destinatario || destinatario.role === "GUARDIAN" || !destinatario.avisosWhatsApp) return false;
     if (!destinatario.active || destinatario.deletedAt) return false;
@@ -64,6 +71,13 @@ export async function avisarEquipePorWhatsApp(msg: NovaMensagem): Promise<boolea
       msg.tipo === "familia" ? await prisma.message.count({ where: filtro }) : await prisma.teamMessage.count({ where: filtro });
     if (recentes > 0) return false;
 
+    // Conversa aberta (a pessoa falou com o número da escola nas últimas 24h): texto livre.
+    if (conversaAberta(destinatario.whatsappUltimaMensagemEm)) {
+      await sendWhatsAppTextMessage(telefone, textoAviso(msg.remetente, msg.texto, msg.link));
+      return true;
+    }
+    const template = await modeloDisponivel("aviso");
+    if (!template) return false;
     await sendWhatsAppTemplateMessage(telefone, template, parametrosModeloAviso(msg.remetente, msg.texto, msg.link));
     return true;
   } catch (err) {

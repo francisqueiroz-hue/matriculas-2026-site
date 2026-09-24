@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiJson } from "@/lib/api-client";
 
 interface Diagnostico {
@@ -10,10 +10,30 @@ interface Diagnostico {
     webhookAssinatura: boolean;
     webhookVerificacao: boolean;
     modeloAcesso: string | null;
-    modeloAviso: string | null;
+    contaBusiness: boolean;
+    modelos: { convite: StatusModelo; aviso: StatusModelo };
     equipeComAvisoWhatsApp: number;
   };
 }
+
+interface StatusModelo {
+  tipo: "convite" | "aviso";
+  nome: string;
+  status: string;
+  motivo?: string | null;
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  APPROVED: "aprovado",
+  PENDING: "em análise na Meta",
+  REJECTED: "recusado pela Meta",
+  PAUSED: "pausado pela Meta",
+  DISABLED: "desativado pela Meta",
+  NAO_CADASTRADO: "ainda não cadastrado",
+  DESCONHECIDO: "situação desconhecida",
+};
+
+const MODELO_TITULO = { convite: "Modelo de convite (envio do acesso)", aviso: "Modelo de aviso à equipe" };
 
 function Item({ ok, titulo, dica }: { ok: boolean; titulo: string; dica: string }) {
   return (
@@ -30,12 +50,36 @@ function Item({ ok, titulo, dica }: { ok: boolean; titulo: string; dica: string 
 /** Quadro "o que está configurado" para os avisos — sem mostrar nenhum segredo. */
 export function DiagnosticoAvisos() {
   const [d, setD] = useState<Diagnostico | null>(null);
+  const [cadastrando, setCadastrando] = useState(false);
+  const [retorno, setRetorno] = useState<string | null>(null);
 
-  useEffect(() => {
+  const carregar = useCallback(() => {
     apiJson<Diagnostico>("/api/admin/diagnostico").then(setD).catch(() => setD(null));
   }, []);
 
+  useEffect(carregar, [carregar]);
+
+  async function cadastrarModelos() {
+    setCadastrando(true);
+    setRetorno(null);
+    try {
+      const res = await apiJson<{ modelos: StatusModelo[] }>("/api/admin/whatsapp/modelos", { method: "POST" });
+      setRetorno(
+        res.modelos
+          .map((m) => `${m.nome}: ${STATUS_LABEL[m.status] ?? m.status}${m.motivo ? ` (${m.motivo})` : ""}`)
+          .join(" · "),
+      );
+      carregar();
+    } catch (err) {
+      setRetorno(err instanceof Error ? err.message : "Falha ao cadastrar os modelos");
+    } finally {
+      setCadastrando(false);
+    }
+  }
+
   if (!d) return null;
+  const modelos = [d.whatsapp.modelos.convite, d.whatsapp.modelos.aviso];
+  const faltaCadastrar = modelos.some((m) => m.status === "NAO_CADASTRADO" || m.status === "DESCONHECIDO");
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
@@ -68,12 +112,37 @@ export function DiagnosticoAvisos() {
               dica="Opcional: WHATSAPP_TEMPLATE_ACESSO permite enviar senhas em lote. O pedido por “ACESSO” funciona sem ele."
             />
             <Item
-              ok={Boolean(d.whatsapp.modeloAviso)}
-              titulo={`Modelo de aviso à equipe${d.whatsapp.modeloAviso ? `: ${d.whatsapp.modeloAviso}` : ""}`}
-              dica="Crie e aprove o modelo de aviso e preencha WHATSAPP_TEMPLATE_AVISO (README)."
+              ok={d.whatsapp.contaBusiness}
+              titulo="ID da conta do WhatsApp Business"
+              dica="Preencha WHATSAPP_BUSINESS_ACCOUNT_ID (Meta for Developers → WhatsApp → Configuração da API) para o ClassLink cadastrar e acompanhar os modelos."
             />
+            {modelos.map((m) => (
+              <Item
+                key={m.tipo}
+                ok={m.status === "APPROVED"}
+                titulo={`${MODELO_TITULO[m.tipo]}: ${STATUS_LABEL[m.status] ?? m.status}`}
+                dica={
+                  m.status === "PENDING"
+                    ? "A Meta está analisando; costuma levar de minutos a algumas horas. Enquanto isso, só quem escreveu para a escola nas últimas 24h recebe."
+                    : m.status === "REJECTED"
+                      ? `Motivo: ${m.motivo ?? "não informado"}.`
+                      : `Cadastre pelo botão abaixo (nome: ${m.nome}).`
+                }
+              />
+            ))}
             <li className="text-xs text-slate-500">Pessoas da equipe com aviso no WhatsApp ativado: {d.whatsapp.equipeComAvisoWhatsApp}</li>
           </ul>
+          {d.whatsapp.api && d.whatsapp.contaBusiness && faltaCadastrar && (
+            <button
+              type="button"
+              disabled={cadastrando}
+              onClick={cadastrarModelos}
+              className="mt-3 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {cadastrando ? "Cadastrando..." : "Cadastrar modelos na Meta"}
+            </button>
+          )}
+          {retorno && <p className="mt-2 text-xs text-slate-600">{retorno}</p>}
         </div>
       </div>
     </section>
