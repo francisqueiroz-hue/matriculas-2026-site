@@ -56,15 +56,26 @@
   /* Cabeçalho */
   header.topo{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--borda)}
   .topo .container{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:68px}
-  .marca{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--roxo-escuro);font-weight:800;line-height:1.15}
+  .marca{flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--roxo-escuro);font-weight:800;line-height:1.15}
   .marca img{height:44px;width:auto}
   .marca small{display:block;font-weight:600;color:var(--texto-suave);font-size:.8rem}
-  nav.menu ul{list-style:none;display:flex;gap:22px;margin:0;padding:0}
+  nav.menu ul{list-style:none;display:flex;gap:18px;margin:0;padding:0}
   nav.menu a{text-decoration:none;color:var(--texto);font-weight:600;font-size:.95rem}
   nav.menu a:hover{color:var(--roxo)}
   .topo .btn{min-height:42px;padding:8px 16px;font-size:.92rem}
-  @media (max-width:860px){nav.menu{display:none}}
+  nav.menu a,.topo .btn{white-space:nowrap}
+  @media (max-width:980px){nav.menu{display:none}}
   @media (max-width:420px){.marca small{display:none}.topo .btn span{display:none}.topo .btn{padding:8px 12px}}
+
+  /* Faixa de rematrícula */
+  .faixa-remat{background:var(--amarelo);color:var(--roxo-escuro);font-weight:700;font-size:.95rem}
+  .faixa-remat .container{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 14px;min-height:44px;padding-top:6px;padding-bottom:6px;text-align:center}
+  .faixa-remat a{color:var(--roxo-escuro);background:#fff;border-radius:999px;padding:4px 14px;text-decoration:none;white-space:nowrap}
+  .faixa-remat a:hover{background:var(--roxo-claro)}
+  .btn-familia{background:var(--roxo-claro);color:var(--roxo);border-color:transparent}
+  .btn-familia:hover{background:#e9dcf1}
+  .topo .acoes-topo{display:flex;gap:8px}
+  @media (max-width:560px){.topo .btn-familia span{display:none}}
 
   /* Hero */
   .hero{background:linear-gradient(135deg,var(--roxo-escuro) 0%,var(--roxo) 60%,#8a3aa8 100%);color:#fff;padding:56px 0 64px;overflow:hidden}
@@ -107,6 +118,25 @@
   ol.passos li::before{content:counter(passo);position:absolute;top:16px;left:22px;width:32px;height:32px;border-radius:50%;background:var(--laranja);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
   ol.passos h3{margin:0 0 4px;font-size:1.08rem;color:var(--roxo-escuro)}
   ol.passos p{margin:0;color:var(--texto-suave);font-size:.98rem}
+
+  /* Rematrícula */
+  .remat{background:linear-gradient(180deg,#fff8e1 0%,#fff 100%);border-top:4px solid var(--amarelo)}
+  .remat-grade{display:grid;grid-template-columns:1fr 1.15fr;gap:32px;align-items:start}
+  @media (max-width:860px){.remat-grade{grid-template-columns:1fr}}
+  .remat h2{color:var(--roxo-escuro);font-size:clamp(1.7rem,4vw,2.4rem);margin:0 0 10px;line-height:1.15}
+  .remat .selo{background:var(--laranja);color:#fff}
+  .remat p{color:var(--texto-suave)}
+  ul.vantagens{list-style:none;padding:0;margin:18px 0;display:grid;gap:10px}
+  ul.vantagens li{display:flex;gap:10px;align-items:flex-start}
+  ul.vantagens li::before{content:"✓";flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--roxo);color:#fff;font-weight:800;font-size:.8rem;display:flex;align-items:center;justify-content:center;margin-top:2px}
+  .remat .app-box{margin-top:18px;background:#fff;border:1px dashed var(--roxo);border-radius:12px;padding:14px 16px;font-size:.95rem}
+  .remat .app-box a{font-weight:700}
+  .form-titulo{grid-column:1/-1;margin:0;color:var(--roxo-escuro);font-size:1.2rem}
+  .familia-acoes{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:28px}
+  .btn-roxo{background:var(--roxo);color:#fff}
+  .btn-roxo:hover{background:var(--roxo-escuro)}
+  .btn-contorno-roxo{border-color:var(--roxo);color:var(--roxo);background:#fff}
+  .btn-contorno-roxo:hover{background:var(--roxo-claro)}
 
   /* Documentos */
   ul.docs{list-style:none;margin:0;padding:0;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
@@ -172,6 +202,13 @@
 <body>
 <a class="pular" href="#conteudo">Pular para o conteúdo</a>
 
+<div class="faixa-remat" role="region" aria-label="Aviso de rematrícula">
+  <div class="container">
+    <span>📣 Rematrícula 2027 aberta! Famílias da escola têm prioridade na vaga.</span>
+    <a href="#rematricula">Fazer rematrícula</a>
+  </div>
+</div>
+
 <header class="topo">
   <div class="container">
     <a class="marca" href="#inicio" aria-label="Instituto Fokus e Espaço Kids — início">
@@ -180,16 +217,21 @@
     </a>
     <nav class="menu" aria-label="Seções da página">
       <ul>
-        <li><a href="#segmentos">Segmentos</a></li>
+        <li><a href="#rematricula">Rematrícula</a></li>
         <li><a href="#como-funciona">Como matricular</a></li>
-        <li><a href="#documentos">Documentos</a></li>
         <li><a href="#duvidas">Dúvidas</a></li>
       </ul>
     </nav>
-    <a class="btn btn-laranja" href="#pre-matricula">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-      <span>Pré-matrícula</span>
-    </a>
+    <div class="acoes-topo">
+      <a class="btn btn-familia" href="https://matriculas-2026-site-murex.vercel.app/login" target="_blank" rel="noopener" aria-label="Área da família — entrar no ClassLink">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+        <span>Área da família</span>
+      </a>
+      <a class="btn btn-laranja" href="#pre-matricula">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <span>Pré-matrícula</span>
+      </a>
+    </div>
   </div>
 </header>
 
@@ -208,12 +250,86 @@
           </a>
           <a class="btn btn-contorno" href="#pre-matricula">Fazer pré-matrícula</a>
         </div>
-        <p class="tel">Prefere ligar? <a href="tel:+5521964699441">(21) 96469-9441</a></p>
+        <p class="tel">Já é aluno da escola? <a href="#rematricula">Faça a rematrícula 2027</a> · Prefere ligar? <a href="tel:+5521964699441">(21) 96469-9441</a></p>
       </div>
       <div class="hero-logos">
         <img class="fokus" src="assets/logo-instituto-fokus.png" alt="Logotipo do Instituto Fokus" width="189" height="188">
         <img class="kids" src="assets/logo-espaco-kids.png" alt="Logotipo do Espaço Kids — um novo conceito em ensino infantil" width="366" height="164">
       </div>
+    </div>
+  </section>
+
+  <section class="remat" id="rematricula" aria-labelledby="titulo-remat">
+    <div class="container remat-grade">
+      <div>
+        <span class="selo">Famílias da escola</span>
+        <h2 id="titulo-remat">Rematrícula 2027</h2>
+        <p>Seu filho já estuda com a gente? Confirme a continuidade para 2027 agora e garanta a vaga antes da abertura para novos alunos.</p>
+        <ul class="vantagens">
+          <li>Prioridade na vaga para quem já é aluno</li>
+          <li>Continuidade do acompanhamento pedagógico e da turma</li>
+          <li>Atendimento rápido: confirme em menos de 2 minutos</li>
+        </ul>
+        <p><strong>Como funciona:</strong> preencha o formulário ao lado. A secretaria confirma pelo WhatsApp e agenda a atualização dos dados e a assinatura do contrato 2027.</p>
+        <div class="app-box">
+          📱 Os comunicados da rematrícula também chegam pelo <strong>ClassLink</strong>.
+          <a href="https://matriculas-2026-site-murex.vercel.app/login" target="_blank" rel="noopener">Entrar na Área da família</a>
+        </div>
+      </div>
+
+      <form class="cartao" id="form-remat" novalidate aria-labelledby="titulo-form-remat">
+        <h3 class="form-titulo" id="titulo-form-remat">Confirmar rematrícula</h3>
+        <div class="campo cheio">
+          <label for="r-responsavel">Nome do responsável <span class="obr" aria-hidden="true">*</span></label>
+          <input id="r-responsavel" name="responsavel" type="text" autocomplete="name" required maxlength="80" aria-describedby="erro-r-responsavel">
+          <span class="msg-erro" id="erro-r-responsavel" aria-live="polite"></span>
+        </div>
+        <div class="campo">
+          <label for="r-telefone">WhatsApp do responsável <span class="obr" aria-hidden="true">*</span></label>
+          <input id="r-telefone" name="telefone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(21) 90000-0000" required maxlength="16" aria-describedby="erro-r-telefone">
+          <span class="msg-erro" id="erro-r-telefone" aria-live="polite"></span>
+        </div>
+        <div class="campo">
+          <label for="r-aluno">Nome do aluno <span class="obr" aria-hidden="true">*</span></label>
+          <input id="r-aluno" name="aluno" type="text" required maxlength="120" aria-describedby="erro-r-aluno r-aluno-dica">
+          <span class="msg-erro" id="erro-r-aluno" aria-live="polite"></span>
+          <small id="r-aluno-dica" style="color:var(--texto-suave)">Mais de um filho? Separe os nomes por vírgula.</small>
+        </div>
+        <div class="campo cheio">
+          <label for="r-serie">Série em 2027 <span class="obr" aria-hidden="true">*</span></label>
+          <select id="r-serie" name="serie" required aria-describedby="erro-r-serie">
+            <option value="">Selecione…</option>
+            <optgroup label="Instituto Fokus — Fundamental II">
+              <option>6º ano</option>
+              <option>7º ano</option>
+              <option>8º ano</option>
+              <option>9º ano</option>
+            </optgroup>
+            <optgroup label="Espaço Kids">
+              <option>Educação Infantil</option>
+            </optgroup>
+            <optgroup label="Outros">
+              <option>Mais de um filho (informo nas observações)</option>
+            </optgroup>
+          </select>
+          <span class="msg-erro" id="erro-r-serie" aria-live="polite"></span>
+        </div>
+        <div class="campo cheio">
+          <label for="r-mensagem">Observações (opcional)</label>
+          <textarea id="r-mensagem" name="mensagem" maxlength="500" placeholder="Ex.: mudança de turno, atualização de endereço…"></textarea>
+        </div>
+        <div class="consent">
+          <input id="r-consentimento" name="consentimento" type="checkbox" required aria-describedby="erro-r-consentimento">
+          <div>
+            <label for="r-consentimento">Autorizo a escola a entrar em contato comigo sobre a rematrícula. Os dados são usados apenas para esse atendimento, conforme a LGPD (Lei nº 13.709/2018).</label>
+            <span class="msg-erro" id="erro-r-consentimento" aria-live="polite"></span>
+          </div>
+        </div>
+        <div class="aviso-form" role="status" hidden></div>
+        <div class="form-acoes">
+          <button class="btn btn-laranja" type="submit">Confirmar rematrícula pelo WhatsApp</button>
+        </div>
+      </form>
     </div>
   </section>
 
@@ -267,6 +383,10 @@
           <p>Conversa direta com a equipe, calendário de eventos e boletos da mensalidade no mesmo lugar.</p>
         </div>
       </div>
+      <div class="familia-acoes">
+        <a class="btn btn-roxo" href="https://matriculas-2026-site-murex.vercel.app/login" target="_blank" rel="noopener">Entrar no ClassLink</a>
+        <a class="btn btn-contorno-roxo" href="https://matriculas-2026-site-murex.vercel.app/guia" target="_blank" rel="noopener">Primeiro acesso? Veja o passo a passo</a>
+      </div>
     </div>
   </section>
 
@@ -309,6 +429,7 @@
     <div class="container form-wrap">
       <div class="form-info">
         <h2 id="titulo-form">Faça a pré-matrícula</h2>
+        <p><strong>Para novos alunos.</strong> Já estuda aqui? <a href="#rematricula">Faça a rematrícula</a>.</p>
         <p>Preencha os dados abaixo. Ao enviar, abriremos o WhatsApp da secretaria com a sua mensagem já pronta — é só tocar em <strong>enviar</strong>.</p>
         <ul>
           <li>Sem compromisso e sem custo</li>
@@ -373,7 +494,7 @@
             <span class="msg-erro" id="erro-consentimento" aria-live="polite"></span>
           </div>
         </div>
-        <div class="aviso-form" id="aviso-form" role="status" hidden></div>
+        <div class="aviso-form" role="status" hidden></div>
         <div class="form-acoes">
           <button class="btn btn-wa" type="submit">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.4-.5c.2-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5 2.5 1 3 .8 3.6.8.6-.1 1.8-.7 2-1.5.3-.7.3-1.3.2-1.5-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1112 20.2z"/></svg>
@@ -390,6 +511,10 @@
         <h2 id="titulo-faq">Dúvidas frequentes</h2>
       </div>
       <div class="faq">
+        <details>
+          <summary>Meu filho já estuda na escola. Como faço a rematrícula 2027?</summary>
+          <p>Preencha o formulário de <a href="#rematricula">rematrícula</a> ou chame a secretaria no WhatsApp. Quem já é aluno tem prioridade na vaga. Depois, é só atualizar os dados e assinar o contrato 2027 na secretaria.</p>
+        </details>
         <details>
           <summary>A pré-matrícula garante a vaga?</summary>
           <p>A pré-matrícula registra o seu interesse e dá prioridade no atendimento. A vaga é confirmada após a visita, a entrega dos documentos e a assinatura do contrato.</p>
@@ -431,7 +556,7 @@
       <img class="kids" src="assets/logo-espaco-kids.png" alt="Espaço Kids" width="110" height="49" style="height:49px">
     </div>
     <div>
-      <p style="margin:0 0 4px"><strong>Secretaria:</strong> <a href="tel:+5521964699441">(21) 96469-9441</a> · <a href="https://wa.me/5521964699441" target="_blank" rel="noopener">WhatsApp</a></p>
+      <p style="margin:0 0 4px"><strong>Secretaria:</strong> <a href="tel:+5521964699441">(21) 96469-9441</a> · <a href="https://wa.me/5521964699441" target="_blank" rel="noopener">WhatsApp</a> · <a href="https://matriculas-2026-site-murex.vercel.app/login" target="_blank" rel="noopener">Área da família (ClassLink)</a></p>
       <p style="margin:0">© <span id="ano-atual">2026</span> Instituto Fokus &amp; Espaço Kids. Todos os direitos reservados.</p>
     </div>
   </div>
@@ -459,11 +584,6 @@
   var ano = document.getElementById("ano-atual");
   if (ano) ano.textContent = String(new Date().getFullYear());
 
-  var form = document.getElementById("form-pre");
-  if (!form) return;
-  var aviso = document.getElementById("aviso-form");
-  var tel = form.elements.telefone;
-
   function soDigitos(v) { return (v || "").replace(/\D/g, ""); }
 
   // Máscara (21) 90000-0000 / (21) 0000-0000
@@ -474,7 +594,6 @@
     if (d.length <= 10) return "(" + d.slice(0, 2) + ") " + d.slice(2, 6) + "-" + d.slice(6);
     return "(" + d.slice(0, 2) + ") " + d.slice(2, 7) + "-" + d.slice(7);
   }
-  tel.addEventListener("input", function () { tel.value = formatarTelefone(tel.value); });
 
   function telefoneValido(v) {
     var d = soDigitos(v);
@@ -486,68 +605,97 @@
     responsavel: function (v) { return v.trim().length >= 3 ? "" : "Informe o nome do responsável."; },
     telefone: function (v) { return telefoneValido(v) ? "" : "Informe um telefone com DDD, ex.: (21) 90000-0000."; },
     aluno: function (v) { return v.trim().length >= 2 ? "" : "Informe o nome do aluno."; },
-    serie: function (v) { return v ? "" : "Selecione a série pretendida."; },
+    serie: function (v) { return v ? "" : "Selecione a série."; },
     consentimento: function (_v, el) { return el.checked ? "" : "É preciso autorizar o contato para continuarmos."; }
   };
 
-  function validarCampo(nome) {
+  function valor(form, nome) {
     var el = form.elements[nome];
-    var msg = regras[nome](el.value, el);
-    var erro = document.getElementById("erro-" + nome);
-    var campo = el.closest(".campo");
-    if (erro) erro.textContent = msg;
-    if (campo) { if (msg) campo.setAttribute("data-invalido", ""); else campo.removeAttribute("data-invalido"); }
-    el.setAttribute("aria-invalid", msg ? "true" : "false");
-    return !msg;
+    return el ? el.value.trim() : "";
   }
 
-  Object.keys(regras).forEach(function (nome) {
-    var el = form.elements[nome];
-    el.addEventListener(el.type === "checkbox" || el.tagName === "SELECT" ? "change" : "blur", function () { validarCampo(nome); });
-  });
+  // Liga validação, máscara e envio por WhatsApp a um formulário.
+  function prepararFormulario(form, montarMensagem) {
+    if (!form) return;
+    var aviso = form.querySelector(".aviso-form");
+    var tel = form.elements.telefone;
+    tel.addEventListener("input", function () { tel.value = formatarTelefone(tel.value); });
 
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    aviso.hidden = true;
-    var primeiroInvalido = null;
-    Object.keys(regras).forEach(function (nome) {
-      if (!validarCampo(nome) && !primeiroInvalido) primeiroInvalido = form.elements[nome];
-    });
-    if (primeiroInvalido) {
-      aviso.className = "aviso-form erro";
-      aviso.textContent = "Confira os campos destacados antes de enviar.";
-      aviso.hidden = false;
-      primeiroInvalido.focus();
-      return;
+    function validarCampo(nome) {
+      var el = form.elements[nome];
+      var msg = regras[nome](el.value, el);
+      // A mensagem de erro é o primeiro id listado em aria-describedby.
+      var erro = document.getElementById((el.getAttribute("aria-describedby") || "").split(" ")[0]);
+      var campo = el.closest(".campo");
+      if (erro) erro.textContent = msg;
+      if (campo) { if (msg) campo.setAttribute("data-invalido", ""); else campo.removeAttribute("data-invalido"); }
+      el.setAttribute("aria-invalid", msg ? "true" : "false");
+      return !msg;
     }
 
-    var f = form.elements;
+    Object.keys(regras).forEach(function (nome) {
+      var el = form.elements[nome];
+      el.addEventListener(el.type === "checkbox" || el.tagName === "SELECT" ? "change" : "blur", function () { validarCampo(nome); });
+    });
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      aviso.hidden = true;
+      var primeiroInvalido = null;
+      Object.keys(regras).forEach(function (nome) {
+        if (!validarCampo(nome) && !primeiroInvalido) primeiroInvalido = form.elements[nome];
+      });
+      if (primeiroInvalido) {
+        aviso.className = "aviso-form erro";
+        aviso.textContent = "Confira os campos destacados antes de enviar.";
+        aviso.hidden = false;
+        primeiroInvalido.focus();
+        return;
+      }
+
+      var url = linkWhatsApp(montarMensagem(form).join("\n"));
+      var janela = window.open(url, "_blank");
+      if (janela) janela.opener = null;
+      aviso.className = "aviso-form ok";
+      aviso.innerHTML = "";
+      aviso.appendChild(document.createTextNode("Pronto! Abrimos o WhatsApp com a sua mensagem — é só tocar em enviar. "));
+      if (!janela) {
+        // Pop-up bloqueado: oferece link direto.
+        var a = document.createElement("a");
+        a.href = url; a.target = "_blank"; a.rel = "noopener";
+        a.textContent = "Se o WhatsApp não abriu, toque aqui.";
+        aviso.appendChild(a);
+      }
+      aviso.hidden = false;
+    });
+  }
+
+  prepararFormulario(document.getElementById("form-pre"), function (form) {
     var linhas = [
       "Olá! Quero fazer a *pré-matrícula 2027*.",
       "",
-      "*Responsável:* " + f.responsavel.value.trim(),
-      "*WhatsApp:* " + f.telefone.value.trim(),
-      "*Aluno(a):* " + f.aluno.value.trim(),
-      "*Série pretendida:* " + f.serie.value,
-      "*Melhor período para visita:* " + f.periodo.value
+      "*Responsável:* " + valor(form, "responsavel"),
+      "*WhatsApp:* " + valor(form, "telefone"),
+      "*Aluno(a):* " + valor(form, "aluno"),
+      "*Série pretendida:* " + valor(form, "serie"),
+      "*Melhor período para visita:* " + valor(form, "periodo")
     ];
-    if (f.escola.value.trim()) linhas.push("*Escola atual:* " + f.escola.value.trim());
-    if (f.mensagem.value.trim()) linhas.push("*Observações:* " + f.mensagem.value.trim());
+    if (valor(form, "escola")) linhas.push("*Escola atual:* " + valor(form, "escola"));
+    if (valor(form, "mensagem")) linhas.push("*Observações:* " + valor(form, "mensagem"));
+    return linhas;
+  });
 
-    var url = linkWhatsApp(linhas.join("\n"));
-    var janela = window.open(url, "_blank");
-    if (janela) janela.opener = null;
-    aviso.className = "aviso-form ok";
-    aviso.innerHTML = "";
-    aviso.appendChild(document.createTextNode("Pronto! Abrimos o WhatsApp com a sua mensagem — é só tocar em enviar. "));
-    if (!janela) {
-      // Pop-up bloqueado: oferece link direto.
-      var a = document.createElement("a");
-      a.href = url; a.target = "_blank"; a.rel = "noopener";
-      a.textContent = "Se o WhatsApp não abriu, toque aqui.";
-      aviso.appendChild(a);
-    }
-    aviso.hidden = false;
+  prepararFormulario(document.getElementById("form-remat"), function (form) {
+    var linhas = [
+      "Olá! Quero confirmar a *rematrícula 2027*.",
+      "",
+      "*Responsável:* " + valor(form, "responsavel"),
+      "*WhatsApp:* " + valor(form, "telefone"),
+      "*Aluno(s):* " + valor(form, "aluno"),
+      "*Série em 2027:* " + valor(form, "serie")
+    ];
+    if (valor(form, "mensagem")) linhas.push("*Observações:* " + valor(form, "mensagem"));
+    return linhas;
   });
 })();
 </script>
