@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { avisarEquipePorWhatsApp } from "@/lib/avisos-equipe";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
       const corpo = msg.type === "text" ? (msg.text?.body ?? "") : `[Mensagem do tipo "${msg.type}" recebida no WhatsApp — abra o WhatsApp da escola para ver o conteúdo]`;
       if (!corpo) continue;
 
-      await prisma.message.create({
+      const recebida = await prisma.message.create({
         data: { conversationId, senderId: guardian.id, body: corpo, channel: "WHATSAPP", externalId: msg.id },
       });
 
@@ -135,11 +136,23 @@ export async function POST(request: NextRequest) {
       }
 
       const conversation = await prisma.conversation.findUniqueOrThrow({ where: { id: conversationId } });
-      void notifyUsers([conversation.staffId], {
-        title: `WhatsApp de ${guardian.name}`,
-        body: corpo.slice(0, 120),
-        url: `/dashboard/mensagens/${conversationId}`,
-      }).catch((err) => console.error("push notify failed", err));
+      const origem = request.nextUrl.origin;
+      after(async () => {
+        await notifyUsers([conversation.staffId], {
+          title: `WhatsApp de ${guardian.name}`,
+          body: corpo.slice(0, 120),
+          url: `/dashboard/mensagens/${conversationId}`,
+        }).catch((err) => console.error("push notify failed", err));
+        await avisarEquipePorWhatsApp({
+          destinatarioId: conversation.staffId,
+          remetente: `${guardian.name} (WhatsApp)`,
+          texto: corpo,
+          link: `${origem}/dashboard/mensagens/${conversationId}`,
+          tipo: "familia",
+          conversationId,
+          mensagemId: recebida.id,
+        });
+      });
     }
 
     return NextResponse.json({ ok: true });

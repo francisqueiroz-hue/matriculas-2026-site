@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
@@ -131,14 +131,17 @@ export async function POST(request: NextRequest) {
     });
 
     const publicoAlvo = await getPublicoAlvo(comunicado.id);
-    void notifyUsers(
-      [...new Set(publicoAlvo.map((p) => p.guardianId))],
-      {
-        title: `Novo comunicado: ${comunicado.titulo}`,
-        body: comunicado.descricao.slice(0, 120),
-        url: `/dashboard/comunicados/${comunicado.id}`,
-      },
-    ).catch((err) => console.error("push notify failed", err));
+    // after: na Vercel, trabalho solto com "void" pode ser cortado ao responder.
+    after(() =>
+      notifyUsers(
+        [...new Set(publicoAlvo.map((p) => p.guardianId))],
+        {
+          title: `Novo comunicado: ${comunicado.titulo}`,
+          body: comunicado.descricao.slice(0, 120),
+          url: `/dashboard/comunicados/${comunicado.id}`,
+        },
+      ).catch((err) => console.error("push notify failed", err)),
+    );
 
     return NextResponse.json({ comunicado }, { status: 201 });
   } catch (error) {

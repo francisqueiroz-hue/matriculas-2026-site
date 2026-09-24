@@ -28,15 +28,25 @@ function getMessagingInstance(): Promise<Messaging | null> {
   return messagingPromise;
 }
 
-/** Solicita permissão de notificação e registra o token FCM do dispositivo. Retorna null se indisponível/negado. */
-export async function requestPushToken(): Promise<string | null> {
+export function isPushConfigured() {
+  return isFirebaseConfigured() && Boolean(process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY);
+}
+
+/**
+ * Obtém o token FCM do dispositivo. Só pede a permissão de notificação quando
+ * `pedirPermissao` é true — navegadores bloqueiam (ou escondem) pedidos feitos sem um
+ * clique da pessoa, então o pedido parte do botão "Ativar avisos". Retorna null se
+ * indisponível, não configurado ou negado.
+ */
+export async function requestPushToken(pedirPermissao = false): Promise<string | null> {
   const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-  if (!vapidKey) return null;
+  if (!vapidKey || typeof Notification === "undefined") return null;
 
   const messaging = await getMessagingInstance();
   if (!messaging) return null;
 
-  const permission = await Notification.requestPermission();
+  let permission = Notification.permission;
+  if (permission === "default" && pedirPermissao) permission = await Notification.requestPermission();
   if (permission !== "granted") return null;
 
   const registration = await navigator.serviceWorker.register("/sw.js");

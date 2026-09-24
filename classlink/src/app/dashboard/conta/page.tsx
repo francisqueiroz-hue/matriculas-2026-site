@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { AvisosWhatsAppEquipe } from "@/components/AvisosWhatsAppEquipe";
 
 export default function ContaPage() {
   const user = useCurrentUser();
@@ -110,6 +111,8 @@ export default function ContaPage() {
           </form>
         </div>
       )}
+
+      {(user.role === "ADMIN" || user.role === "STAFF") && <AvisosWhatsAppEquipe />}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="font-semibold">Trocar senha</h2>

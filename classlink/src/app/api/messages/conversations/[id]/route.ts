@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { avisarEquipePorWhatsApp } from "@/lib/avisos-equipe";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
@@ -73,13 +74,29 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     });
 
     const recipientId = conversation.staffId === session.sub ? conversation.guardianId : conversation.staffId;
-    if (canalEfetivo === "APP") {
-      void notifyUsers([recipientId], {
-        title: `Nova mensagem de ${message.sender.name}`,
-        body: body.slice(0, 120),
-        url: `/dashboard/mensagens/${id}`,
-      }).catch((err) => console.error("push notify failed", err));
-    }
+    // Depois da resposta (after): na Vercel, trabalho solto com "void" pode ser cortado.
+    const origem = request.nextUrl.origin;
+    after(async () => {
+      if (canalEfetivo === "APP") {
+        await notifyUsers([recipientId], {
+          title: `Nova mensagem de ${message.sender.name}`,
+          body: body.slice(0, 120),
+          url: `/dashboard/mensagens/${id}`,
+        }).catch((err) => console.error("push notify failed", err));
+      }
+      // Família escreveu pelo app: avisa a pessoa da equipe também no WhatsApp (se ela ativou).
+      if (recipientId === conversation.staffId) {
+        await avisarEquipePorWhatsApp({
+          destinatarioId: recipientId,
+          remetente: message.sender.name,
+          texto: body,
+          link: `${origem}/dashboard/mensagens/${id}`,
+          tipo: "familia",
+          conversationId: id,
+          mensagemId: message.id,
+        });
+      }
+    });
 
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {

@@ -211,8 +211,14 @@ Passo a passo completo, do zero:
 1. Reinicie o servidor (`npm run dev`) para carregar as novas variáveis.
 2. Publique um aviso no mural com uma foto anexada — se o upload funcionar e a foto
    aparecer no mural, o Storage está OK.
-3. Acesse o app pelo navegador como responsável e aceite a permissão de notificação —
-   se não der erro no console, o push está registrando o token corretamente.
+3. Cadastre as variáveis na Vercel (Settings → Environment Variables, ambiente
+   **Production**) e faça um novo deploy — as `NEXT_PUBLIC_*` entram no código do
+   navegador no momento do build. O quadro **Configuração dos avisos**, no Painel da
+   administração, mostra se cada parte foi reconhecida.
+4. No ClassLink, clique em **Ativar avisos** (convite no topo do painel) e permita as
+   notificações. O contador "Dispositivos registrados para push" do Painel deve subir.
+5. No iPhone, o push só funciona com o ClassLink **adicionado à Tela de Início** e aberto
+   pelo ícone (limitação do iOS).
 
 > O plano gratuito (**Spark**) do Firebase não exige cartão de crédito, não expira, e
 > cobre bastante margem para uma escola pequena/média (5 GB de armazenamento, milhares
@@ -457,6 +463,34 @@ configurado, **Enviar acesso automático para quem nunca entrou** (em lote). O l
 guia (`/guia`), o "Esqueci minha senha" e a página de matrículas também mostram o atalho.
 
 Para testes locais, `WHATSAPP_API_URL` pode apontar a Graph API para um simulador.
+
+#### Avisos de mensagens para a equipe no WhatsApp
+
+Cada pessoa da equipe (direção/professores) pode ativar em **Conta → Avisos de mensagens
+no WhatsApp** (informando o celular). A partir daí, quando uma família escreve (pelo app ou
+pelo WhatsApp) ou um colega manda mensagem interna, o número da escola envia ao celular
+dela um aviso com o remetente, o trecho da mensagem e o link para responder. Várias
+mensagens seguidas na mesma conversa geram no máximo um aviso a cada 10 minutos.
+
+Como o aviso parte da escola (fora da janela de 24h), ele exige um modelo aprovado:
+
+1. WhatsApp Manager → **Modelos de mensagem** → Criar. Categoria **Utilidade**, idioma
+   **Português (BR)**, nome por exemplo `aviso_mensagem_classlink`.
+2. Corpo (a Meta não aceita variável no começo nem no fim do texto):
+   ```
+   Você recebeu uma nova mensagem no ClassLink de {{1}}:
+
+   "{{2}}"
+
+   Para responder, abra: {{3}}
+
+   Aviso automático da escola.
+   ```
+   Exemplos para a revisão: `Maria Silva`, `Bom dia! O Davi vai sair mais cedo hoje`,
+   `https://seu-dominio/dashboard/mensagens/abc123`.
+3. Aprovado, configure `WHATSAPP_TEMPLATE_AVISO=aviso_mensagem_classlink` na Vercel e faça
+   um novo deploy. O Painel da administração mostra, em **Configuração dos avisos**, o que
+   já está ativo.
 
 #### Modelo para enviar acesso e senha provisória
 

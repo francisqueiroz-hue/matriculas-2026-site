@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
@@ -59,11 +59,14 @@ export async function POST(request: NextRequest) {
       data: { conversationId, senderId: conversation.guardian.id, body: corpo, channel: "EMAIL", externalId },
     });
 
-    void notifyUsers([conversation.staffId], {
-      title: `E-mail de ${conversation.guardian.name}`,
-      body: corpo.slice(0, 120),
-      url: `/dashboard/mensagens/${conversationId}`,
-    }).catch((err) => console.error("push notify failed", err));
+    // after: na Vercel, trabalho solto com "void" pode ser cortado ao responder.
+    after(() =>
+      notifyUsers([conversation.staffId], {
+        title: `E-mail de ${conversation.guardian.name}`,
+        body: corpo.slice(0, 120),
+        url: `/dashboard/mensagens/${conversationId}`,
+      }).catch((err) => console.error("push notify failed", err)),
+    );
 
     return NextResponse.json({ ok: true });
   } catch (error) {

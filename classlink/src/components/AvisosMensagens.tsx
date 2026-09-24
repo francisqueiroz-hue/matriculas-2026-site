@@ -3,7 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { apiJson } from "@/lib/api-client";
+import { apiFetch, apiJson } from "@/lib/api-client";
+import { requestPushToken } from "@/lib/firebase-client";
 
 interface UltimaMensagem {
   id: string;
@@ -226,9 +227,13 @@ export function ConviteAtivarAvisos() {
     setVisivel(false);
     try {
       const resultado = await Notification.requestPermission();
-      if (resultado === "granted") tocarSom();
+      if (resultado !== "granted") return;
+      tocarSom();
+      // Com o Firebase configurado, registra também o push (avisa com o navegador fechado).
+      const token = await requestPushToken(false);
+      if (token) await apiFetch("/api/push/register", { method: "POST", body: JSON.stringify({ token }) });
     } catch {
-      // navegador sem suporte
+      // navegador sem suporte ou push indisponível: os avisos com a aba aberta seguem funcionando
     }
   }
 

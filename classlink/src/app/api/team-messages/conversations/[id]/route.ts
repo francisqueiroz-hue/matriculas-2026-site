@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { avisarEquipePorWhatsApp } from "@/lib/avisos-equipe";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
@@ -53,11 +54,23 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/team-me
     });
 
     const recipientId = conversation.userAId === session.sub ? conversation.userBId : conversation.userAId;
-    void notifyUsers([recipientId], {
-      title: `Nova mensagem de ${message.sender.name}`,
-      body: body.slice(0, 120),
-      url: `/dashboard/mensagens/${id}?tipo=equipe`,
-    }).catch((err) => console.error("push notify failed", err));
+    const origem = request.nextUrl.origin;
+    after(async () => {
+      await notifyUsers([recipientId], {
+        title: `Nova mensagem de ${message.sender.name}`,
+        body: body.slice(0, 120),
+        url: `/dashboard/mensagens/${id}?tipo=equipe`,
+      }).catch((err) => console.error("push notify failed", err));
+      await avisarEquipePorWhatsApp({
+        destinatarioId: recipientId,
+        remetente: message.sender.name,
+        texto: body,
+        link: `${origem}/dashboard/mensagens/${id}?tipo=equipe`,
+        tipo: "equipe",
+        conversationId: id,
+        mensagemId: message.id,
+      });
+    });
 
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {
