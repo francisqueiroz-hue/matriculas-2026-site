@@ -74,11 +74,15 @@ if (${Boolean(firebaseConfig.apiKey)}) {
   firebase.initializeApp(${JSON.stringify(firebaseConfig)});
   const messaging = firebase.messaging();
 
+  // Mensagens com "notification" (as que o servidor envia) já são exibidas pelo próprio
+  // SDK do Firebase — mostrar de novo aqui duplicava o aviso. Só exibe as de dados puros.
   messaging.onBackgroundMessage((payload) => {
-    const { title, body } = payload.notification || {};
-    self.registration.showNotification(title || "ClassLink", {
-      body: body || "",
+    if (payload.notification) return;
+    const data = payload.data || {};
+    self.registration.showNotification(data.title || "ClassLink", {
+      body: data.body || "",
       icon: "/icons/icon-192.png",
+      data: data.url ? { url: data.url, origem: "classlink-aviso" } : undefined,
     });
   });
 }

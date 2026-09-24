@@ -93,9 +93,29 @@ export async function sendWhatsAppTextMessage(toPhone: string, body: string): Pr
  * de status). Configure WHATSAPP_TEMPLATE_ACESSO com o nome do modelo aprovado.
  */
 export function getAccessTemplate(): { name: string; language: string } | null {
-  const name = process.env.WHATSAPP_TEMPLATE_ACESSO?.trim();
+  return templateFromEnv("WHATSAPP_TEMPLATE_ACESSO");
+}
+
+/**
+ * Modelo aprovado para avisar a equipe de mensagem nova no ClassLink (WHATSAPP_TEMPLATE_AVISO).
+ * Mesmo motivo do de acesso: fora da janela de 24h só modelo aprovado é entregue.
+ */
+export function getNoticeTemplate(): { name: string; language: string } | null {
+  return templateFromEnv("WHATSAPP_TEMPLATE_AVISO");
+}
+
+function templateFromEnv(variavel: string): { name: string; language: string } | null {
+  const name = process.env[variavel]?.trim();
   if (!name) return null;
   return { name, language: process.env.WHATSAPP_TEMPLATE_IDIOMA?.trim() || "pt_BR" };
+}
+
+/**
+ * Variáveis de modelo não podem ter quebra de linha, tabulação nem mais de 4 espaços
+ * seguidos (a Meta recusa o envio) — normaliza tudo para espaços simples.
+ */
+export function sanitizeTemplateParam(value: string): string {
+  return value.replace(/\s+/g, " ").trim() || "-";
 }
 
 export async function sendWhatsAppTemplateMessage(
@@ -134,7 +154,7 @@ export function buildTemplatePayload(toPhone: string, template: { name: string; 
     template: {
       name: template.name,
       language: { code: template.language },
-      components: [{ type: "body", parameters: bodyParams.map((text) => ({ type: "text", text })) }],
+      components: [{ type: "body", parameters: bodyParams.map((text) => ({ type: "text", text: sanitizeTemplateParam(text) })) }],
     },
   };
 }

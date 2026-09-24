@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
@@ -55,11 +55,14 @@ export async function POST(request: NextRequest) {
         select: { guardianId: true },
       });
       if (responsavelLink) {
-        void notifyUsers([responsavelLink.guardianId], {
-          title: "Pagamento confirmado",
-          body: `Recebemos o pagamento do boleto de ${boleto.mesReferencia}. Obrigado!`,
-          url: "/dashboard/financeiro",
-        }).catch((err) => console.error("push notify failed", err));
+        // after: na Vercel, trabalho solto com "void" pode ser cortado ao responder.
+        after(() =>
+          notifyUsers([responsavelLink.guardianId], {
+            title: "Pagamento confirmado",
+            body: `Recebemos o pagamento do boleto de ${boleto.mesReferencia}. Obrigado!`,
+            url: "/dashboard/financeiro",
+          }).catch((err) => console.error("push notify failed", err)),
+        );
       }
     }
 

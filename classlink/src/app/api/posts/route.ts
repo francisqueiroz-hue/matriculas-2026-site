@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole, requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
@@ -118,10 +118,13 @@ export async function POST(request: NextRequest) {
       },
       select: { id: true },
     });
-    void notifyUsers(
-      recipients.map((r) => r.id),
-      { title: `Novo aviso: ${post.title}`, body: post.body.slice(0, 120), url: "/dashboard/mural" },
-    ).catch((err) => console.error("push notify failed", err));
+    // after: na Vercel, trabalho solto com "void" pode ser cortado ao responder.
+    after(() =>
+      notifyUsers(
+        recipients.map((r) => r.id),
+        { title: `Novo aviso: ${post.title}`, body: post.body.slice(0, 120), url: "/dashboard/mural" },
+      ).catch((err) => console.error("push notify failed", err)),
+    );
 
     return NextResponse.json({ post: await withSignedMedia(post) }, { status: 201 });
   } catch (error) {

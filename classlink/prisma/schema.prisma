@@ -116,9 +116,13 @@ model User {
   deletedAt    DateTime? // exclusão lógica (LGPD) antes de expurgo definitivo
 
   // Permissão extra para STAFF: coordenação pedagógica pode lançar notas (além da direção/ADMIN).
-  isCoordenacao Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isCoordenacao Boolean @default(false)
+
+  // Equipe (ADMIN/STAFF): receber no WhatsApp (pelo número da escola) um aviso quando
+  // chega mensagem nova no ClassLink. Opt-in pela própria pessoa, em Conta.
+  avisosWhatsApp Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Dados de cobrança (Módulo Boleto — Banco Inter). Preenchidos apenas pelo próprio
   // responsável, só quando necessário para emissão de boleto (CPF e endereço são
