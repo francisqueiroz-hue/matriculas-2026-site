@@ -68,6 +68,11 @@ export const createPostSchema = z.object({
   mediaType: z.enum(["image", "video"]).optional(),
 });
 
+export const updatePostSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  body: z.string().min(1).max(5000).optional(),
+});
+
 export const createEventSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),

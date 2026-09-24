@@ -29,6 +29,12 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   const [readByMe, setReadByMe] = useState(post.readByMe);
   const [showReaders, setShowReaders] = useState(false);
   const [readers, setReaders] = useState<ReadEntry[] | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(post.title);
+  const [editBody, setEditBody] = useState(post.body);
+  const [current, setCurrent] = useState(post);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const canModerate = user.role === "ADMIN" || user.id === post.author.id;
   const canSeeReaders = user.role === "ADMIN" || user.role === "STAFF";
@@ -65,25 +71,86 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
     onDeleted?.(post.id);
   }
 
+  function startEdit() {
+    setEditTitle(current.title);
+    setEditBody(current.body);
+    setEditError(null);
+    setEditing(true);
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    setEditError(null);
+    setSavingEdit(true);
+    try {
+      const data = await apiJson<{ post: PostItem }>(`/api/posts/${post.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title: editTitle, body: editBody }),
+      });
+      setCurrent((prev) => ({ ...prev, title: data.post.title, body: data.post.body }));
+      setEditing(false);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Erro ao salvar");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
-          <h3 className="font-semibold">{post.title}</h3>
+          <h3 className="font-semibold">{current.title}</h3>
           <p className="text-xs text-slate-500">
             {post.author.name} ·{" "}
             {post.audience === "SCHOOL" ? "Toda a escola" : post.class?.name ?? "Turma"} ·{" "}
             {new Date(post.createdAt).toLocaleString("pt-BR")}
           </p>
         </div>
-        {canModerate && (
-          <button onClick={handleDelete} className="text-xs text-red-600 hover:underline">
-            Remover
-          </button>
+        {canModerate && !editing && (
+          <span className="flex shrink-0 items-center gap-3">
+            <button onClick={startEdit} className="text-xs text-indigo-600 hover:underline">
+              Editar
+            </button>
+            <button onClick={handleDelete} className="text-xs text-red-600 hover:underline">
+              Remover
+            </button>
+          </span>
         )}
       </div>
 
-      <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{post.body}</p>
+      {editing ? (
+        <form onSubmit={handleSaveEdit} className="space-y-2">
+          <input
+            required
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          />
+          <textarea
+            required
+            rows={4}
+            value={editBody}
+            onChange={(e) => setEditBody(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+          />
+          {editError && <p className="text-xs text-red-600">{editError}</p>}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={savingEdit}
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {savingEdit ? "Salvando..." : "Salvar"}
+            </button>
+            <button type="button" onClick={() => setEditing(false)} className="text-sm text-slate-500 hover:underline">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      ) : (
+        <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{current.body}</p>
+      )}
 
       {post.mediaUrl && post.mediaType === "image" && (
         // eslint-disable-next-line @next/next/no-img-element
