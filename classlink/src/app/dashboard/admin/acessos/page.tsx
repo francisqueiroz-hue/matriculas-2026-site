@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
-import { EnviarAcessoWhatsApp } from "@/components/EnviarAcessoWhatsApp";
 import { apiJson } from "@/lib/api-client";
 
 interface Responsavel {
@@ -14,13 +13,13 @@ interface Responsavel {
   alunos: string[];
   funcao: string | null;
   turmas: string[];
-  linkConvite: string | null;
 }
 
 interface Dados {
   numeroEscola: string;
   linkPedirAcesso: string;
-  envioAutomaticoDisponivel: boolean;
+  whatsappConfigurado: boolean;
+  conviteAprovado: boolean;
   responsaveis: Responsavel[];
 }
 
@@ -37,8 +36,8 @@ function AcessosContent() {
   const [publico, setPublico] = useState<"familias" | "equipe">("familias");
   const [dados, setDados] = useState<Dados | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [convidados, setConvidados] = useState<Record<string, boolean>>({});
-  const [senhas, setSenhas] = useState<Record<string, { texto: string; link: string | null }>>({});
+  const [avisos, setAvisos] = useState<Record<string, { texto: string; ok: boolean }>>({});
+  const [enviando, setEnviando] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [enviandoTodos, setEnviandoTodos] = useState(false);
   const [resultadoLote, setResultadoLote] = useState<string | null>(null);
@@ -55,24 +54,35 @@ function AcessosContent() {
 
   useEffect(carregar, [carregar]);
 
+  async function enviarAcesso(r: Responsavel) {
+    setEnviando(r.id);
+    try {
+      const res = await apiJson<{ resultados: { id: string; enviado: boolean; mensagem: string }[] }>("/api/admin/acessos/enviar", {
+        method: "POST",
+        body: JSON.stringify({ ids: [r.id] }),
+      });
+      const item = res.resultados[0];
+      setAvisos((prev) => ({ ...prev, [r.id]: item ? { texto: item.mensagem, ok: item.enviado } : { texto: "Pessoa não encontrada.", ok: false } }));
+    } catch (err) {
+      setAvisos((prev) => ({ ...prev, [r.id]: { texto: err instanceof Error ? err.message : "Erro no envio", ok: false } }));
+    } finally {
+      setEnviando(null);
+    }
+  }
+
   async function gerarSenha(r: Responsavel) {
     if (!confirm(`Gerar uma nova senha provisória para ${r.name}? A senha atual deixará de funcionar.`)) return;
     try {
-      const res = await apiJson<{ temporaryPassword?: string; notificadoPorWhatsApp?: boolean; whatsappManual?: string | null }>(
-        `/api/admin/users/${r.id}`,
-        { method: "PATCH", body: JSON.stringify({ resetPassword: true }) },
-      );
-      setSenhas((prev) => ({
-        ...prev,
-        [r.id]: {
-          texto: res.notificadoPorWhatsApp
-            ? `Nova senha ${res.temporaryPassword} enviada pelo WhatsApp da escola.`
-            : `Nova senha: ${res.temporaryPassword}. Envie pelo botão ao lado.`,
-          link: res.whatsappManual ?? null,
-        },
-      }));
+      const res = await apiJson<{ temporaryPassword?: string; envio?: { enviado: boolean; mensagem: string } }>(`/api/admin/users/${r.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ resetPassword: true }),
+      });
+      const texto = res.envio?.enviado
+        ? res.envio.mensagem
+        : `${res.envio?.mensagem ?? ""} Nova senha provisória: ${res.temporaryPassword} — entregue pessoalmente.`.trim();
+      setAvisos((prev) => ({ ...prev, [r.id]: { texto, ok: Boolean(res.envio?.enviado) } }));
     } catch (err) {
-      setSenhas((prev) => ({ ...prev, [r.id]: { texto: err instanceof Error ? err.message : "Erro", link: null } }));
+      setAvisos((prev) => ({ ...prev, [r.id]: { texto: err instanceof Error ? err.message : "Erro", ok: false } }));
     }
   }
 
@@ -80,17 +90,24 @@ function AcessosContent() {
     if (!dados) return;
     const pendentes = dados.responsaveis.filter((r) => !r.jaEntrou && r.phone);
     if (pendentes.length === 0) return;
-    if (!confirm(`Enviar o acesso (com nova senha provisória) pelo WhatsApp da escola para ${pendentes.length} responsável(is)?`)) return;
+    if (!confirm(`Enviar o acesso pelo WhatsApp da escola para ${pendentes.length} pessoa(s) que nunca entraram?`)) return;
     setEnviandoTodos(true);
     setResultadoLote(null);
     try {
-      const res = await apiJson<{ enviados: number; falhas: { nome: string; motivo: string }[] }>("/api/admin/acessos/reenviar", {
+      const res = await apiJson<{
+        enviados: number;
+        falhas: { nome: string; motivo: string }[];
+        resultados: { id: string; enviado: boolean; mensagem: string }[];
+      }>("/api/admin/acessos/enviar", {
         method: "POST",
         body: JSON.stringify({ ids: pendentes.map((r) => r.id) }),
       });
+      setAvisos((prev) => ({
+        ...prev,
+        ...Object.fromEntries(res.resultados.map((item) => [item.id, { texto: item.mensagem, ok: item.enviado }])),
+      }));
       setResultadoLote(
-        `${res.enviados} enviado(s).` +
-          (res.falhas.length ? ` Falharam: ${res.falhas.map((f) => `${f.nome} (${f.motivo})`).join("; ")}.` : ""),
+        `${res.enviados} enviado(s) pelo WhatsApp da escola.` + (res.falhas.length ? ` ${res.falhas.length} não enviado(s) — veja o motivo em cada nome.` : ""),
       );
     } catch (err) {
       setResultadoLote(err instanceof Error ? err.message : "Erro no envio");
@@ -126,12 +143,24 @@ function AcessosContent() {
 
       {dados && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
-          <p className="font-semibold">📲 A família pede o acesso e recebe na hora</p>
+          <p className="font-semibold">📲 O acesso sai pelo WhatsApp da escola, direto do ClassLink</p>
           <p className="mt-1">
-            Quem enviar <strong>ACESSO</strong> para o WhatsApp da escola <strong>{formatarTelefone(dados.numeroEscola)}</strong> recebe
-            automaticamente o link e uma senha provisória — desde que o número dela esteja cadastrado aqui. Use o botão
-            <strong> Enviar convite</strong> de cada família ou divulgue o link nos grupos da escola.
+            O ClassLink envia o acesso pelo WhatsApp da escola <strong>{formatarTelefone(dados.numeroEscola)}</strong> — nada sai do seu
+            WhatsApp pessoal. A pessoa recebe um convite com o botão <strong>ACESSO</strong>; ao tocar, recebe o link, o login e uma
+            senha provisória na hora. Quem já mandou <strong>ACESSO</strong> para a escola também recebe automaticamente.
           </p>
+          {!dados.whatsappConfigurado && (
+            <p className="mt-2 rounded-md bg-amber-100 p-2 text-xs text-amber-950">
+              A API do WhatsApp da escola não está configurada na Vercel — o envio pelo aplicativo fica indisponível.
+            </p>
+          )}
+          {dados.whatsappConfigurado && !dados.conviteAprovado && (
+            <p className="mt-2 rounded-md bg-amber-100 p-2 text-xs text-amber-950">
+              O modelo de convite ainda não está aprovado pela Meta. Até lá, o envio só chega a quem escreveu para a escola nas últimas
+              24 horas. Cadastre o modelo em Painel → Configuração dos avisos → “Cadastrar modelos na Meta”, ou divulgue o link abaixo
+              nos grupos.
+            </p>
+          )}
           <button
             type="button"
             onClick={copiarLink}
@@ -172,14 +201,14 @@ function AcessosContent() {
         >
           {publico === "equipe" ? "Toda a equipe" : "Todos os responsáveis"}
         </button>
-        {dados?.envioAutomaticoDisponivel && pendentes > 0 && (
+        {dados?.whatsappConfigurado && pendentes > 0 && (
           <button
             type="button"
             disabled={enviandoTodos}
             onClick={enviarTodos}
             className="ml-auto rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
           >
-            {enviandoTodos ? "Enviando..." : `Enviar acesso automático para quem nunca entrou (${pendentes})`}
+            {enviandoTodos ? "Enviando..." : `Enviar acesso para quem nunca entrou (${pendentes})`}
           </button>
         )}
       </div>
@@ -227,16 +256,15 @@ function AcessosContent() {
                 {r.alunos.length > 0 && <p className="text-xs text-slate-500">Aluno(s): {r.alunos.join(", ")}</p>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {r.linkConvite && (
-                  <a
-                    href={r.linkConvite}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setConvidados((prev) => ({ ...prev, [r.id]: true }))}
-                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                {dados?.whatsappConfigurado && r.phone && (
+                  <button
+                    type="button"
+                    disabled={enviando === r.id || enviandoTodos}
+                    onClick={() => enviarAcesso(r)}
+                    className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                   >
-                    {convidados[r.id] ? "✓ Convite aberto — enviar de novo" : "Enviar convite pelo meu WhatsApp"}
-                  </a>
+                    {enviando === r.id ? "Enviando..." : avisos[r.id]?.ok ? "✓ Enviado — enviar de novo" : "Enviar acesso pelo WhatsApp da escola"}
+                  </button>
                 )}
                 <button
                   type="button"
@@ -250,11 +278,8 @@ function AcessosContent() {
             {!r.phone && (
               <p className="mt-1 text-xs text-red-600">Sem telefone: cadastre o celular em {publico === "equipe" ? "Equipe" : "Alunos"} → Editar para poder enviar o acesso.</p>
             )}
-            {senhas[r.id] && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <p className="text-xs text-slate-600">{senhas[r.id].texto}</p>
-                <EnviarAcessoWhatsApp href={senhas[r.id].link} />
-              </div>
+            {avisos[r.id] && (
+              <p className={`mt-2 text-xs ${avisos[r.id].ok ? "text-emerald-700" : "text-red-600"}`}>{avisos[r.id].texto}</p>
             )}
           </li>
         ))}

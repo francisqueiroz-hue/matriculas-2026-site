@@ -25,7 +25,25 @@ interface WhatsAppMessage {
   timestamp: string;
   type: string;
   text?: { body: string };
+  // Toque em botão de resposta rápida de um modelo (ex.: "ACESSO" no convite).
+  button?: { payload?: string; text?: string };
+  interactive?: { button_reply?: { id?: string; title?: string } };
   context?: { id: string };
+}
+
+/** Texto útil da mensagem: digitado, ou o botão tocado. */
+function textoDaMensagem(msg: WhatsAppMessage): string {
+  if (msg.type === "text") return msg.text?.body ?? "";
+  if (msg.type === "button") return msg.button?.payload || msg.button?.text || "";
+  if (msg.type === "interactive") return msg.interactive?.button_reply?.title || msg.interactive?.button_reply?.id || "";
+  return "";
+}
+
+/** Guarda quando a pessoa escreveu: nas 24h seguintes a escola pode responder em texto livre. */
+async function registrarUltimaMensagem(userId: string) {
+  await prisma.user
+    .update({ where: { id: userId }, data: { whatsappUltimaMensagemEm: new Date() } })
+    .catch((err) => console.error("Falha ao registrar última mensagem do WhatsApp", err));
 }
 
 interface WhatsAppStatus {
@@ -96,17 +114,21 @@ export async function POST(request: NextRequest) {
       const jaProcessada = await prisma.message.findUnique({ where: { externalId: msg.id } });
       if (jaProcessada) continue;
 
-      const textoRecebido = msg.type === "text" ? (msg.text?.body ?? "") : "";
+      const textoRecebido = textoDaMensagem(msg);
       const pediuAcesso = ehPedidoDeAcesso(textoRecebido);
 
       const guardian = await findGuardianByPhone(msg.from);
+      if (guardian) await registrarUltimaMensagem(guardian.id);
       if (!guardian) {
         // Equipe (coordenação, professores, auxiliares) também pode pedir o acesso por "ACESSO".
-        const equipe = pediuAcesso ? await findStaffByPhone(msg.from) : null;
+        const equipe = await findStaffByPhone(msg.from);
         if (equipe) {
-          await responderPedidoDeAcesso(equipe, msg.from, `${request.nextUrl.origin}/login`).catch((err) =>
-            console.error("Falha ao responder pedido de acesso da equipe pelo WhatsApp", err),
-          );
+          await registrarUltimaMensagem(equipe.id);
+          if (pediuAcesso) {
+            await responderPedidoDeAcesso(equipe, msg.from, `${request.nextUrl.origin}/login`).catch((err) =>
+              console.error("Falha ao responder pedido de acesso da equipe pelo WhatsApp", err),
+            );
+          }
           continue;
         }
         console.warn(`Mensagem WhatsApp recebida de número não cadastrado: ${msg.from}`);
@@ -128,7 +150,7 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const corpo = msg.type === "text" ? (msg.text?.body ?? "") : `[Mensagem do tipo "${msg.type}" recebida no WhatsApp — abra o WhatsApp da escola para ver o conteúdo]`;
+      const corpo = textoRecebido || `[Mensagem do tipo "${msg.type}" recebida no WhatsApp — abra o WhatsApp da escola para ver o conteúdo]`;
       if (!corpo) continue;
 
       const recebida = await prisma.message.create({

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
-import { getAccessTemplate, isWhatsAppConfigured } from "@/lib/whatsapp";
-import { NUMERO_WHATSAPP_ESCOLA, linkPedirAcesso, linkWhatsAppManual, mensagemConvite } from "@/lib/acesso";
+import { isWhatsAppConfigured } from "@/lib/whatsapp";
+import { NUMERO_WHATSAPP_ESCOLA, linkPedirAcesso } from "@/lib/acesso";
+import { modeloDisponivel } from "@/lib/whatsapp-modelos";
 import { FUNCAO_LABEL, funcaoDoUsuario } from "@/lib/equipe";
 
 /**
@@ -47,7 +48,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       numeroEscola: NUMERO_WHATSAPP_ESCOLA,
       linkPedirAcesso: linkPedirAcesso(),
-      envioAutomaticoDisponivel: isWhatsAppConfigured() && getAccessTemplate() !== null,
+      whatsappConfigurado: isWhatsAppConfigured(),
+      // Convite (modelo aprovado) disponível: dá para enviar a quem não escreveu nas últimas 24h.
+      conviteAprovado: (await modeloDisponivel("convite")) !== null,
       responsaveis: responsaveis.map((r) => ({
         id: r.id,
         name: r.name,
@@ -58,7 +61,6 @@ export async function GET(request: NextRequest) {
         alunos: r.studentLinks.map((l) => (l.student.class ? `${l.student.name} (${l.student.class.name})` : l.student.name)),
         funcao: equipe ? FUNCAO_LABEL[funcaoDoUsuario(r) ?? "PROFESSOR"] : null,
         turmas: r.classesTeaching.map((c) => c.class.name),
-        linkConvite: linkWhatsAppManual(r.phone, mensagemConvite(r.name.split(" ")[0])),
       })),
     });
   } catch (error) {

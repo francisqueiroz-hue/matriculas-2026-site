@@ -19,7 +19,7 @@ export async function GET() {
       where: { id: session.sub },
       select: { phone: true, avisosWhatsApp: true },
     });
-    return NextResponse.json({ ...user, disponivel: avisosWhatsAppDisponiveis() });
+    return NextResponse.json({ ...user, disponivel: await avisosWhatsAppDisponiveis() });
   } catch (error) {
     return handleApiError(error);
   }
@@ -46,7 +46,7 @@ export async function PATCH(request: NextRequest) {
       data: { phone, avisosWhatsApp: body.avisosWhatsApp },
       select: { phone: true, avisosWhatsApp: true },
     });
-    return NextResponse.json({ ...user, disponivel: avisosWhatsAppDisponiveis() });
+    return NextResponse.json({ ...user, disponivel: await avisosWhatsAppDisponiveis() });
   } catch (error) {
     return handleApiError(error);
   }

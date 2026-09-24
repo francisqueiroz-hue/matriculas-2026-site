@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ehPedidoDeAcesso, mensagemConvite } from "@/lib/acesso";
+import { ehPedidoDeAcesso } from "@/lib/acesso";
 import { NUMERO_WHATSAPP_ESCOLA_FORMATADO, linkPedirAcesso } from "@/lib/whatsapp-escola";
 import { phoneVariantsBR, samePhoneBR } from "@/lib/whatsapp";
 
@@ -19,13 +19,9 @@ describe("pedido de acesso pelo WhatsApp", () => {
     ).toBe(false);
   });
 
-  it("link e convite apontam para o número dedicado da escola com a palavra ACESSO", () => {
+  it("link para os grupos aponta para o número dedicado da escola com a palavra ACESSO", () => {
     expect(linkPedirAcesso()).toBe("https://wa.me/5521992865778?text=ACESSO");
     expect(NUMERO_WHATSAPP_ESCOLA_FORMATADO).toBe("(21) 99286-5778");
-    const convite = mensagemConvite("Rosa");
-    expect(convite).toContain("Olá, Rosa!");
-    expect(convite).toContain("https://wa.me/5521992865778?text=ACESSO");
-    expect(convite).not.toMatch(/senha provis/i);
   });
 });
 

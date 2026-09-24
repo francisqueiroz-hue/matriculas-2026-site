@@ -229,8 +229,8 @@ Passo a passo completo, do zero:
 
 A tela **Equipe** (administração) cadastra direção, coordenação, professores e auxiliares
 no mesmo formato dos responsáveis: **nome + celular e/ou e-mail + função**. A senha
-provisória é gerada automaticamente e pode ser enviada pelo botão **"Enviar acesso pelo meu
-WhatsApp"** (ou automaticamente, com o modelo `WHATSAPP_TEMPLATE_ACESSO`). A função define o
+provisória é gerada automaticamente e o acesso sai **pelo WhatsApp da escola, direto do
+ClassLink** (veja "Envio do acesso pelo próprio ClassLink"). A função define o
 perfil: **Direção** = administrador; **Coordenação** = professor com permissão de lançar
 notas; **Professor(a)** e **Auxiliar** = acesso às turmas em que atuam. O celular é salvo
 padronizado (login por telefone) e não pode repetir entre usuários. A equipe também recebe
@@ -468,11 +468,13 @@ celulares brasileiros, **sem o nono dígito** (ex.: 552187654321 = (21) 98765-43
 Requisitos: webhook configurado (passo 7 acima, campo **messages**) e
 `WHATSAPP_APP_SECRET` preenchido — sem a assinatura válida o webhook recusa as mensagens.
 
-A tela **Acessos** (administração) lista os responsáveis que nunca entraram (nenhuma
-sessão criada), com o botão **Enviar convite pelo meu WhatsApp** (mensagem sem senha, com
-o link `wa.me/5521992865778?text=ACESSO`), **Gerar nova senha** e, com o modelo aprovado
-configurado, **Enviar acesso automático para quem nunca entrou** (em lote). O login, o
-guia (`/guia`), o "Esqueci minha senha" e a página de matrículas também mostram o atalho.
+A tela **Acessos** (administração) lista famílias e equipe que nunca entraram (nenhuma
+sessão criada), com **Enviar acesso pelo WhatsApp da escola** (por pessoa), **Enviar acesso
+para quem nunca entrou** (em lote) e **Gerar nova senha**. Todo envio sai do número da
+escola pela API — nada abre o WhatsApp pessoal de quem está no painel. O login, o guia
+(`/guia`), o "Esqueci minha senha" e a página de matrículas mostram o atalho
+`wa.me/5521992865778?text=ACESSO`, e a tela Acessos copia a mensagem com esse link para os
+grupos da escola.
 
 Para testes locais, `WHATSAPP_API_URL` pode apontar a Graph API para um simulador.
 
@@ -484,55 +486,55 @@ pelo WhatsApp) ou um colega manda mensagem interna, o número da escola envia ao
 dela um aviso com o remetente, o trecho da mensagem e o link para responder. Várias
 mensagens seguidas na mesma conversa geram no máximo um aviso a cada 10 minutos.
 
-Como o aviso parte da escola (fora da janela de 24h), ele exige um modelo aprovado:
+Se a pessoa escreveu para o número da escola nas últimas 24h, o aviso vai em texto livre;
+fora disso, usa o modelo `aviso_mensagem_classlink`, que o próprio ClassLink cadastra na
+Meta (seção abaixo).
 
-1. WhatsApp Manager → **Modelos de mensagem** → Criar. Categoria **Utilidade**, idioma
-   **Português (BR)**, nome por exemplo `aviso_mensagem_classlink`.
-2. Corpo (a Meta não aceita variável no começo nem no fim do texto):
-   ```
-   Você recebeu uma nova mensagem no ClassLink de {{1}}:
+#### Envio do acesso pelo próprio ClassLink
 
-   "{{2}}"
+A Meta só entrega mensagem iniciada pela escola se ela usar um **modelo aprovado** (texto
+livre é aceito pela API, mas descartado com o erro 131047 para quem não escreveu à escola
+nas últimas 24h). Por isso o ClassLink envia o acesso assim — sempre pelo número da escola:
 
-   Para responder, abra: {{3}}
+1. **Conversa aberta** (a pessoa escreveu para a escola nas últimas 24h; o webhook grava o
+   horário da última mensagem): envia link, login e senha provisória direto.
+2. **Modelo de acesso com senha** (opcional, `WHATSAPP_TEMPLATE_ACESSO`): envia por ele.
+3. **Convite** (`convite_acesso_classlink`, sem senha): "Olá, {{1}}! A escola cadastrou
+   você no ClassLink... toque no botão ACESSO abaixo." Ao tocar no botão, a resposta chega
+   ao webhook, que devolve link, login e senha provisória na hora.
 
-   Aviso automático da escola.
-   ```
-   Exemplos para a revisão: `Maria Silva`, `Bom dia! O Davi vai sair mais cedo hoje`,
-   `https://seu-dominio/dashboard/mensagens/abc123`.
-3. Aprovado, configure `WHATSAPP_TEMPLATE_AVISO=aviso_mensagem_classlink` na Vercel e faça
-   um novo deploy. O Painel da administração mostra, em **Configuração dos avisos**, o que
-   já está ativo.
+Vale para o cadastro de responsável (Alunos), o cadastro da equipe (Equipe), Gerar nova
+senha, a tela Acessos e o "Esqueci minha senha". Se nada puder ser enviado (sem celular,
+modelo ainda em análise), o painel diz o motivo e mostra a senha para entrega pessoal.
 
-#### Modelo para enviar acesso e senha provisória
+**Configuração (uma vez):**
 
-O envio automático do acesso (ao vincular um responsável novo, ao redefinir a senha pelo
-painel e no "Esqueci minha senha") usa **somente** um modelo aprovado — nunca texto
-livre, que não chegaria a famílias que ainda não conversaram com a escola.
+1. Na Vercel, cadastre `WHATSAPP_BUSINESS_ACCOUNT_ID` — o **ID da conta do WhatsApp
+   Business** (Meta for Developers → seu app → WhatsApp → Configuração da API; fica acima
+   do número de telefone). O token (`WHATSAPP_API_TOKEN`) precisa da permissão
+   `whatsapp_business_management`. Faça um novo deploy.
+2. No ClassLink, **Painel → Configuração dos avisos → Cadastrar modelos na Meta**. O
+   sistema cria os modelos `convite_acesso_classlink` (com o botão ACESSO) e
+   `aviso_mensagem_classlink`, na categoria Utilidade, em português.
+3. Aguarde a aprovação da Meta (de minutos a algumas horas). O mesmo quadro mostra a
+   situação (em análise, aprovado, recusado e o motivo).
 
-1. WhatsApp Manager → **Modelos de mensagem** → Criar modelo. Categoria **Utilidade**,
-   idioma **Português (BR)**, nome por exemplo `acesso_classlink`.
-2. Corpo sugerido (as variáveis precisam estar nesta ordem):
-   ```
-   Olá, {{1}}! Seu acesso ao ClassLink, o aplicativo de comunicação da escola, está pronto.
+Para usar modelos já aprovados com outros nomes, informe `WHATSAPP_TEMPLATE_CONVITE` e/ou
+`WHATSAPP_TEMPLATE_AVISO` (sem o ID da conta, o ClassLink confia nesses nomes).
 
-   Acesse: {{2}}
-   Entrar com: {{3}}
-   Senha provisória: {{4}}
+Modelo opcional com senha (`WHATSAPP_TEMPLATE_ACESSO`), criado manualmente no WhatsApp
+Manager, categoria Utilidade, variáveis nesta ordem:
+```
+Olá, {{1}}! Seu acesso ao ClassLink, o aplicativo de comunicação da escola, está pronto.
 
-   Assim que entrar, troque a senha em Conta > Trocar senha.
-   ```
-   Exemplos para a revisão da Meta: `Maria`, `https://seu-dominio/guia`,
-   `(21) 98765-4321`, `a1b2c3d4e5f6`.
-3. Depois de aprovado, configure `WHATSAPP_TEMPLATE_ACESSO=acesso_classlink` (e
-   `WHATSAPP_TEMPLATE_IDIOMA=pt_BR`, que já é o padrão).
+Acesse: {{2}}
+Entrar com: {{3}}
+Senha provisória: {{4}}
 
-Sem o modelo configurado, nada é enviado automaticamente — e o sistema diz isso. Em todos
-os casos, o painel mostra o botão **"Enviar acesso pelo meu WhatsApp"**, que abre o
-WhatsApp de quem está no painel (celular ou WhatsApp Web) com a mensagem pronta para
-aquele contato. Isso funciona na hora, sem API nem aprovação. O "Esqueci minha senha" só
-troca a senha quando consegue entregar a nova (modelo no WhatsApp ou e-mail); caso
-contrário, a senha antiga continua valendo.
+Assim que entrar, troque a senha em Conta > Trocar senha.
+```
+O "Esqueci minha senha" só troca a senha quando consegue entregar a nova (WhatsApp ou
+e-mail); caso contrário, a senha antiga continua valendo.
 
 ### Configurando o e-mail (Mailgun)
 

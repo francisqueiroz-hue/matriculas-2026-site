@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getFirebaseAdminApp } from "@/lib/firebase-admin";
-import { getAccessTemplate, getNoticeTemplate, isWhatsAppConfigured } from "@/lib/whatsapp";
+import { getAccessTemplate, isWhatsAppConfigured } from "@/lib/whatsapp";
+import { consultarModelo, wabaId } from "@/lib/whatsapp-modelos";
 
 /**
  * O que está configurado para os avisos (push do Firebase e WhatsApp), sem expor
@@ -14,9 +15,11 @@ export async function GET() {
     const session = await requireRole("ADMIN");
     const env = (nome: string) => Boolean(process.env[nome]?.trim());
 
-    const [dispositivosPush, equipeComAvisoWhatsApp] = await Promise.all([
+    const [dispositivosPush, equipeComAvisoWhatsApp, convite, aviso] = await Promise.all([
       prisma.pushToken.count({ where: { user: { schoolId: session.schoolId } } }),
       prisma.user.count({ where: { schoolId: session.schoolId, avisosWhatsApp: true, deletedAt: null } }),
+      consultarModelo("convite"),
+      consultarModelo("aviso"),
     ]);
 
     return NextResponse.json({
@@ -35,7 +38,8 @@ export async function GET() {
         webhookAssinatura: env("WHATSAPP_APP_SECRET"),
         webhookVerificacao: env("WHATSAPP_VERIFY_TOKEN"),
         modeloAcesso: getAccessTemplate()?.name ?? null,
-        modeloAviso: getNoticeTemplate()?.name ?? null,
+        contaBusiness: wabaId() !== null,
+        modelos: { convite, aviso },
         equipeComAvisoWhatsApp,
       },
     });

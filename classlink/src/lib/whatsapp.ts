@@ -96,14 +96,6 @@ export function getAccessTemplate(): { name: string; language: string } | null {
   return templateFromEnv("WHATSAPP_TEMPLATE_ACESSO");
 }
 
-/**
- * Modelo aprovado para avisar a equipe de mensagem nova no ClassLink (WHATSAPP_TEMPLATE_AVISO).
- * Mesmo motivo do de acesso: fora da janela de 24h só modelo aprovado é entregue.
- */
-export function getNoticeTemplate(): { name: string; language: string } | null {
-  return templateFromEnv("WHATSAPP_TEMPLATE_AVISO");
-}
-
 function templateFromEnv(variavel: string): { name: string; language: string } | null {
   const name = process.env[variavel]?.trim();
   if (!name) return null;
@@ -122,6 +114,7 @@ export async function sendWhatsAppTemplateMessage(
   toPhone: string,
   template: { name: string; language: string },
   bodyParams: string[],
+  quickReplyPayloads: string[] = [],
 ): Promise<{ externalId: string }> {
   const phoneNumberId = env("WHATSAPP_PHONE_NUMBER_ID");
   const token = env("WHATSAPP_API_TOKEN");
@@ -132,7 +125,7 @@ export async function sendWhatsAppTemplateMessage(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(buildTemplatePayload(toPhone, template, bodyParams)),
+    body: JSON.stringify(buildTemplatePayload(toPhone, template, bodyParams, quickReplyPayloads)),
   });
 
   const data = await response.json();
@@ -146,7 +139,24 @@ export async function sendWhatsAppTemplateMessage(
   return { externalId };
 }
 
-export function buildTemplatePayload(toPhone: string, template: { name: string; language: string }, bodyParams: string[]) {
+/**
+ * Monta o envio de um modelo. `quickReplyPayloads` preenche, na ordem, os botões de
+ * resposta rápida do modelo — o que a pessoa tocar volta no webhook como mensagem do tipo
+ * "button" com esse payload (ex.: "ACESSO").
+ */
+export function buildTemplatePayload(
+  toPhone: string,
+  template: { name: string; language: string },
+  bodyParams: string[],
+  quickReplyPayloads: string[] = [],
+) {
+  const components: Record<string, unknown>[] = [];
+  if (bodyParams.length > 0) {
+    components.push({ type: "body", parameters: bodyParams.map((text) => ({ type: "text", text: sanitizeTemplateParam(text) })) });
+  }
+  quickReplyPayloads.forEach((payload, index) => {
+    components.push({ type: "button", sub_type: "quick_reply", index: String(index), parameters: [{ type: "payload", payload }] });
+  });
   return {
     messaging_product: "whatsapp",
     to: toPhone,
@@ -154,7 +164,7 @@ export function buildTemplatePayload(toPhone: string, template: { name: string; 
     template: {
       name: template.name,
       language: { code: template.language },
-      components: [{ type: "body", parameters: bodyParams.map((text) => ({ type: "text", text: sanitizeTemplateParam(text) })) }],
+      components,
     },
   };
 }
