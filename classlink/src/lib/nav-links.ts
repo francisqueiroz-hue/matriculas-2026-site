@@ -52,7 +52,7 @@ const adminLinks: NavLink[] = [
   },
   {
     href: "/dashboard/admin/usuarios",
-    label: "Usuários",
+    label: "Equipe",
     icon: "M12 12a4 4 0 100-8 4 4 0 000 8z M4 20c1-4 4-6 8-6s7 2 8 6",
   },
   {

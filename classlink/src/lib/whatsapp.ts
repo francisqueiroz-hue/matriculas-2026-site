@@ -184,6 +184,18 @@ export async function findGuardianByPhone(fromPhone: string) {
   return candidatos.find((c) => c.phone && samePhoneBR(c.phone, fromPhone)) ?? null;
 }
 
+/**
+ * Encontra alguém da equipe (ADMIN/STAFF) pelo telefone recebido no webhook — usado para
+ * responder ao pedido de acesso ("ACESSO") também de professores, coordenação e auxiliares.
+ */
+export async function findStaffByPhone(fromPhone: string) {
+  const candidatos = await prisma.user.findMany({
+    where: { role: { in: ["ADMIN", "STAFF"] }, phone: { not: null }, deletedAt: null },
+    select: { id: true, name: true, phone: true, schoolId: true },
+  });
+  return candidatos.find((c) => c.phone && samePhoneBR(c.phone, fromPhone)) ?? null;
+}
+
 /** Valida a assinatura HMAC-SHA256 (X-Hub-Signature-256) do webhook, conforme exigido pela Meta. */
 export function verifyWhatsAppSignature(rawBody: string, signatureHeader: string | null): boolean {
   const appSecret = process.env.WHATSAPP_APP_SECRET;

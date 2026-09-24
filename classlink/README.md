@@ -225,6 +225,18 @@ Passo a passo completo, do zero:
 > de notificações/dia). Se a escola crescer muito, o Firebase avisa antes de qualquer
 > cobrança — o plano pago (Blaze) só é necessário acima desses limites.
 
+## Cadastro da equipe
+
+A tela **Equipe** (administração) cadastra direção, coordenação, professores e auxiliares
+no mesmo formato dos responsáveis: **nome + celular e/ou e-mail + função**. A senha
+provisória é gerada automaticamente e pode ser enviada pelo botão **"Enviar acesso pelo meu
+WhatsApp"** (ou automaticamente, com o modelo `WHATSAPP_TEMPLATE_ACESSO`). A função define o
+perfil: **Direção** = administrador; **Coordenação** = professor com permissão de lançar
+notas; **Professor(a)** e **Auxiliar** = acesso às turmas em que atuam. O celular é salvo
+padronizado (login por telefone) e não pode repetir entre usuários. A equipe também recebe
+o acesso mandando **ACESSO** para o WhatsApp da escola, e a tela **Acessos** tem a aba
+**Equipe** com quem ainda não entrou.
+
 ## Página de matrículas e rematrícula
 
 - A página pública de matrículas fica em **`/matriculas`** (link também na tela de login).

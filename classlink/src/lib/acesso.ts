@@ -62,5 +62,5 @@ export function ehPedidoDeAcesso(texto: string): boolean {
 
 /** Convite (sem senha) para a família pedir o acesso ao número da escola. */
 export function mensagemConvite(nome: string): string {
-  return `Olá, ${nome}! A escola criou o seu acesso ao ClassLink, o aplicativo de comunicação com as famílias.\n\nPara receber sua senha, toque no link abaixo e envie a mensagem ${PALAVRA_PEDIDO_ACESSO} — a resposta chega na hora:\n${linkPedirAcesso()}`;
+  return `Olá, ${nome}! A escola criou o seu acesso ao ClassLink, o aplicativo de comunicação da escola.\n\nPara receber sua senha, toque no link abaixo e envie a mensagem ${PALAVRA_PEDIDO_ACESSO} — a resposta chega na hora:\n${linkPedirAcesso()}`;
 }

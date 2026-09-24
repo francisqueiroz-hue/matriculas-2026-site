@@ -17,6 +17,16 @@ enum Role {
   GUARDIAN // responsável (pai/mãe/tutor)
 }
 
+// Função na equipe (só ADMIN/STAFF). Define o perfil: DIRECAO → ADMIN; COORDENACAO →
+// STAFF com isCoordenacao; PROFESSOR e AUXILIAR → STAFF. Nulo em cadastros antigos (a
+// função é deduzida do perfil).
+enum FuncaoEquipe {
+  DIRECAO
+  COORDENACAO
+  PROFESSOR
+  AUXILIAR
+}
+
 enum PostAudience {
   SCHOOL // mural geral da escola
   CLASS // mural de uma turma específica
@@ -120,9 +130,11 @@ model User {
 
   // Equipe (ADMIN/STAFF): receber no WhatsApp (pelo número da escola) um aviso quando
   // chega mensagem nova no ClassLink. Opt-in pela própria pessoa, em Conta.
-  avisosWhatsApp Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  avisosWhatsApp Boolean @default(false)
+
+  funcao    FuncaoEquipe?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   // Dados de cobrança (Módulo Boleto — Banco Inter). Preenchidos apenas pelo próprio
   // responsável, só quando necessário para emissão de boleto (CPF e endereço são

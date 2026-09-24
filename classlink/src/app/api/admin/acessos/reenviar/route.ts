@@ -11,8 +11,8 @@ import { parametrosModeloAcesso } from "@/lib/acesso";
 const bodySchema = z.object({ ids: z.array(z.string().min(1)).min(1).max(300) });
 
 /**
- * Reenvia, pelo modelo aprovado na Meta, o acesso de vários responsáveis de uma vez (os
- * que nunca entraram). A senha de cada um só é trocada se o envio foi aceito — quem
+ * Reenvia, pelo modelo aprovado na Meta, o acesso de várias pessoas de uma vez (famílias
+ * ou equipe que nunca entraram). A senha de cada um só é trocada se o envio foi aceito — quem
  * falhar mantém a senha anterior e aparece na lista de falhas.
  */
 export async function POST(request: NextRequest) {
@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     }
 
     const responsaveis = await prisma.user.findMany({
-      where: { id: { in: ids }, schoolId: session.schoolId, role: "GUARDIAN", deletedAt: null, active: true },
-      select: { id: true, name: true, phone: true, email: true },
+      where: { id: { in: ids }, schoolId: session.schoolId, deletedAt: null, active: true },
+      select: { id: true, name: true, phone: true, email: true, role: true },
     });
 
     const enviados: string[] = [];
@@ -44,7 +44,12 @@ export async function POST(request: NextRequest) {
       try {
         const enviado = await sendAccessViaWhatsApp(
           r.phone,
-          parametrosModeloAcesso({ nome: r.name, url: `${request.nextUrl.origin}/guia`, login: r.email ?? r.phone, senha }),
+          parametrosModeloAcesso({
+            nome: r.name,
+            url: `${request.nextUrl.origin}${r.role === "GUARDIAN" ? "/guia" : "/login"}`,
+            login: r.email ?? r.phone,
+            senha,
+          }),
         );
         if (!enviado) {
           falhas.push({ id: r.id, nome: r.name, motivo: "telefone inválido" });
