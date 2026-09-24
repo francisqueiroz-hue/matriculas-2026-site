@@ -240,8 +240,6 @@ Passo a passo completo, do zero:
   domínios (CORS aberto, sem cookies), exige o consentimento, tem campo-armadilha contra
   robôs e limita a 5 envios a cada 10 minutos por IP. Se houver mais de uma escola no
   banco, defina `MATRICULAS_SCHOOL_ID`.
-- Ao publicar esta funcionalidade, rode `npx prisma migrate deploy` no banco de produção
-  (migração `solicitacoes_matricula`, só cria a tabela nova).
 - Para garantir que todas as famílias foram avisadas, crie também um **Comunicado** do tipo
   circular "Rematrícula 2027" com prazo de resposta: o painel mostra quem ainda não
   confirmou a leitura, permite reenviar lembrete e exportar CSV. (Os tipos atuais de
@@ -526,8 +524,14 @@ individualmente. É um canal separado das conversas com família:
    `BANCO_INTER_KEY` (veja a opção 1 no `.env.example`); `src/lib/banco-inter.ts` já lê
    o certificado a partir delas quando estiverem preenchidas, sem precisar de arquivo
    nenhum em disco.
-3. Rode `npx prisma migrate deploy` contra o banco de produção (uma vez, no pipeline de
-   deploy ou manualmente) e depois `npm run db:seed` se quiser dados de exemplo.
+3. As migrações do banco são aplicadas **automaticamente** a cada deploy de produção na
+   Vercel: o script `vercel-build` roda `scripts/migrate-on-deploy.mjs` (que executa
+   `prisma migrate deploy` só quando `VERCEL_ENV=production`) antes do `next build`.
+   Deploys de preview nunca migram. Se a migração falhar, o deploy é interrompido e a
+   versão anterior continua no ar. Se o `DATABASE_URL` usar um pooler (ex.: host
+   "-pooler" do Neon ou PgBouncer), cadastre também `DIRECT_URL` com a conexão direta.
+   Fora da Vercel, rode `npx prisma migrate deploy` manualmente. Depois,
+   `npm run db:seed` se quiser dados de exemplo.
 4. Faça o deploy na [Vercel](https://vercel.com): conecte o repositório GitHub — a Vercel
    detecta o Next.js automaticamente e já lê o `vercel.json` para agendar os crons.
 5. Siga o passo a passo de [Ativando o Firebase](#ativando-o-firebase-notificações-push--upload-de-mídia)
