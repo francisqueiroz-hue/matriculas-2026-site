@@ -219,6 +219,23 @@ Passo a passo completo, do zero:
 > de notificações/dia). Se a escola crescer muito, o Firebase avisa antes de qualquer
 > cobrança — o plano pago (Blaze) só é necessário acima desses limites.
 
+## Página de matrículas e rematrícula
+
+- A página pública de matrículas fica em **`/matriculas`** (link também na tela de login).
+  A fonte única é `site/index.html` na raiz do repositório — a mesma publicada no GitHub
+  Pages e enviada para a hospedagem do site da escola. Depois de editá-la, rode
+  `npm run sync:matriculas` para regenerar `public/matriculas.html` (logos apontando para
+  `/logos` e links do ClassLink relativos). O teste `tests/matriculas.test.ts` falha se as
+  duas versões ficarem fora de sincronia.
+- Responsáveis logados veem no painel o aviso de **rematrícula** com o nome dos filhos e
+  um botão que abre o WhatsApp da secretaria com a confirmação pronta. Ano, número e
+  ativação da campanha ficam em `src/lib/rematricula.ts` (`ativa: false` desliga o aviso).
+- Para garantir que todas as famílias foram avisadas, crie também um **Comunicado** do tipo
+  circular "Rematrícula 2027" com prazo de resposta: o painel mostra quem ainda não
+  confirmou a leitura, permite reenviar lembrete e exportar CSV. (Os tipos atuais de
+  comunicado não têm botões "rematricular / não rematricular"; a confirmação da vaga em si
+  chega pelo WhatsApp.)
+
 ## Autorizações e confirmações (Comunicados)
 
 Tela **Comunicados**, disponível para todos os perfis:

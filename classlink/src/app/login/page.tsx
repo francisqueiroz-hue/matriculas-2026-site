@@ -75,6 +75,13 @@ function LoginForm() {
             Esqueci minha senha
           </Link>
         </form>
+
+        <a
+          href="/matriculas"
+          className="mt-6 block rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-center text-sm font-semibold text-amber-900 hover:bg-amber-100"
+        >
+          📣 Matrículas e rematrícula 2027 — saiba mais
+        </a>
       </div>
     </div>
   );
