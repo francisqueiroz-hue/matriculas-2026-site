@@ -8,6 +8,7 @@ import { PushRegister } from "@/components/PushRegister";
 import { IosInstallBanner } from "@/components/IosInstallBanner";
 import { AndroidInstallBanner } from "@/components/AndroidInstallBanner";
 import { RematriculaBanner } from "@/components/RematriculaBanner";
+import { AvisosMensagensProvider, ConviteAtivarAvisos } from "@/components/AvisosMensagens";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -39,17 +40,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
         isCoordenacao: user.isCoordenacao,
       }}
     >
-      <Navbar />
-      <PushRegister />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-          <IosInstallBanner />
-          <AndroidInstallBanner />
-          <RematriculaBanner />
-          {children}
-        </main>
-      </div>
+      <AvisosMensagensProvider>
+        <Navbar />
+        <PushRegister />
+        <div className="flex flex-1">
+          <Sidebar />
+          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+            <IosInstallBanner />
+            <AndroidInstallBanner />
+            <ConviteAtivarAvisos />
+            <RematriculaBanner />
+            {children}
+          </main>
+        </div>
+      </AvisosMensagensProvider>
     </UserProvider>
   );
 }

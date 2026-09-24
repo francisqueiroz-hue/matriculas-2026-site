@@ -6,12 +6,14 @@ import { useCurrentUser } from "@/components/UserContext";
 import { NavIcon } from "@/components/NavIcon";
 import { apiFetch } from "@/lib/api-client";
 import { getNavLinks, useComunicadosPendentes } from "@/lib/nav-links";
+import { useMensagensNaoLidas } from "@/components/AvisosMensagens";
 
 export function Sidebar() {
   const user = useCurrentUser();
   const pathname = usePathname();
   const router = useRouter();
   const comunicadosPendentes = useComunicadosPendentes(user.role);
+  const mensagensNaoLidas = useMensagensNaoLidas().total;
 
   const links = getNavLinks(user);
 
@@ -44,6 +46,14 @@ export function Sidebar() {
             {link.href === "/dashboard/comunicados" && comunicadosPendentes > 0 && (
               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
                 {comunicadosPendentes}
+              </span>
+            )}
+            {link.href === "/dashboard/mensagens" && mensagensNaoLidas > 0 && (
+              <span
+                aria-label={`${mensagensNaoLidas} mensagem(ns) não lida(s)`}
+                className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white"
+              >
+                {mensagensNaoLidas}
               </span>
             )}
           </Link>

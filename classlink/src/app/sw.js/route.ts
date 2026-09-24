@@ -49,6 +49,24 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+// Clique no aviso de mensagem nova (mostrado pelo painel): foca a aba do ClassLink e abre a conversa.
+self.addEventListener("notificationclick", (event) => {
+  const data = event.notification.data || {};
+  if (data.origem !== "classlink-aviso" || !data.url) return;
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
+      const alvo = new URL(data.url, self.location.origin).href;
+      for (const janela of janelas) {
+        if (new URL(janela.url).origin === self.location.origin && "focus" in janela) {
+          return janela.focus().then((j) => (j && "navigate" in j ? j.navigate(alvo) : undefined));
+        }
+      }
+      return self.clients.openWindow(alvo);
+    }),
+  );
+});
+
 if (${Boolean(firebaseConfig.apiKey)}) {
   importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js");
   importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js");

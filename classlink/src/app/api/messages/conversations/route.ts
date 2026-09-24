@@ -22,7 +22,8 @@ export async function GET() {
         messages: { orderBy: { createdAt: "desc" }, take: 1 },
         _count: {
           select: {
-            messages: session.role === "GUARDIAN" ? { where: { senderId: { not: session.sub }, readAt: null } } : true,
+            // Não lidas (recebidas e ainda não abertas) — para família e equipe.
+            messages: { where: { senderId: { not: session.sub }, readAt: null } },
           },
         },
       },

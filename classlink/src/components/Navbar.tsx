@@ -7,12 +7,15 @@ import { useCurrentUser } from "@/components/UserContext";
 import { NavIcon } from "@/components/NavIcon";
 import { apiFetch } from "@/lib/api-client";
 import { getNavLinks, useComunicadosPendentes } from "@/lib/nav-links";
+import { useMensagensNaoLidas } from "@/components/AvisosMensagens";
 
 export function Navbar() {
   const user = useCurrentUser();
   const pathname = usePathname();
   const router = useRouter();
   const comunicadosPendentes = useComunicadosPendentes(user.role);
+  const mensagensNaoLidas = useMensagensNaoLidas().total;
+  const pendenciasMenu = comunicadosPendentes + mensagensNaoLidas;
   const [open, setOpen] = useState(false);
 
   const links = getNavLinks(user);
@@ -38,9 +41,9 @@ export function Navbar() {
           className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100"
         >
           {open ? "✕" : "☰"}
-          {!open && comunicadosPendentes > 0 && (
+          {!open && pendenciasMenu > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
-              {comunicadosPendentes}
+              {pendenciasMenu}
             </span>
           )}
         </button>
@@ -71,6 +74,11 @@ export function Navbar() {
                 {link.href === "/dashboard/comunicados" && comunicadosPendentes > 0 && (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
                     {comunicadosPendentes}
+                  </span>
+                )}
+                {link.href === "/dashboard/mensagens" && mensagensNaoLidas > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-semibold text-white">
+                    {mensagensNaoLidas}
                   </span>
                 )}
               </Link>
