@@ -5,3 +5,22 @@
    seriam aplicadas dentro de um ancestral com a classe `.dark`, que
    nunca é adicionada. */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Paleta "indigo" substituída por um roxo mais suave, inspirado na cor da marca
+   (logo Espaço Kids), em vez do índigo padrão do Tailwind — deixa botões,
+   links e destaques com menos contraste "gritante", mais aconchegante para o
+   uso do dia a dia. Como todo o app usa classes `bg-indigo-*`/`text-indigo-*`,
+   redefinir os tokens aqui já atualiza a cor em toda a aplicação de uma vez. */
+@theme {
+  --color-indigo-50: #f6f4fd;
+  --color-indigo-100: #ede9fb;
+  --color-indigo-200: #dcd4f7;
+  --color-indigo-300: #c2b4f0;
+  --color-indigo-400: #a690e6;
+  --color-indigo-500: #8b76dc;
+  --color-indigo-600: #6f5fd0;
+  --color-indigo-700: #5c4db8;
+  --color-indigo-800: #4c3f96;
+  --color-indigo-900: #3f3579;
+  --color-indigo-950: #271f4d;
+}
