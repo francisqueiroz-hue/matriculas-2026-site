@@ -1,3 +1,5 @@
+import { linkPedirAcesso } from "@/lib/whatsapp-escola";
+
 const AREAS = [
   {
     titulo: "Mural",
@@ -38,7 +40,7 @@ const PASSOS = [
   },
   {
     titulo: "Entre com seu e-mail (ou telefone) e a senha provisória",
-    texto: "A escola te repassa o contato cadastrado — e-mail ou telefone — e uma senha provisória para o primeiro acesso. Quem não tem e-mail pode entrar com o telefone normalmente, e adicionar um e-mail depois em Minha conta. Se ainda não recebeu sua senha, é só pedir à secretaria.",
+    texto: "Use o telefone (ou e-mail) que a escola cadastrou e a senha provisória. Ainda não recebeu a senha? Toque em \"Receber meu acesso pelo WhatsApp\" e envie a mensagem ACESSO para o número da escola: a resposta com a senha chega na hora. Quem não tem e-mail entra com o telefone normalmente, e pode adicionar um e-mail depois em Minha conta.",
   },
   {
     titulo: "Troque a senha",
@@ -73,6 +75,14 @@ export default function GuiaPage() {
           className="mt-6 inline-block rounded-lg bg-indigo-600 px-8 py-3 font-semibold text-white transition hover:bg-indigo-700"
         >
           Entrar no ClassLink
+        </a>
+        <a
+          href={linkPedirAcesso()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-emerald-700 hover:underline"
+        >
+          📲 Ainda não tem senha? Receber meu acesso pelo WhatsApp
         </a>
       </div>
 

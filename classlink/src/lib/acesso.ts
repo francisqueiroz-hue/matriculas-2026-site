@@ -1,4 +1,7 @@
 import { normalizePhoneBR } from "@/lib/whatsapp";
+import { PALAVRA_PEDIDO_ACESSO, linkPedirAcesso } from "@/lib/whatsapp-escola";
+
+export { NUMERO_WHATSAPP_ESCOLA, PALAVRA_PEDIDO_ACESSO, linkPedirAcesso } from "@/lib/whatsapp-escola";
 
 /** Dados da mensagem de acesso (novo cadastro ou nova senha temporária). */
 export interface DadosAcesso {
@@ -40,4 +43,24 @@ export function linkWhatsAppManual(telefone: string | null | undefined, texto: s
   const numero = telefone ? normalizePhoneBR(telefone) : null;
   if (!numero) return null;
   return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+}
+
+/**
+ * Mensagem recebida é um pedido de acesso/senha? Só mensagens curtas com a palavra
+ * "acesso" ou "senha" contam, para uma conversa comum ("a senha do portão...") não gerar
+ * uma senha nova sem querer.
+ */
+export function ehPedidoDeAcesso(texto: string): boolean {
+  const limpo = texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase();
+  if (!limpo || limpo.length > 60) return false;
+  return /\b(acesso|senha)\b/.test(limpo);
+}
+
+/** Convite (sem senha) para a família pedir o acesso ao número da escola. */
+export function mensagemConvite(nome: string): string {
+  return `Olá, ${nome}! A escola criou o seu acesso ao ClassLink, o aplicativo de comunicação com as famílias.\n\nPara receber sua senha, toque no link abaixo e envie a mensagem ${PALAVRA_PEDIDO_ACESSO} — a resposta chega na hora:\n${linkPedirAcesso()}`;
 }

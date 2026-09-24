@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { apiJson } from "@/lib/api-client";
+import { NUMERO_WHATSAPP_ESCOLA_FORMATADO, linkPedirAcesso } from "@/lib/whatsapp-escola";
 
 export default function EsqueciSenhaPage() {
   const [identifier, setIdentifier] = useState("");
@@ -38,8 +39,17 @@ export default function EsqueciSenhaPage() {
               e-mail. Confira suas mensagens.
             </p>
             <p className="text-xs text-slate-400">
-              Se depois de alguns minutos você não receber nada, procure a secretaria da escola.
+              Não chegou? Envie <strong>ACESSO</strong> para o WhatsApp da escola {NUMERO_WHATSAPP_ESCOLA_FORMATADO} e
+              receba uma senha nova na hora.
             </p>
+            <a
+              href={linkPedirAcesso()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              Receber pelo WhatsApp
+            </a>
             <Link href="/login" className="block font-medium text-indigo-600 hover:underline">
               Voltar para o login
             </Link>

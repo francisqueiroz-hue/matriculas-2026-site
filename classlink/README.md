@@ -436,6 +436,28 @@ conversa no ClassLink. Cada canal fala com seu próprio provedor:
 > o texto livre é **aceito** pela API (resposta 200 com id) e só depois descartado — a
 > falha (código 131047) chega pelo webhook de status e fica registrada nos logs.
 
+#### Família pede o acesso pelo WhatsApp ("ACESSO")
+
+Não precisa de modelo aprovado: quando o responsável envia **ACESSO** (ou uma mensagem
+curta com "senha") para o número dedicado da escola — (21) 99286-5778, definido em
+`src/lib/whatsapp-escola.ts` —, o webhook reconhece o telefone cadastrado e responde na
+hora, em texto livre (a janela de 24h foi aberta pela própria família), com o link e uma
+senha provisória. A senha só é trocada se a resposta for aceita pela Meta. Número não
+cadastrado recebe uma orientação para procurar a secretaria; conversas comuns não geram
+senha. A comparação de telefones aceita o formato que a Meta usa no webhook para
+celulares brasileiros, **sem o nono dígito** (ex.: 552187654321 = (21) 98765-4321).
+
+Requisitos: webhook configurado (passo 7 acima, campo **messages**) e
+`WHATSAPP_APP_SECRET` preenchido — sem a assinatura válida o webhook recusa as mensagens.
+
+A tela **Acessos** (administração) lista os responsáveis que nunca entraram (nenhuma
+sessão criada), com o botão **Enviar convite pelo meu WhatsApp** (mensagem sem senha, com
+o link `wa.me/5521992865778?text=ACESSO`), **Gerar nova senha** e, com o modelo aprovado
+configurado, **Enviar acesso automático para quem nunca entrou** (em lote). O login, o
+guia (`/guia`), o "Esqueci minha senha" e a página de matrículas também mostram o atalho.
+
+Para testes locais, `WHATSAPP_API_URL` pode apontar a Graph API para um simulador.
+
 #### Modelo para enviar acesso e senha provisória
 
 O envio automático do acesso (ao vincular um responsável novo, ao redefinir a senha pelo

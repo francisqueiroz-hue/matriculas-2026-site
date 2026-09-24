@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiJson } from "@/lib/api-client";
+import { linkPedirAcesso } from "@/lib/whatsapp-escola";
 
 function LoginForm() {
   const router = useRouter();
@@ -74,6 +75,14 @@ function LoginForm() {
           <Link href="/esqueci-senha" className="block text-center text-sm text-indigo-600 hover:underline">
             Esqueci minha senha
           </Link>
+          <a
+            href={linkPedirAcesso()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block text-center text-sm font-medium text-emerald-700 hover:underline"
+          >
+            Primeiro acesso? Receba sua senha pelo WhatsApp
+          </a>
         </form>
 
         <a

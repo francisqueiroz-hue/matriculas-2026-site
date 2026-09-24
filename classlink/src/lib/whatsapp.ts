@@ -20,6 +20,11 @@ function env(name: string): string {
   return value;
 }
 
+/** Base da Graph API. WHATSAPP_API_URL só existe para testes locais apontarem para um simulador. */
+function apiBaseUrl() {
+  return (process.env.WHATSAPP_API_URL || "https://graph.facebook.com/v21.0").replace(/\/$/, "");
+}
+
 export function isWhatsAppConfigured() {
   return Boolean(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
 }
@@ -33,11 +38,30 @@ export function normalizePhoneBR(phone: string): string | null {
   return null;
 }
 
+/**
+ * Formas equivalentes de um celular brasileiro: com e sem o nono dígito. A Meta costuma
+ * informar no webhook o número sem o 9 (ex.: 552187654321), enquanto o cadastro guarda
+ * 5521987654321 — sem isso a família não seria reconhecida ao escrever para a escola.
+ */
+export function phoneVariantsBR(phone: string): string[] {
+  const n = normalizePhoneBR(phone);
+  if (!n) return [];
+  // O nono dígito só foi acrescentado a celulares, que começavam com 6–9.
+  if (n.length === 13 && n[4] === "9" && /[6-9]/.test(n[5])) return [n, n.slice(0, 4) + n.slice(5)];
+  if (n.length === 12 && /[6-9]/.test(n[4])) return [n, n.slice(0, 4) + "9" + n.slice(4)];
+  return [n];
+}
+
+export function samePhoneBR(a: string, b: string): boolean {
+  const variantes = phoneVariantsBR(a);
+  return phoneVariantsBR(b).some((v) => variantes.includes(v));
+}
+
 export async function sendWhatsAppTextMessage(toPhone: string, body: string): Promise<{ externalId: string }> {
   const phoneNumberId = env("WHATSAPP_PHONE_NUMBER_ID");
   const token = env("WHATSAPP_API_TOKEN");
 
-  const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+  const response = await fetch(`${apiBaseUrl()}/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -82,7 +106,7 @@ export async function sendWhatsAppTemplateMessage(
   const phoneNumberId = env("WHATSAPP_PHONE_NUMBER_ID");
   const token = env("WHATSAPP_API_TOKEN");
 
-  const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+  const response = await fetch(`${apiBaseUrl()}/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -137,7 +161,7 @@ export async function findGuardianByPhone(fromPhone: string) {
     where: { role: "GUARDIAN", phone: { not: null }, deletedAt: null },
     select: { id: true, name: true, phone: true, schoolId: true },
   });
-  return candidatos.find((c) => c.phone && normalizePhoneBR(c.phone) === fromPhone) ?? null;
+  return candidatos.find((c) => c.phone && samePhoneBR(c.phone, fromPhone)) ?? null;
 }
 
 /** Valida a assinatura HMAC-SHA256 (X-Hub-Signature-256) do webhook, conforme exigido pela Meta. */
