@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { linkGuardianSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
-import { normalizePhoneBR } from "@/lib/whatsapp";
+import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTextMessage } from "@/lib/whatsapp";
 
 /** Vincula um responsável (existente ou novo) a um aluno. Vínculo explícito e revogável (LGPD). */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/students/[id]/guardians">) {
@@ -53,8 +53,27 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
       create: { guardianId: guardian.id, studentId, relation: body.relation },
     });
 
+    // Ao criar o acesso, já avisa a família pelo WhatsApp com o link e a senha provisória —
+    // evita depender de alguém da escola copiar e colar isso manualmente numa conversa.
+    let notificadoPorWhatsApp = false;
+    if (temporaryPassword && phone && isWhatsAppConfigured()) {
+      const login = guardian.email ?? phone;
+      const mensagem = `Olá, ${guardian.name}! Seu acesso ao ClassLink (comunicação da escola) está pronto.\n\nAcesse: ${request.nextUrl.origin}/guia\nEntrar com: ${login}\nSenha provisória: ${temporaryPassword}\n\nAssim que entrar, troque a senha em Conta > Trocar senha.`;
+      try {
+        await sendWhatsAppTextMessage(phone, mensagem);
+        notificadoPorWhatsApp = true;
+      } catch (err) {
+        console.error("Falha ao enviar convite por WhatsApp", err);
+      }
+    }
+
     return NextResponse.json(
-      { link, guardian: { id: guardian.id, email: guardian.email, name: guardian.name }, temporaryPassword },
+      {
+        link,
+        guardian: { id: guardian.id, email: guardian.email, name: guardian.name },
+        temporaryPassword,
+        notificadoPorWhatsApp,
+      },
       { status: 201 },
     );
   } catch (error) {
