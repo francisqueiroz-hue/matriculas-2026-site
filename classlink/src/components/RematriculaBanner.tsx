@@ -17,6 +17,7 @@ export function RematriculaBanner() {
   const user = useCurrentUser();
   const [visible, setVisible] = useState(false);
   const [alunos, setAlunos] = useState<AlunoRematricula[]>([]);
+  const [registrada, setRegistrada] = useState(false);
 
   const enabled = CAMPANHA_REMATRICULA.ativa && user.role === "GUARDIAN";
 
@@ -42,6 +43,18 @@ export function RematriculaBanner() {
       // ignora: o aviso só não fica lembrado como fechado
     }
     setVisible(false);
+  }
+
+  // Registra a rematrícula no sistema da escola (lista de Matrículas do admin). O WhatsApp
+  // abre pelo próprio link, sem esperar a resposta, para o navegador não bloquear a aba.
+  function registrar() {
+    fetch("/api/account/rematricula", { method: "POST", credentials: "include", keepalive: true })
+      .then((res) => {
+        if (res.ok) setRegistrada(true);
+      })
+      .catch(() => {
+        // Sem conexão: a confirmação ainda chega pela mensagem de WhatsApp.
+      });
   }
 
   const nomes = alunos.map((a) => a.name.split(" ")[0]);
@@ -71,6 +84,7 @@ export function RematriculaBanner() {
           href={linkWhatsAppRematricula(user.name, alunos)}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={registrar}
           className="rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
         >
           Confirmar rematrícula pelo WhatsApp
@@ -82,6 +96,11 @@ export function RematriculaBanner() {
           Saiba mais
         </Link>
       </div>
+      {registrada && (
+        <p className="mt-2 text-xs font-medium text-emerald-800" role="status">
+          ✓ Rematrícula registrada no sistema da escola. Envie a mensagem no WhatsApp para concluir.
+        </p>
+      )}
     </div>
   );
 }

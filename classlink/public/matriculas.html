@@ -172,6 +172,7 @@
   .aviso-form.ok{background:#e8f6ee;color:#14532d;border:1px solid #b7e2c7}
   .aviso-form.erro{background:#fdecea;color:var(--erro);border:1px solid #f5c2bd}
   .aviso-form[hidden]{display:none}
+  .armadilha{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 
   /* FAQ */
   .faq{max-width:760px;margin:0 auto;display:grid;gap:12px}
@@ -326,6 +327,7 @@
             <span class="msg-erro" id="erro-r-consentimento" aria-live="polite"></span>
           </div>
         </div>
+        <div class="armadilha" aria-hidden="true"><label>Não preencha este campo <input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
         <div class="aviso-form" role="status" hidden></div>
         <div class="form-acoes">
           <button class="btn btn-laranja" type="submit">Confirmar rematrícula pelo WhatsApp</button>
@@ -495,6 +497,7 @@
             <span class="msg-erro" id="erro-consentimento" aria-live="polite"></span>
           </div>
         </div>
+        <div class="armadilha" aria-hidden="true"><label>Não preencha este campo <input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
         <div class="aviso-form" role="status" hidden></div>
         <div class="form-acoes">
           <button class="btn btn-wa" type="submit">
@@ -572,6 +575,9 @@
   "use strict";
   // Número da secretaria (DDI + DDD + número, só dígitos).
   var WHATSAPP = "5521964699441";
+  // Endereço do ClassLink, que registra as solicitações para a administração da escola.
+  // Dentro do próprio ClassLink (/matriculas) este valor vira "" e a chamada é local.
+  var CLASSLINK = "";
 
   function linkWhatsApp(texto) {
     return "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(texto);
@@ -615,9 +621,22 @@
     return el ? el.value.trim() : "";
   }
 
-  // Liga validação, máscara e envio por WhatsApp a um formulário.
-  function prepararFormulario(form, montarMensagem) {
+  // Registra a solicitação no ClassLink (lista de Matrículas da administração).
+  function registrarNoSistema(dados) {
+    return fetch(CLASSLINK + "/api/matriculas/solicitacoes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dados),
+      keepalive: true
+    }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+    });
+  }
+
+  // Liga validação, máscara, registro no sistema e envio por WhatsApp a um formulário.
+  function prepararFormulario(form, tipo, montarMensagem) {
     if (!form) return;
+    var ultimoEnvio = null;
     var aviso = form.querySelector(".aviso-form");
     var tel = form.elements.telefone;
     tel.addEventListener("input", function () { tel.value = formatarTelefone(tel.value); });
@@ -654,6 +673,7 @@
         return;
       }
 
+      // O WhatsApp abre antes de qualquer espera, senão o navegador bloqueia a nova aba.
       var url = linkWhatsApp(montarMensagem(form).join("\n"));
       var janela = window.open(url, "_blank");
       if (janela) janela.opener = null;
@@ -667,11 +687,42 @@
         a.textContent = "Se o WhatsApp não abriu, toque aqui.";
         aviso.appendChild(a);
       }
+      var status = document.createElement("span");
+      status.style.display = "block";
+      status.style.marginTop = "6px";
+      aviso.appendChild(status);
       aviso.hidden = false;
+
+      var dados = {
+        tipo: tipo,
+        origem: CLASSLINK ? "SITE" : "CLASSLINK",
+        responsavelNome: valor(form, "responsavel"),
+        telefone: valor(form, "telefone"),
+        alunoNome: valor(form, "aluno"),
+        serie: valor(form, "serie"),
+        periodoVisita: valor(form, "periodo") || undefined,
+        escolaAtual: valor(form, "escola") || undefined,
+        observacoes: valor(form, "mensagem") || undefined,
+        consentimento: true,
+        website: valor(form, "website")
+      };
+      var chave = JSON.stringify(dados);
+      if (chave === ultimoEnvio) {
+        status.textContent = "✓ Sua solicitação já está registrada na escola.";
+        return;
+      }
+      status.textContent = "Registrando sua solicitação na escola…";
+      registrarNoSistema(dados).then(function () {
+        ultimoEnvio = chave;
+        status.textContent = "✓ Solicitação registrada na escola. A secretaria vai entrar em contato.";
+      }).catch(function () {
+        // O WhatsApp já garante que a secretaria recebe o pedido.
+        status.textContent = "Não conseguimos registrar pelo site agora, mas sua mensagem no WhatsApp chega normalmente à secretaria.";
+      });
     });
   }
 
-  prepararFormulario(document.getElementById("form-pre"), function (form) {
+  prepararFormulario(document.getElementById("form-pre"), "PRE_MATRICULA", function (form) {
     var linhas = [
       "Olá! Quero fazer a *pré-matrícula 2027*.",
       "",
@@ -686,7 +737,7 @@
     return linhas;
   });
 
-  prepararFormulario(document.getElementById("form-remat"), function (form) {
+  prepararFormulario(document.getElementById("form-remat"), "REMATRICULA", function (form) {
     var linhas = [
       "Olá! Quero confirmar a *rematrícula 2027*.",
       "",

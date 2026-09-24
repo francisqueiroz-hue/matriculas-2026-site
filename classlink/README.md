@@ -230,6 +230,16 @@ Passo a passo completo, do zero:
 - Responsáveis logados veem no painel o aviso de **rematrícula** com o nome dos filhos e
   um botão que abre o WhatsApp da secretaria com a confirmação pronta. Ano, número e
   ativação da campanha ficam em `src/lib/rematricula.ts` (`ativa: false` desliga o aviso).
+- **Registro no sistema:** cada envio dos formulários de pré-matrícula e rematrícula (no
+  site da escola ou em `/matriculas`) e cada confirmação feita pelo aviso do painel é
+  gravado em `SolicitacaoMatricula` e aparece para a administração em **Matrículas**
+  (`/dashboard/admin/matriculas`): indicadores, filtros por tipo e situação (Nova, Em
+  atendimento, Visita agendada, Matriculado, Desistiu), anotações internas, botão de
+  WhatsApp para a família, exportação CSV e exclusão (pedido LGPD). Só o perfil ADMIN acessa.
+- O endpoint público `POST /api/matriculas/solicitacoes` aceita chamadas de outros
+  domínios (CORS aberto, sem cookies), exige o consentimento, tem campo-armadilha contra
+  robôs e limita a 5 envios a cada 10 minutos por IP. Se houver mais de uma escola no
+  banco, defina `MATRICULAS_SCHOOL_ID`.
 - Para garantir que todas as famílias foram avisadas, crie também um **Comunicado** do tipo
   circular "Rematrícula 2027" com prazo de resposta: o painel mostra quem ainda não
   confirmou a leitura, permite reenviar lembrete e exportar CSV. (Os tipos atuais de
@@ -514,8 +524,14 @@ individualmente. É um canal separado das conversas com família:
    `BANCO_INTER_KEY` (veja a opção 1 no `.env.example`); `src/lib/banco-inter.ts` já lê
    o certificado a partir delas quando estiverem preenchidas, sem precisar de arquivo
    nenhum em disco.
-3. Rode `npx prisma migrate deploy` contra o banco de produção (uma vez, no pipeline de
-   deploy ou manualmente) e depois `npm run db:seed` se quiser dados de exemplo.
+3. As migrações do banco são aplicadas **automaticamente** a cada deploy de produção na
+   Vercel: o script `vercel-build` roda `scripts/migrate-on-deploy.mjs` (que executa
+   `prisma migrate deploy` só quando `VERCEL_ENV=production`) antes do `next build`.
+   Deploys de preview nunca migram. Se a migração falhar, o deploy é interrompido e a
+   versão anterior continua no ar. Se o `DATABASE_URL` usar um pooler (ex.: host
+   "-pooler" do Neon ou PgBouncer), cadastre também `DIRECT_URL` com a conexão direta.
+   Fora da Vercel, rode `npx prisma migrate deploy` manualmente. Depois,
+   `npm run db:seed` se quiser dados de exemplo.
 4. Faça o deploy na [Vercel](https://vercel.com): conecte o repositório GitHub — a Vercel
    detecta o Next.js automaticamente e já lê o `vercel.json` para agendar os crons.
 5. Siga o passo a passo de [Ativando o Firebase](#ativando-o-firebase-notificações-push--upload-de-mídia)

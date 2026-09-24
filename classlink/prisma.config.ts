@@ -7,6 +7,8 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // Usado só pela CLI (migrações). DIRECT_URL: conexão direta, necessária quando
+    // DATABASE_URL passa por um pooler (ex.: Neon "-pooler", PgBouncer).
+    url: process.env.DIRECT_URL || env("DATABASE_URL"),
   },
 });
