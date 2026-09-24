@@ -5,7 +5,8 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { linkGuardianSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
-import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTextMessage } from "@/lib/whatsapp";
+import { normalizePhoneBR, sendAccessViaWhatsApp } from "@/lib/whatsapp";
+import { linkWhatsAppManual, mensagemAcesso, parametrosModeloAcesso } from "@/lib/acesso";
 
 /** Vincula um responsável (existente ou novo) a um aluno. Vínculo explícito e revogável (LGPD). */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/students/[id]/guardians">) {
@@ -53,17 +54,25 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
       create: { guardianId: guardian.id, studentId, relation: body.relation },
     });
 
-    // Ao criar o acesso, já avisa a família pelo WhatsApp com o link e a senha provisória —
-    // evita depender de alguém da escola copiar e colar isso manualmente numa conversa.
+    // Ao criar o acesso, avisa a família pelo WhatsApp com o link e a senha provisória.
+    // Envio automático só pelo modelo aprovado na Meta (texto livre não chega a contatos
+    // novos); em todo caso devolve o link wa.me para a escola enviar do próprio WhatsApp.
     let notificadoPorWhatsApp = false;
-    if (temporaryPassword && phone && isWhatsAppConfigured()) {
-      const login = guardian.email ?? phone;
-      const mensagem = `Olá, ${guardian.name}! Seu acesso ao ClassLink (comunicação da escola) está pronto.\n\nAcesse: ${request.nextUrl.origin}/guia\nEntrar com: ${login}\nSenha provisória: ${temporaryPassword}\n\nAssim que entrar, troque a senha em Conta > Trocar senha.`;
-      try {
-        await sendWhatsAppTextMessage(phone, mensagem);
-        notificadoPorWhatsApp = true;
-      } catch (err) {
-        console.error("Falha ao enviar convite por WhatsApp", err);
+    let whatsappManual: string | null = null;
+    if (temporaryPassword) {
+      const dados = {
+        nome: guardian.name,
+        url: `${request.nextUrl.origin}/guia`,
+        login: guardian.email ?? phone ?? "",
+        senha: temporaryPassword,
+      };
+      whatsappManual = linkWhatsAppManual(phone, mensagemAcesso(dados));
+      if (phone) {
+        try {
+          notificadoPorWhatsApp = await sendAccessViaWhatsApp(phone, parametrosModeloAcesso(dados));
+        } catch (err) {
+          console.error("Falha ao enviar convite por WhatsApp", err);
+        }
       }
     }
 
@@ -73,6 +82,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
         guardian: { id: guardian.id, email: guardian.email, name: guardian.name },
         temporaryPassword,
         notificadoPorWhatsApp,
+        whatsappManual,
       },
       { status: 201 },
     );

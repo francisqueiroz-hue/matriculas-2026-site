@@ -63,6 +63,72 @@ export async function sendWhatsAppTextMessage(toPhone: string, body: string): Pr
 }
 
 /**
+ * Modelo (template) aprovado pela Meta para enviar acesso/senha provisória. É o único
+ * jeito de a mensagem chegar a quem não falou com a escola nas últimas 24h — texto livre
+ * nesse caso é aceito pela API (200 + id), mas descartado depois (erro 131047 no webhook
+ * de status). Configure WHATSAPP_TEMPLATE_ACESSO com o nome do modelo aprovado.
+ */
+export function getAccessTemplate(): { name: string; language: string } | null {
+  const name = process.env.WHATSAPP_TEMPLATE_ACESSO?.trim();
+  if (!name) return null;
+  return { name, language: process.env.WHATSAPP_TEMPLATE_IDIOMA?.trim() || "pt_BR" };
+}
+
+export async function sendWhatsAppTemplateMessage(
+  toPhone: string,
+  template: { name: string; language: string },
+  bodyParams: string[],
+): Promise<{ externalId: string }> {
+  const phoneNumberId = env("WHATSAPP_PHONE_NUMBER_ID");
+  const token = env("WHATSAPP_API_TOKEN");
+
+  const response = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(buildTemplatePayload(toPhone, template, bodyParams)),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    const message = data?.error?.message ?? "Falha ao enviar modelo no WhatsApp";
+    throw new Error(message);
+  }
+
+  const externalId: string | undefined = data?.messages?.[0]?.id;
+  if (!externalId) throw new Error("WhatsApp não retornou o id da mensagem enviada");
+  return { externalId };
+}
+
+export function buildTemplatePayload(toPhone: string, template: { name: string; language: string }, bodyParams: string[]) {
+  return {
+    messaging_product: "whatsapp",
+    to: toPhone,
+    type: "template",
+    template: {
+      name: template.name,
+      language: { code: template.language },
+      components: [{ type: "body", parameters: bodyParams.map((text) => ({ type: "text", text })) }],
+    },
+  };
+}
+
+/**
+ * Envia acesso/senha provisória pelo modelo aprovado. Retorna false (sem enviar) quando o
+ * WhatsApp ou o modelo não estão configurados — nunca cai para texto livre, que não chega
+ * a contatos novos e faria o sistema dizer que enviou algo que a família não recebeu.
+ */
+export async function sendAccessViaWhatsApp(toPhone: string, bodyParams: string[]): Promise<boolean> {
+  const template = getAccessTemplate();
+  const numero = normalizePhoneBR(toPhone);
+  if (!isWhatsAppConfigured() || !template || !numero) return false;
+  await sendWhatsAppTemplateMessage(numero, template, bodyParams);
+  return true;
+}
+
+/**
  * Encontra o responsável (GUARDIAN) dono de um telefone recebido no webhook. Compara o
  * número normalizado pois o telefone é digitado livremente no cadastro (com ou sem DDI/símbolos).
  */

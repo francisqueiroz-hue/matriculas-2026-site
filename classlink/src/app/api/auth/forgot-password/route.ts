@@ -5,7 +5,8 @@ import { resolveLoginIdentifier } from "@/lib/login-identifier";
 import { hashPassword } from "@/lib/auth";
 import { handleApiError } from "@/lib/http";
 import { forgotPasswordSchema } from "@/lib/validators";
-import { isWhatsAppConfigured, sendWhatsAppTextMessage } from "@/lib/whatsapp";
+import { sendAccessViaWhatsApp } from "@/lib/whatsapp";
+import { parametrosModeloAcesso } from "@/lib/acesso";
 import { isEmailConfigured, sendPlainEmail } from "@/lib/email";
 
 const MENSAGEM_PADRAO =
@@ -34,10 +35,19 @@ export async function POST(request: NextRequest) {
         const mensagem = `Sua nova senha temporária do ClassLink é: ${temporaryPassword}\n\nUse-a para entrar e, se quiser, troque por uma de sua preferência em Conta > Trocar senha.`;
 
         let entregue = false;
-        if (user.phone && isWhatsAppConfigured()) {
+        // Só pelo modelo aprovado: texto livre é aceito pela Meta mas não chega a quem não
+        // falou com a escola nas últimas 24h — e aqui a senha seria trocada sem a pessoa receber.
+        if (user.phone) {
           try {
-            await sendWhatsAppTextMessage(user.phone, mensagem);
-            entregue = true;
+            entregue = await sendAccessViaWhatsApp(
+              user.phone,
+              parametrosModeloAcesso({
+                nome: user.name,
+                url: `${request.nextUrl.origin}/login`,
+                login: user.email ?? user.phone,
+                senha: temporaryPassword,
+              }),
+            );
           } catch (err) {
             console.error("Falha ao enviar nova senha por WhatsApp", err);
           }

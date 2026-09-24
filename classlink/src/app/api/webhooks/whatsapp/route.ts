@@ -25,11 +25,18 @@ interface WhatsAppMessage {
   context?: { id: string };
 }
 
+interface WhatsAppStatus {
+  id: string;
+  status: string;
+  recipient_id?: string;
+  errors?: { code: number; title?: string; message?: string; error_data?: { details?: string } }[];
+}
+
 interface WhatsAppWebhookPayload {
   entry?: {
     changes?: {
       field: string;
-      value?: { messages?: WhatsAppMessage[] };
+      value?: { messages?: WhatsAppMessage[]; statuses?: WhatsAppStatus[] };
     }[];
   }[];
 }
@@ -67,6 +74,20 @@ export async function POST(request: NextRequest) {
       .flatMap((entry) => entry.changes ?? [])
       .filter((change) => change.field === "messages")
       .flatMap((change) => change.value?.messages ?? []);
+
+    // A Meta aceita o envio (200 + id) e só depois avisa, por aqui, se a entrega falhou —
+    // ex.: 131047, texto livre fora da janela de 24h. Registra para aparecer nos logs.
+    const falhas = (payload.entry ?? [])
+      .flatMap((entry) => entry.changes ?? [])
+      .flatMap((change) => change.value?.statuses ?? [])
+      .filter((st) => st.status === "failed");
+    for (const falha of falhas) {
+      const erro = falha.errors?.[0];
+      console.error(
+        `WhatsApp: entrega falhou para ${falha.recipient_id ?? "?"} (mensagem ${falha.id}): ` +
+          `${erro?.code ?? "?"} ${erro?.title ?? ""} ${erro?.error_data?.details ?? ""}`.trim(),
+      );
+    }
 
     for (const msg of mensagens) {
       const jaProcessada = await prisma.message.findUnique({ where: { externalId: msg.id } });
