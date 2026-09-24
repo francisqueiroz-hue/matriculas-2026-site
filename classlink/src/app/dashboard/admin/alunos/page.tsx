@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
+import { EnviarAcessoWhatsApp } from "@/components/EnviarAcessoWhatsApp";
 import { apiJson } from "@/lib/api-client";
 
 interface ClassOption {
@@ -28,6 +29,8 @@ function AlunosContent() {
     Record<string, { email: string; guardianName: string; phone: string; relation: string }>
   >({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
+  // Link wa.me com a mensagem de acesso, para a escola enviar do próprio WhatsApp.
+  const [acessoLinks, setAcessoLinks] = useState<Record<string, string | null>>({});
   const [billingForms, setBillingForms] = useState<Record<string, { mensalidadeValor: string; diaVencimento: string }>>({});
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
   const [editGuardianName, setEditGuardianName] = useState("");
@@ -70,7 +73,7 @@ function AlunosContent() {
       return;
     }
     try {
-      const data = await apiJson<{ temporaryPassword?: string; notificadoPorWhatsApp?: boolean }>(
+      const data = await apiJson<{ temporaryPassword?: string; notificadoPorWhatsApp?: boolean; whatsappManual?: string | null }>(
         `/api/admin/students/${studentId}/guardians`,
         {
           method: "POST",
@@ -87,9 +90,10 @@ function AlunosContent() {
         [studentId]: !data.temporaryPassword
           ? "Responsável vinculado."
           : data.notificadoPorWhatsApp
-            ? `Responsável criado. Já mandamos o acesso e a senha temporária (${data.temporaryPassword}) pelo WhatsApp dele.`
-            : `Responsável criado. Senha temporária: ${data.temporaryPassword} (não deu pra mandar pelo WhatsApp — repasse manualmente)`,
+            ? `Responsável criado. Enviamos o acesso (senha temporária ${data.temporaryPassword}) pelo WhatsApp oficial da escola. Se não chegar em alguns minutos, use o botão abaixo.`
+            : `Responsável criado. Senha temporária: ${data.temporaryPassword}. Envie o acesso para a família pelo botão abaixo${data.whatsappManual ? "" : " (sem telefone válido: repasse manualmente)"}.`,
       }));
+      setAcessoLinks((prev) => ({ ...prev, [studentId]: data.whatsappManual ?? null }));
       setGuardianForms((prev) => ({ ...prev, [studentId]: { email: "", guardianName: "", phone: "", relation: "" } }));
       load();
     } catch (err) {
@@ -106,11 +110,17 @@ function AlunosContent() {
   async function handleResetGuardianPassword(studentId: string, guardianId: string) {
     if (!confirm("Gerar uma nova senha temporária para este responsável? A senha atual deixará de funcionar.")) return;
     try {
-      const data = await apiJson<{ temporaryPassword?: string }>(`/api/admin/users/${guardianId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ resetPassword: true }),
-      });
-      setFeedback((prev) => ({ ...prev, [studentId]: `Nova senha temporária: ${data.temporaryPassword}` }));
+      const data = await apiJson<{ temporaryPassword?: string; notificadoPorWhatsApp?: boolean; whatsappManual?: string | null }>(
+        `/api/admin/users/${guardianId}`,
+        { method: "PATCH", body: JSON.stringify({ resetPassword: true }) },
+      );
+      setFeedback((prev) => ({
+        ...prev,
+        [studentId]: data.notificadoPorWhatsApp
+          ? `Nova senha temporária: ${data.temporaryPassword} (enviada pelo WhatsApp oficial da escola; se não chegar, use o botão abaixo).`
+          : `Nova senha temporária: ${data.temporaryPassword}. Envie para a família pelo botão abaixo.`,
+      }));
+      setAcessoLinks((prev) => ({ ...prev, [studentId]: data.whatsappManual ?? null }));
     } catch (err) {
       setFeedback((prev) => ({ ...prev, [studentId]: err instanceof Error ? err.message : "Erro ao redefinir senha" }));
     }
@@ -345,6 +355,7 @@ function AlunosContent() {
                 </button>
               </form>
               {feedback[s.id] && <p className="mt-1 text-xs text-slate-500">{feedback[s.id]}</p>}
+              <EnviarAcessoWhatsApp href={acessoLinks[s.id]} />
             </li>
           );
         })}

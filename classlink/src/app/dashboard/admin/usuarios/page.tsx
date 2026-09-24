@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
+import { EnviarAcessoWhatsApp } from "@/components/EnviarAcessoWhatsApp";
 import { apiJson } from "@/lib/api-client";
 
 interface ClassOption {
@@ -35,6 +36,8 @@ function UsuariosContent() {
   const [editCoordenacao, setEditCoordenacao] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, string>>({});
+  // Link wa.me com a mensagem de acesso, para a escola enviar do próprio WhatsApp.
+  const [acessoLinks, setAcessoLinks] = useState<Record<string, string | null>>({});
 
   function load() {
     apiJson<{ users: UserItem[] }>("/api/admin/users").then((data) =>
@@ -71,11 +74,17 @@ function UsuariosContent() {
   async function handleResetPassword(id: string) {
     if (!confirm("Gerar uma nova senha temporária para este usuário? A senha atual deixará de funcionar.")) return;
     try {
-      const data = await apiJson<{ temporaryPassword?: string }>(`/api/admin/users/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ resetPassword: true }),
-      });
-      setFeedback((prev) => ({ ...prev, [id]: `Nova senha temporária: ${data.temporaryPassword}` }));
+      const data = await apiJson<{ temporaryPassword?: string; notificadoPorWhatsApp?: boolean; whatsappManual?: string | null }>(
+        `/api/admin/users/${id}`,
+        { method: "PATCH", body: JSON.stringify({ resetPassword: true }) },
+      );
+      setFeedback((prev) => ({
+        ...prev,
+        [id]: data.notificadoPorWhatsApp
+          ? `Nova senha temporária: ${data.temporaryPassword} (enviada pelo WhatsApp oficial da escola; se não chegar, use o botão abaixo).`
+          : `Nova senha temporária: ${data.temporaryPassword}${data.whatsappManual ? ". Envie pelo botão abaixo." : ""}`,
+      }));
+      setAcessoLinks((prev) => ({ ...prev, [id]: data.whatsappManual ?? null }));
     } catch (err) {
       setFeedback((prev) => ({ ...prev, [id]: err instanceof Error ? err.message : "Erro ao redefinir senha" }));
     }
@@ -220,6 +229,7 @@ function UsuariosContent() {
                 </div>
               </div>
               {feedback[u.id] && <p className="mt-1 text-xs text-slate-500">{feedback[u.id]}</p>}
+              <EnviarAcessoWhatsApp href={acessoLinks[u.id]} />
             </li>
           ),
         )}

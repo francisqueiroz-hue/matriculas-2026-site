@@ -5,6 +5,8 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { updateUserSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
+import { sendAccessViaWhatsApp } from "@/lib/whatsapp";
+import { linkWhatsAppManual, mensagemAcesso, parametrosModeloAcesso } from "@/lib/acesso";
 
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/users/[id]">) {
   try {
@@ -40,7 +42,33 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
       return updated;
     });
 
-    return NextResponse.json({ user: { id: user.id, name: user.name, active: user.active }, temporaryPassword });
+    // Nova senha: tenta enviar pelo modelo aprovado no WhatsApp e sempre devolve o link
+    // wa.me para a escola repassar do próprio WhatsApp.
+    let notificadoPorWhatsApp = false;
+    let whatsappManual: string | null = null;
+    if (temporaryPassword) {
+      const dados = {
+        nome: user.name,
+        url: `${request.nextUrl.origin}/guia`,
+        login: user.email ?? user.phone ?? "",
+        senha: temporaryPassword,
+      };
+      whatsappManual = linkWhatsAppManual(user.phone, mensagemAcesso(dados));
+      if (user.phone) {
+        try {
+          notificadoPorWhatsApp = await sendAccessViaWhatsApp(user.phone, parametrosModeloAcesso(dados));
+        } catch (err) {
+          console.error("Falha ao enviar nova senha por WhatsApp", err);
+        }
+      }
+    }
+
+    return NextResponse.json({
+      user: { id: user.id, name: user.name, active: user.active },
+      temporaryPassword,
+      notificadoPorWhatsApp,
+      whatsappManual,
+    });
   } catch (error) {
     return handleApiError(error);
   }

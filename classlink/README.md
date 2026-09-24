@@ -432,9 +432,39 @@ conversa no ClassLink. Cada canal fala com seu próprio provedor:
    **messages**.
 
 > ⚠️ Fora de uma janela de 24h desde a última mensagem recebida do contato, a Cloud API
-> só permite enviar "modelos de mensagem" pré-aprovados pela Meta, não texto livre —
-> para falar com uma família pela primeira vez, pode ser necessário aprovar um modelo em
-> WhatsApp Manager → Modelos de mensagem.
+> só permite enviar "modelos de mensagem" pré-aprovados pela Meta, não texto livre. Pior:
+> o texto livre é **aceito** pela API (resposta 200 com id) e só depois descartado — a
+> falha (código 131047) chega pelo webhook de status e fica registrada nos logs.
+
+#### Modelo para enviar acesso e senha provisória
+
+O envio automático do acesso (ao vincular um responsável novo, ao redefinir a senha pelo
+painel e no "Esqueci minha senha") usa **somente** um modelo aprovado — nunca texto
+livre, que não chegaria a famílias que ainda não conversaram com a escola.
+
+1. WhatsApp Manager → **Modelos de mensagem** → Criar modelo. Categoria **Utilidade**,
+   idioma **Português (BR)**, nome por exemplo `acesso_classlink`.
+2. Corpo sugerido (as variáveis precisam estar nesta ordem):
+   ```
+   Olá, {{1}}! Seu acesso ao ClassLink, o aplicativo de comunicação da escola, está pronto.
+
+   Acesse: {{2}}
+   Entrar com: {{3}}
+   Senha provisória: {{4}}
+
+   Assim que entrar, troque a senha em Conta > Trocar senha.
+   ```
+   Exemplos para a revisão da Meta: `Maria`, `https://seu-dominio/guia`,
+   `(21) 98765-4321`, `a1b2c3d4e5f6`.
+3. Depois de aprovado, configure `WHATSAPP_TEMPLATE_ACESSO=acesso_classlink` (e
+   `WHATSAPP_TEMPLATE_IDIOMA=pt_BR`, que já é o padrão).
+
+Sem o modelo configurado, nada é enviado automaticamente — e o sistema diz isso. Em todos
+os casos, o painel mostra o botão **"Enviar acesso pelo meu WhatsApp"**, que abre o
+WhatsApp de quem está no painel (celular ou WhatsApp Web) com a mensagem pronta para
+aquele contato. Isso funciona na hora, sem API nem aprovação. O "Esqueci minha senha" só
+troca a senha quando consegue entregar a nova (modelo no WhatsApp ou e-mail); caso
+contrário, a senha antiga continua valendo.
 
 ### Configurando o e-mail (Mailgun)
 
