@@ -27,6 +27,13 @@ export default function PrivacidadePage() {
             coletamos dados sensíveis além do estritamente necessário para a comunicação
             escolar e a gestão administrativa.
           </p>
+          <p className="mt-2">
+            Nos formulários de pré-matrícula e rematrícula: nome e telefone do responsável,
+            nome e série pretendida do aluno e, se informados, escola atual e observações —
+            enviados somente com a autorização de contato marcada. Esses dados ficam
+            acessíveis apenas à administração da escola, são usados só para o atendimento da
+            matrícula e podem ser excluídos a pedido da família.
+          </p>
         </section>
 
         <section>

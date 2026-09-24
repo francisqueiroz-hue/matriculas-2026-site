@@ -230,6 +230,18 @@ Passo a passo completo, do zero:
 - Responsáveis logados veem no painel o aviso de **rematrícula** com o nome dos filhos e
   um botão que abre o WhatsApp da secretaria com a confirmação pronta. Ano, número e
   ativação da campanha ficam em `src/lib/rematricula.ts` (`ativa: false` desliga o aviso).
+- **Registro no sistema:** cada envio dos formulários de pré-matrícula e rematrícula (no
+  site da escola ou em `/matriculas`) e cada confirmação feita pelo aviso do painel é
+  gravado em `SolicitacaoMatricula` e aparece para a administração em **Matrículas**
+  (`/dashboard/admin/matriculas`): indicadores, filtros por tipo e situação (Nova, Em
+  atendimento, Visita agendada, Matriculado, Desistiu), anotações internas, botão de
+  WhatsApp para a família, exportação CSV e exclusão (pedido LGPD). Só o perfil ADMIN acessa.
+- O endpoint público `POST /api/matriculas/solicitacoes` aceita chamadas de outros
+  domínios (CORS aberto, sem cookies), exige o consentimento, tem campo-armadilha contra
+  robôs e limita a 5 envios a cada 10 minutos por IP. Se houver mais de uma escola no
+  banco, defina `MATRICULAS_SCHOOL_ID`.
+- Ao publicar esta funcionalidade, rode `npx prisma migrate deploy` no banco de produção
+  (migração `solicitacoes_matricula`, só cria a tabela nova).
 - Para garantir que todas as famílias foram avisadas, crie também um **Comunicado** do tipo
   circular "Rematrícula 2027" com prazo de resposta: o painel mostra quem ainda não
   confirmou a leitura, permite reenviar lembrete e exportar CSV. (Os tipos atuais de

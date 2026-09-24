@@ -58,6 +58,24 @@ enum Trimestre {
   TERCEIRO
 }
 
+enum SolicitacaoMatriculaTipo {
+  PRE_MATRICULA // família nova interessada em uma vaga
+  REMATRICULA // família atual confirmando a continuidade no ano seguinte
+}
+
+enum SolicitacaoMatriculaStatus {
+  NOVA
+  EM_ATENDIMENTO
+  VISITA_AGENDADA
+  MATRICULADO
+  DESISTIU
+}
+
+enum SolicitacaoMatriculaOrigem {
+  SITE // formulário da página pública hospedada fora do app (GitHub Pages/Hostinger)
+  CLASSLINK // formulário da página /matriculas ou aviso do painel, dentro do app
+}
+
 enum MessageChannel {
   APP // enviada/lida só dentro do ClassLink
   WHATSAPP
@@ -74,15 +92,16 @@ model School {
   diaVencimentoPadrao Int? // dia do mês usado como vencimento quando o aluno não tem um específico
   diaEmissaoBoletos   Int? // dia do mês em que o job de emissão deve rodar
 
-  users             User[]
-  classes           Class[]
-  students          Student[]
-  posts             Post[]
-  events            Event[]
-  comunicados       Comunicado[]
-  boletos           Boleto[]
-  disciplinas       Disciplina[]
-  teamConversations TeamConversation[]
+  users                 User[]
+  classes               Class[]
+  students              Student[]
+  posts                 Post[]
+  events                Event[]
+  comunicados           Comunicado[]
+  boletos               Boleto[]
+  disciplinas           Disciplina[]
+  teamConversations     TeamConversation[]
+  solicitacoesMatricula SolicitacaoMatricula[]
 }
 
 model User {
@@ -97,9 +116,9 @@ model User {
   deletedAt    DateTime? // exclusão lógica (LGPD) antes de expurgo definitivo
 
   // Permissão extra para STAFF: coordenação pedagógica pode lançar notas (além da direção/ADMIN).
-  isCoordenacao Boolean @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  isCoordenacao Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Dados de cobrança (Módulo Boleto — Banco Inter). Preenchidos apenas pelo próprio
   // responsável, só quando necessário para emissão de boleto (CPF e endereço são
@@ -136,6 +155,9 @@ model User {
   comunicadosCriados  Comunicado[]         @relation("ComunicadoAuthor")
   respostasComunicado RespostaComunicado[] @relation("RespostaResponsavel")
   notasLancadas       Nota[]               @relation("NotaLancadaPor")
+
+  // Responsável: rematrículas confirmadas pelo aviso do painel
+  solicitacoesMatricula SolicitacaoMatricula[] @relation("SolicitacaoMatriculaResponsavel")
 
   @@index([schoolId])
 }
@@ -521,4 +543,40 @@ model TeamMessage {
   readAt         DateTime?
 
   @@index([conversationId])
+}
+
+// Pré-matrículas e rematrículas enviadas pelos formulários públicos de matrícula ou pelo
+// aviso de rematrícula do painel. Ficam visíveis só para a administração (ADMIN), que
+// acompanha o atendimento pelo status. Dados mínimos, coletados com consentimento
+// explícito (LGPD) — o horário do consentimento é gravado pelo servidor.
+model SolicitacaoMatricula {
+  id       String @id @default(cuid())
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  tipo      SolicitacaoMatriculaTipo
+  status    SolicitacaoMatriculaStatus @default(NOVA)
+  origem    SolicitacaoMatriculaOrigem
+  anoLetivo Int
+
+  responsavelNome String
+  telefone        String // só dígitos, com DDI 55
+  alunoNome       String // um ou mais nomes (rematrícula de irmãos)
+  serie           String?
+  periodoVisita   String?
+  escolaAtual     String?
+  observacoes     String?
+
+  // Preenchido quando a solicitação vem de um responsável logado (aviso do painel).
+  responsavel   User?   @relation("SolicitacaoMatriculaResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  responsavelId String?
+
+  observacoesInternas String? // anotações da equipe, nunca exibidas à família
+  consentimentoEm     DateTime
+  ipOrigem            String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([schoolId, anoLetivo, tipo, status])
+  @@index([ipOrigem, createdAt])
 }
