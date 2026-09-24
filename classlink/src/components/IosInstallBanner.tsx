@@ -21,6 +21,9 @@ export function IosInstallBanner() {
     const nav = window.navigator as Navigator & { standalone?: boolean };
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
 
+    // Detecção de plataforma só existe no navegador (SSR não tem window/navigator),
+    // por isso precisa rodar depois da montagem — não há como mover para fora do efeito.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setVisible(shouldShowIosInstallBanner(navigator.userAgent, isStandalone));
   }, []);
 
