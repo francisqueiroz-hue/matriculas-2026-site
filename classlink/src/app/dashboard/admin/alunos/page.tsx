@@ -70,20 +70,25 @@ function AlunosContent() {
       return;
     }
     try {
-      const data = await apiJson<{ temporaryPassword?: string }>(`/api/admin/students/${studentId}/guardians`, {
-        method: "POST",
-        body: JSON.stringify({
-          guardianEmail: form.email || undefined,
-          guardianName: form.guardianName,
-          guardianPhone: form.phone || undefined,
-          relation: form.relation,
-        }),
-      });
+      const data = await apiJson<{ temporaryPassword?: string; notificadoPorWhatsApp?: boolean }>(
+        `/api/admin/students/${studentId}/guardians`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            guardianEmail: form.email || undefined,
+            guardianName: form.guardianName,
+            guardianPhone: form.phone || undefined,
+            relation: form.relation,
+          }),
+        },
+      );
       setFeedback((prev) => ({
         ...prev,
-        [studentId]: data.temporaryPassword
-          ? `Responsável criado. Senha temporária: ${data.temporaryPassword}`
-          : "Responsável vinculado.",
+        [studentId]: !data.temporaryPassword
+          ? "Responsável vinculado."
+          : data.notificadoPorWhatsApp
+            ? `Responsável criado. Já mandamos o acesso e a senha temporária (${data.temporaryPassword}) pelo WhatsApp dele.`
+            : `Responsável criado. Senha temporária: ${data.temporaryPassword} (não deu pra mandar pelo WhatsApp — repasse manualmente)`,
       }));
       setGuardianForms((prev) => ({ ...prev, [studentId]: { email: "", guardianName: "", phone: "", relation: "" } }));
       load();
