@@ -28,17 +28,31 @@ export const linkGuardianSchema = z
     path: ["guardianEmail"],
   });
 
-export const createUserSchema = z.object({
-  name: z.string().min(1).max(150),
-  email: z.string().email(),
-  password: z.string().min(8),
-  role: z.enum(["ADMIN", "STAFF", "GUARDIAN"]),
-  phone: z.string().max(30).optional(),
-  classIds: z.array(z.string()).optional(),
-});
+const opcionalVazio = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), schema.optional());
+
+/**
+ * Cadastro da equipe, no mesmo formato dos responsáveis: nome + celular ou e-mail (pelo
+ * menos um) e a função. A senha é opcional — sem ela, o sistema gera uma provisória e
+ * oferece o envio pelo WhatsApp.
+ */
+export const createUserSchema = z
+  .object({
+    name: z.string().trim().min(1).max(150),
+    email: opcionalVazio(z.string().trim().email()),
+    phone: opcionalVazio(z.string().trim().max(30)),
+    password: opcionalVazio(z.string().min(8)),
+    funcao: z.enum(["DIRECAO", "COORDENACAO", "PROFESSOR", "AUXILIAR"]),
+    classIds: z.array(z.string()).optional(),
+  })
+  .refine((data) => Boolean(data.email || data.phone), {
+    message: "Informe pelo menos um celular ou e-mail",
+    path: ["phone"],
+  });
 
 export const updateUserSchema = z.object({
   name: z.string().min(1).max(150).optional(),
+  funcao: z.enum(["DIRECAO", "COORDENACAO", "PROFESSOR", "AUXILIAR"]).optional(),
   phone: z.string().max(30).optional(),
   active: z.boolean().optional(),
   classIds: z.array(z.string()).optional(),

@@ -12,6 +12,8 @@ interface Responsavel {
   email: string | null;
   jaEntrou: boolean;
   alunos: string[];
+  funcao: string | null;
+  turmas: string[];
   linkConvite: string | null;
 }
 
@@ -32,6 +34,7 @@ function formatarTelefone(telefone: string | null) {
 
 function AcessosContent() {
   const [todos, setTodos] = useState(false);
+  const [publico, setPublico] = useState<"familias" | "equipe">("familias");
   const [dados, setDados] = useState<Dados | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [convidados, setConvidados] = useState<Record<string, boolean>>({});
@@ -41,13 +44,14 @@ function AcessosContent() {
   const [resultadoLote, setResultadoLote] = useState<string | null>(null);
 
   const carregar = useCallback(() => {
-    apiJson<Dados>(`/api/admin/acessos${todos ? "?todos=1" : ""}`)
+    const params = new URLSearchParams({ ...(todos && { todos: "1" }), ...(publico === "equipe" && { publico: "equipe" }) });
+    apiJson<Dados>(`/api/admin/acessos?${params}`)
       .then((d) => {
         setDados(d);
         setErro(null);
       })
       .catch((err) => setErro(err instanceof Error ? err.message : "Erro ao carregar"));
-  }, [todos]);
+  }, [todos, publico]);
 
   useEffect(carregar, [carregar]);
 
@@ -114,9 +118,9 @@ function AcessosContent() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold">Acessos das famílias</h1>
+        <h1 className="text-xl font-bold">Acessos ao ClassLink</h1>
         <p className="text-sm text-slate-500">
-          Responsáveis que ainda não entraram no ClassLink e como enviar o acesso para eles.
+          Famílias e equipe que ainda não entraram no ClassLink e como enviar o acesso para elas.
         </p>
       </div>
 
@@ -138,6 +142,21 @@ function AcessosContent() {
         </div>
       )}
 
+      <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 text-sm" role="tablist" aria-label="Público">
+        {(["familias", "equipe"] as const).map((p) => (
+          <button
+            key={p}
+            type="button"
+            role="tab"
+            aria-selected={publico === p}
+            onClick={() => setPublico(p)}
+            className={`rounded-md px-4 py-1.5 font-semibold ${publico === p ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+          >
+            {p === "familias" ? "Famílias" : "Equipe"}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -151,7 +170,7 @@ function AcessosContent() {
           onClick={() => setTodos(true)}
           className={`rounded-full px-3 py-1.5 text-sm font-medium ${todos ? "bg-indigo-600 text-white" : "border border-slate-300 bg-white text-slate-700"}`}
         >
-          Todos os responsáveis
+          {publico === "equipe" ? "Toda a equipe" : "Todos os responsáveis"}
         </button>
         {dados?.envioAutomaticoDisponivel && pendentes > 0 && (
           <button
@@ -170,7 +189,13 @@ function AcessosContent() {
       {!dados && !erro && <p className="text-sm text-slate-500">Carregando...</p>}
       {dados?.responsaveis.length === 0 && (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-          {todos ? "Nenhum responsável cadastrado." : "🎉 Todos os responsáveis já entraram no ClassLink."}
+          {publico === "equipe"
+            ? todos
+              ? "Ninguém da equipe cadastrado."
+              : "🎉 Toda a equipe já entrou no ClassLink."
+            : todos
+              ? "Nenhum responsável cadastrado."
+              : "🎉 Todos os responsáveis já entraram no ClassLink."}
         </p>
       )}
 
@@ -193,6 +218,12 @@ function AcessosContent() {
                   {formatarTelefone(r.phone)}
                   {r.email && ` · ${r.email}`}
                 </p>
+                {r.funcao && (
+                  <p className="text-xs text-slate-500">
+                    {r.funcao}
+                    {r.turmas.length > 0 && ` · ${r.turmas.join(", ")}`}
+                  </p>
+                )}
                 {r.alunos.length > 0 && <p className="text-xs text-slate-500">Aluno(s): {r.alunos.join(", ")}</p>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -217,7 +248,7 @@ function AcessosContent() {
               </div>
             </div>
             {!r.phone && (
-              <p className="mt-1 text-xs text-red-600">Sem telefone: cadastre o celular em Alunos → Editar para poder enviar o acesso.</p>
+              <p className="mt-1 text-xs text-red-600">Sem telefone: cadastre o celular em {publico === "equipe" ? "Equipe" : "Alunos"} → Editar para poder enviar o acesso.</p>
             )}
             {senhas[r.id] && (
               <div className="mt-2 flex flex-wrap items-center gap-2">

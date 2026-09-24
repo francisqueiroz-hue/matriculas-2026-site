@@ -3,7 +3,7 @@ import { avisarEquipePorWhatsApp } from "@/lib/avisos-equipe";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
-import { findGuardianByPhone, verifyWhatsAppSignature } from "@/lib/whatsapp";
+import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "@/lib/whatsapp";
 import { ehPedidoDeAcesso } from "@/lib/acesso";
 import { responderNumeroNaoCadastrado, responderPedidoDeAcesso } from "@/lib/pedido-acesso";
 
@@ -101,6 +101,14 @@ export async function POST(request: NextRequest) {
 
       const guardian = await findGuardianByPhone(msg.from);
       if (!guardian) {
+        // Equipe (coordenação, professores, auxiliares) também pode pedir o acesso por "ACESSO".
+        const equipe = pediuAcesso ? await findStaffByPhone(msg.from) : null;
+        if (equipe) {
+          await responderPedidoDeAcesso(equipe, msg.from, `${request.nextUrl.origin}/login`).catch((err) =>
+            console.error("Falha ao responder pedido de acesso da equipe pelo WhatsApp", err),
+          );
+          continue;
+        }
         console.warn(`Mensagem WhatsApp recebida de número não cadastrado: ${msg.from}`);
         if (pediuAcesso) {
           await responderNumeroNaoCadastrado(msg.from).catch((err) =>

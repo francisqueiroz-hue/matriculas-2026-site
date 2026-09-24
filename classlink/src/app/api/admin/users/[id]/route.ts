@@ -5,7 +5,9 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { updateUserSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
-import { sendAccessViaWhatsApp } from "@/lib/whatsapp";
+import { normalizePhoneBR, sendAccessViaWhatsApp } from "@/lib/whatsapp";
+import { telefoneEmUso } from "@/lib/usuarios";
+import { perfilDaFuncao } from "@/lib/equipe";
 import { linkWhatsAppManual, mensagemAcesso, parametrosModeloAcesso } from "@/lib/acesso";
 
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/users/[id]">) {
@@ -17,10 +19,34 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
     const existing = await prisma.user.findFirst({ where: { id, schoolId: session.schoolId } });
     if (!existing) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
 
+    // Telefone sempre padronizado (55 + DDD + número): o login por telefone compara exatamente.
+    let phone: string | null | undefined;
+    if (body.phone !== undefined) {
+      if (body.phone.trim() === "") {
+        phone = null;
+      } else {
+        phone = normalizePhoneBR(body.phone);
+        if (!phone) return NextResponse.json({ error: "Celular inválido. Use o DDD, ex.: (21) 98765-4321." }, { status: 400 });
+        if (await telefoneEmUso(phone, id)) {
+          return NextResponse.json({ error: "Celular já cadastrado para outro usuário" }, { status: 409 });
+        }
+      }
+    }
+
+    // Função da equipe (Direção/Coordenação/Professor/Auxiliar) define perfil e coordenação.
+    let perfil: { role: "ADMIN" | "STAFF"; isCoordenacao: boolean } | undefined;
+    if (body.funcao && existing.role !== "GUARDIAN") {
+      const novo = perfilDaFuncao(body.funcao);
+      if (id === session.sub && novo.role !== "ADMIN") {
+        return NextResponse.json({ error: "Você não pode tirar de si mesmo o acesso de Direção." }, { status: 400 });
+      }
+      perfil = { role: novo.role as "ADMIN" | "STAFF", isCoordenacao: novo.isCoordenacao };
+    }
+
     const temporaryPassword = body.resetPassword ? randomBytes(6).toString("hex") : undefined;
 
     const user = await prisma.$transaction(async (tx) => {
-      if (body.classIds && existing.role === "STAFF") {
+      if (body.classIds && (perfil?.role ?? existing.role) === "STAFF") {
         await tx.classTeacher.deleteMany({ where: { teacherId: id } });
         await tx.classTeacher.createMany({
           data: body.classIds.map((classId) => ({ classId, teacherId: id })),
@@ -30,9 +56,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
         where: { id },
         data: {
           ...(body.name ? { name: body.name } : {}),
-          ...(body.phone !== undefined ? { phone: body.phone } : {}),
+          ...(phone !== undefined ? { phone } : {}),
           ...(body.active !== undefined ? { active: body.active } : {}),
-          ...(body.isCoordenacao !== undefined && existing.role === "STAFF" ? { isCoordenacao: body.isCoordenacao } : {}),
+          ...(perfil
+            ? { role: perfil.role, isCoordenacao: perfil.isCoordenacao, funcao: body.funcao }
+            : body.isCoordenacao !== undefined && existing.role === "STAFF"
+              ? { isCoordenacao: body.isCoordenacao }
+              : {}),
           ...(temporaryPassword ? { passwordHash: await hashPassword(temporaryPassword) } : {}),
         },
       });
@@ -49,7 +79,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
     if (temporaryPassword) {
       const dados = {
         nome: user.name,
-        url: `${request.nextUrl.origin}/guia`,
+        // Famílias caem no guia de primeiro acesso; a equipe, direto no login.
+        url: `${request.nextUrl.origin}${user.role === "GUARDIAN" ? "/guia" : "/login"}`,
         login: user.email ?? user.phone ?? "",
         senha: temporaryPassword,
       };
