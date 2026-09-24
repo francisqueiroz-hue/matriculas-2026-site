@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { PushRegister } from "@/components/PushRegister";
 import { IosInstallBanner } from "@/components/IosInstallBanner";
 import { AndroidInstallBanner } from "@/components/AndroidInstallBanner";
+import { RematriculaBanner } from "@/components/RematriculaBanner";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -45,6 +46,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
           <IosInstallBanner />
           <AndroidInstallBanner />
+          <RematriculaBanner />
           {children}
         </main>
       </div>
