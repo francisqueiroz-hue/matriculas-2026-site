@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { excluirAluno } from "@/lib/exclusao";
 import { handleApiError } from "@/lib/http";
 import { updateStudentSchema } from "@/lib/validators";
 
@@ -28,16 +29,16 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
 }
 
 /** Exclusão lógica — mantém histórico de frequência/posts já vinculados. */
-export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/admin/students/[id]">) {
+export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/admin/students/[id]">) {
   try {
     const session = await requireRole("ADMIN");
     const { id } = await ctx.params;
+    // Padrão: exclui também o acesso dos responsáveis sem outro aluno na escola.
+    const excluirResponsaveis = request.nextUrl.searchParams.get("responsaveis") !== "manter";
 
-    const existing = await prisma.student.findFirst({ where: { id, schoolId: session.schoolId } });
-    if (!existing) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
-
-    await prisma.student.update({ where: { id }, data: { deletedAt: new Date() } });
-    return NextResponse.json({ ok: true });
+    const resultado = await excluirAluno(id, session.schoolId, excluirResponsaveis);
+    if (!resultado) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
+    return NextResponse.json({ ok: true, ...resultado });
   } catch (error) {
     return handleApiError(error);
   }

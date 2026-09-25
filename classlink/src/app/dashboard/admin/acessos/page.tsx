@@ -86,6 +86,22 @@ function AcessosContent() {
     }
   }
 
+  async function excluir(r: Responsavel) {
+    if (
+      !confirm(
+        `Excluir ${r.name}? A pessoa perde o acesso ao ClassLink e sai das listas; e-mail e celular são apagados do cadastro. Use para quem saiu da escola.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await apiJson(`/api/admin/users/${r.id}`, { method: "DELETE" });
+      carregar();
+    } catch (err) {
+      setAvisos((prev) => ({ ...prev, [r.id]: { texto: err instanceof Error ? err.message : "Erro ao excluir", ok: false } }));
+    }
+  }
+
   async function enviarTodos() {
     if (!dados) return;
     const pendentes = dados.responsaveis.filter((r) => !r.jaEntrou && r.phone);
@@ -254,6 +270,9 @@ function AcessosContent() {
                   </p>
                 )}
                 {r.alunos.length > 0 && <p className="text-xs text-slate-500">Aluno(s): {r.alunos.join(", ")}</p>}
+                {publico === "familias" && r.alunos.length === 0 && (
+                  <p className="text-xs text-amber-700">Sem aluno ativo na escola — se a família saiu, use Excluir.</p>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {dados?.whatsappConfigurado && r.phone && (
@@ -272,6 +291,13 @@ function AcessosContent() {
                   className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Gerar nova senha
+                </button>
+                <button
+                  type="button"
+                  onClick={() => excluir(r)}
+                  className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                >
+                  Excluir
                 </button>
               </div>
             </div>

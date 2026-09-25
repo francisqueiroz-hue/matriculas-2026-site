@@ -237,6 +237,23 @@ padronizado (login por telefone) e não pode repetir entre usuários. A equipe t
 o acesso mandando **ACESSO** para o WhatsApp da escola, e a tela **Acessos** tem a aba
 **Equipe** com quem ainda não entrou.
 
+## Saída de alunos, famílias e equipe (excluir)
+
+- **Equipe → Excluir:** a pessoa perde o acesso **na hora** (a sessão aberta também cai),
+  sai das listas e das turmas, e o e-mail e o celular são apagados do cadastro — ficam
+  livres para um novo cadastro, se ela voltar.
+- **Alunos → Excluir:** o aluno sai das listas e das turmas. Em seguida o painel pergunta se
+  exclui também o acesso dos responsáveis **que não têm outro aluno na escola** (irmãos que
+  continuam mantêm o acesso da família).
+- **Alunos → Revogar vínculo:** desvincula o responsável e, se confirmado, exclui o acesso
+  dele quando não sobrar outro aluno.
+- **Acessos → Excluir:** exclui um responsável ou alguém da equipe direto da lista; quem
+  está sem aluno ativo aparece com o aviso "Sem aluno ativo na escola".
+
+A exclusão não apaga o histórico: notas, frequência, financeiro, mensagens e respostas a
+comunicados continuam guardados (escrituração escolar), com o nome da pessoa apenas como
+registro de autoria. Os dados de contato são apagados (LGPD, minimização).
+
 ## Página de matrículas e rematrícula
 
 - A página pública de matrículas fica em **`/matriculas`** (link também na tela de login).

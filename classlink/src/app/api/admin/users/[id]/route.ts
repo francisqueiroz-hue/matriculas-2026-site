@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
+import { excluirUsuario } from "@/lib/exclusao";
 import { handleApiError } from "@/lib/http";
 import { updateUserSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
@@ -98,8 +99,9 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/admi
       return NextResponse.json({ error: "Use a exclusão de conta para remover seu próprio usuário" }, { status: 400 });
     }
 
-    await prisma.user.update({ where: { id }, data: { active: false, deletedAt: new Date() } });
-    await prisma.refreshToken.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+    // Exclusão de quem saiu: some das listas, perde o acesso e tem os contatos apagados;
+    // mensagens e registros lançados continuam no histórico (ver lib/exclusao).
+    await excluirUsuario(id, session.schoolId);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return handleApiError(error);
