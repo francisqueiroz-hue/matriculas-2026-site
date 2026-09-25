@@ -251,6 +251,11 @@ oculta e não aceita novas mensagens. Resposta da família pelo WhatsApp ou e-ma
 conversa dela com a gestão (a mais recente, ou uma nova com a direção). "Coordenação" é a
 função Coordenação do cadastro da equipe.
 
+**Excluir conversa:** a direção e a coordenação têm a lixeira ao lado de cada conversa em
+Mensagens. Ela apaga a conversa e todas as mensagens para as duas pessoas (sem volta) —
+para conversas de teste ou encerradas. Professores e famílias não excluem conversas.
+Conversas com quem foi excluído do cadastro (saiu da escola) somem da lista sozinhas.
+
 ## Saída de alunos, famílias e equipe (excluir)
 
 - **Equipe → Excluir:** a pessoa perde o acesso **na hora** (a sessão aberta também cai),

@@ -57,6 +57,17 @@ export async function exigirPodeConversar(userIdA: string, userIdB: string): Pro
   if (!podeConversar(a, b)) throw new AuthError(MENSAGEM_BLOQUEIO, 403);
 }
 
+/**
+ * Excluir conversa (com todas as mensagens, para os dois lados) é da gestão: direção e
+ * coordenação limpam conversas de teste ou encerradas. Professores e famílias não apagam
+ * registros da escola.
+ */
+export async function exigirPodeExcluirConversa(userId: string): Promise<void> {
+  if ((await perfilDoUsuario(userId)) !== "gestao") {
+    throw new AuthError("Só a direção e a coordenação podem excluir conversas.", 403);
+  }
+}
+
 /** Cargo para exibir ao lado do nome ("Direção", "Coordenação", "Professor(a)", "Responsável"). */
 export function cargoParaExibir(user: DadosPerfil): string {
   if (user.role === "GUARDIAN") return "Responsável";

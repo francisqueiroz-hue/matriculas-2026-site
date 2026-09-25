@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { assertTeamConversationParticipant } from "@/lib/messaging";
-import { exigirPodeConversar } from "@/lib/permissoes-mensagens";
+import { exigirPodeConversar, exigirPodeExcluirConversa } from "@/lib/permissoes-mensagens";
 import { notifyUsers } from "@/lib/push";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/team-messages/conversations/[id]">) {
@@ -77,6 +77,20 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/team-me
     });
 
     return NextResponse.json({ message }, { status: 201 });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+/** Exclui a conversa e todas as mensagens dela, para os dois lados (só direção/coordenação). */
+export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/team-messages/conversations/[id]">) {
+  try {
+    const session = await requireRole("ADMIN", "STAFF");
+    const { id } = await ctx.params;
+    await assertTeamConversationParticipant(id, session.sub);
+    await exigirPodeExcluirConversa(session.sub);
+    await prisma.teamConversation.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     return handleApiError(error);
   }

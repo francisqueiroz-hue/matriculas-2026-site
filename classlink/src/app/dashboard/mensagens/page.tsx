@@ -57,21 +57,25 @@ export default function MensagensPage() {
   const [contatosResponsaveis, setContatosResponsaveis] = useState<Contact[]>([]);
   const [contatosEquipe, setContatosEquipe] = useState<Contact[]>([]);
   const [perfil, setPerfil] = useState<string | null>(null);
+  const [podeExcluir, setPodeExcluir] = useState(false);
+  const [excluindo, setExcluindo] = useState<string | null>(null);
+  const [erroExclusao, setErroExclusao] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [starting, setStarting] = useState(false);
 
   function loadConversations() {
     const pedidos: Promise<ConversaExibida[]>[] = [
-      apiJson<{ conversations: GuardianConversation[] }>("/api/messages/conversations").then((data) =>
-        data.conversations.map((c) => ({
+      apiJson<{ conversations: GuardianConversation[]; podeExcluir?: boolean }>("/api/messages/conversations").then((data) => {
+        setPodeExcluir(Boolean(data.podeExcluir));
+        return data.conversations.map((c) => ({
           id: c.id,
           tipo: "responsavel" as const,
           contraparte: user.id === c.staff.id ? c.guardian.name : c.staff.name,
           ultimaMensagem: c.messages[0]?.body ?? null,
           naoLidas: c._count.messages,
           criadaEm: c.messages[0]?.createdAt ?? "",
-        })),
-      ),
+        }));
+      }),
     ];
 
     if (podeFalarComEquipe) {
@@ -116,6 +120,27 @@ export default function MensagensPage() {
       router.push(tipo === "equipe" ? `/dashboard/mensagens/${data.conversation.id}?tipo=equipe` : `/dashboard/mensagens/${data.conversation.id}`);
     } finally {
       setStarting(false);
+    }
+  }
+
+  async function excluirConversa(c: ConversaExibida) {
+    if (
+      !confirm(
+        `Excluir a conversa com ${c.contraparte}? Todas as mensagens serão apagadas para as duas pessoas e não será possível recuperar.`,
+      )
+    ) {
+      return;
+    }
+    setExcluindo(`${c.tipo}-${c.id}`);
+    setErroExclusao(null);
+    try {
+      const path = c.tipo === "equipe" ? `/api/team-messages/conversations/${c.id}` : `/api/messages/conversations/${c.id}`;
+      await apiJson(path, { method: "DELETE" });
+      setConversas((atual) => atual?.filter((x) => !(x.id === c.id && x.tipo === c.tipo)) ?? null);
+    } catch (err) {
+      setErroExclusao(err instanceof Error ? err.message : "Não foi possível excluir a conversa");
+    } finally {
+      setExcluindo(null);
     }
   }
 
@@ -198,15 +223,16 @@ export default function MensagensPage() {
 
       {conversas === null && <p className="text-sm text-slate-500">Carregando conversas...</p>}
       {conversas?.length === 0 && <p className="text-sm text-slate-500">Nenhuma conversa ainda.</p>}
+      {erroExclusao && <p className="text-sm text-red-600">{erroExclusao}</p>}
 
       <ul className="space-y-2">
         {conversas?.map((c) => (
-          <li key={`${c.tipo}-${c.id}`}>
+          <li key={`${c.tipo}-${c.id}`} className="flex items-stretch gap-2">
             <a
               href={c.tipo === "equipe" ? `/dashboard/mensagens/${c.id}?tipo=equipe` : `/dashboard/mensagens/${c.id}`}
-              className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+              className="flex min-w-0 flex-1 items-center justify-between rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
             >
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium">
                   {c.contraparte}
                   {c.tipo === "equipe" && <span className="ml-2 text-xs font-normal text-slate-400">· equipe</span>}
@@ -217,6 +243,20 @@ export default function MensagensPage() {
                 <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-xs text-white">{c.naoLidas}</span>
               )}
             </a>
+            {podeExcluir && (
+              <button
+                type="button"
+                onClick={() => excluirConversa(c)}
+                disabled={excluindo === `${c.tipo}-${c.id}`}
+                aria-label={`Excluir conversa com ${c.contraparte}`}
+                title="Excluir conversa"
+                className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+                </svg>
+              </button>
+            )}
           </li>
         ))}
       </ul>
