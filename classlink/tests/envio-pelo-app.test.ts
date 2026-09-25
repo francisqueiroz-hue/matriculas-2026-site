@@ -87,3 +87,49 @@ describe("modelo disponível", () => {
     expect(await modeloDisponivel("convite")).toEqual({ name: "convite_acesso_classlink", language: "pt_BR" });
   });
 });
+
+describe("reenvio de modelo recusado", () => {
+  it("edição leva só categoria e componentes, com o texto revisado", async () => {
+    const { payloadEdicao } = await import("@/lib/whatsapp-modelos");
+    const p = payloadEdicao("convite");
+    expect(Object.keys(p).sort()).toEqual(["category", "components"]);
+    expect(JSON.stringify(p)).not.toContain("aplicativo de comunicação");
+  });
+});
+
+describe("cadastrar modelos", () => {
+  const envOriginal = { ...process.env };
+  afterEach(() => {
+    process.env = { ...envOriginal };
+    vi.unstubAllGlobals();
+  });
+
+  it("reenvia o recusado editando pelo ID e não mexe no que está em análise", async () => {
+    process.env.WHATSAPP_API_TOKEN = "token";
+    process.env.WHATSAPP_PHONE_NUMBER_ID = "123";
+    process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = "999";
+    delete process.env.WHATSAPP_TEMPLATE_CONVITE;
+    delete process.env.WHATSAPP_TEMPLATE_AVISO;
+    const { cadastrarModelos } = await import("@/lib/whatsapp-modelos");
+    const chamadas: { url: string; method: string; body?: unknown }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        chamadas.push({ url: String(url), method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : undefined });
+        if (String(url).includes("name=convite_acesso_classlink")) {
+          return new Response(JSON.stringify({ data: [{ id: "555", name: "convite_acesso_classlink", status: "REJECTED", language: "pt_BR", rejected_reason: "INCORRECT_CATEGORY" }] }));
+        }
+        if (String(url).includes("name=aviso_mensagem_classlink")) {
+          return new Response(JSON.stringify({ data: [{ id: "777", name: "aviso_mensagem_classlink", status: "PENDING", language: "pt_BR" }] }));
+        }
+        return new Response(JSON.stringify({ success: true }));
+      }),
+    );
+    const r = await cadastrarModelos();
+    const envios = chamadas.filter((c) => c.method === "POST");
+    expect(envios).toHaveLength(1);
+    expect(envios[0].url).toMatch(/\/555$/);
+    expect(envios[0].body).toMatchObject({ category: "UTILITY" });
+    expect(r.map((m) => m.status)).toEqual(["PENDING", "PENDING"]);
+  });
+});

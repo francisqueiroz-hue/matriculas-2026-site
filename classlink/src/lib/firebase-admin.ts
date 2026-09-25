@@ -10,6 +10,33 @@ export function erroFirebaseAdmin(): string | null {
 }
 
 /**
+ * Aceita a chave privada colada de vários jeitos na Vercel e devolve o PEM correto:
+ * com ou sem aspas/vírgula do JSON, com "\n" literais, com quebras de linha trocadas por
+ * espaços, ou até o arquivo JSON da conta de serviço inteiro.
+ */
+export function normalizarChavePrivada(valor: string | undefined): string | undefined {
+  let chave = valor?.trim();
+  if (!chave) return undefined;
+  if (chave.startsWith("{")) {
+    try {
+      const json = JSON.parse(chave) as { private_key?: string };
+      if (json.private_key) chave = json.private_key.trim();
+    } catch {
+      // não é JSON válido; segue tentando como texto
+    }
+  }
+  chave = chave.replace(/^"private_key"\s*:\s*/, "").replace(/,$/, "").trim();
+  chave = chave.replace(/^["']+|["']+$/g, "");
+  chave = chave.replace(/\\+r/g, "").replace(/\\+n/g, "\n").replace(/\r/g, "");
+
+  const pem = chave.match(/-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/);
+  if (!pem) return chave;
+  const corpo = pem[2].replace(/[^A-Za-z0-9+/=]/g, "");
+  const linhas = corpo.match(/.{1,64}/g) ?? [];
+  return `-----BEGIN ${pem[1]}-----\n${linhas.join("\n")}\n-----END ${pem[1]}-----\n`;
+}
+
+/**
  * Instância única do Firebase Admin SDK, compartilhada entre push (FCM) e
  * armazenamento de mídia (Storage) — os dois usam a mesma conta de serviço.
  * Retorna null se as credenciais não estiverem configuradas (features
@@ -20,7 +47,7 @@ export function getFirebaseAdminApp(): App | null {
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const privateKey = normalizarChavePrivada(process.env.FIREBASE_PRIVATE_KEY);
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
   if (!projectId || !clientEmail || !privateKey) {

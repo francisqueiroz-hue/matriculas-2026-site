@@ -499,8 +499,11 @@ nas últimas 24h). Por isso o ClassLink envia o acesso assim — sempre pelo nú
 1. **Conversa aberta** (a pessoa escreveu para a escola nas últimas 24h; o webhook grava o
    horário da última mensagem): envia link, login e senha provisória direto.
 2. **Modelo de acesso com senha** (opcional, `WHATSAPP_TEMPLATE_ACESSO`): envia por ele.
-3. **Convite** (`convite_acesso_classlink`, sem senha): "Olá, {{1}}! A escola cadastrou
-   você no ClassLink... toque no botão ACESSO abaixo." Ao tocar no botão, a resposta chega
+3. **Convite** (`convite_acesso_classlink`, sem senha): "Olá, {{1}}! Seu cadastro na
+   escola foi concluído e sua conta no ClassLink está ativa. Para receber seus dados de
+   entrada, toque no botão ACESSO abaixo." (Texto de confirmação de cadastro: uma versão
+   que apresentava o app foi recusada como INCORRECT_CATEGORY. Modelo recusado é reenviado
+   com o texto atual pelo mesmo botão do Painel.) Ao tocar no botão, a resposta chega
    ao webhook, que devolve link, login e senha provisória na hora.
 
 Vale para o cadastro de responsável (Alunos), o cadastro da equipe (Equipe), Gerar nova
