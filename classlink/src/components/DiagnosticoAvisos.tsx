@@ -102,6 +102,7 @@ export function DiagnosticoAvisos() {
   }
   const modelos = [d.whatsapp.modelos.convite, d.whatsapp.modelos.aviso];
   const faltaCadastrar = modelos.some((m) => m.status === "NAO_CADASTRADO" || m.status === "DESCONHECIDO");
+  const recusado = modelos.some((m) => m.status === "REJECTED");
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
@@ -155,21 +156,21 @@ export function DiagnosticoAvisos() {
                   m.status === "PENDING"
                     ? "A Meta está analisando; costuma levar de minutos a algumas horas. Enquanto isso, só quem escreveu para a escola nas últimas 24h recebe."
                     : m.status === "REJECTED"
-                      ? `Motivo: ${m.motivo ?? "não informado"}.`
+                      ? `Motivo: ${m.motivo ?? "não informado"}. Use o botão abaixo para reenviar com o texto revisado.`
                       : `Cadastre pelo botão abaixo (nome: ${m.nome}).`
                 }
               />
             ))}
             <li className="text-xs text-slate-500">Pessoas da equipe com aviso no WhatsApp ativado: {d.whatsapp.equipeComAvisoWhatsApp}</li>
           </ul>
-          {d.whatsapp.api && d.whatsapp.contaBusiness && faltaCadastrar && (
+          {d.whatsapp.api && d.whatsapp.contaBusiness && (faltaCadastrar || recusado) && (
             <button
               type="button"
               disabled={cadastrando}
               onClick={cadastrarModelos}
               className="mt-3 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
-              {cadastrando ? "Cadastrando..." : "Cadastrar modelos na Meta"}
+              {cadastrando ? "Enviando..." : recusado && !faltaCadastrar ? "Reenviar modelo recusado com o texto novo" : "Cadastrar modelos na Meta"}
             </button>
           )}
           {retorno && <p className="mt-2 text-xs text-slate-600">{retorno}</p>}

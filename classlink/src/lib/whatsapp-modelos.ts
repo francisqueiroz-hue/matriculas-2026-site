@@ -31,9 +31,12 @@ export const MODELOS: Record<TipoModelo, DefinicaoModelo> = {
     tipo: "convite",
     variavel: "WHATSAPP_TEMPLATE_CONVITE",
     nomePadrao: "convite_acesso_classlink",
+    // Texto de confirmação de cadastro (conta criada = Utilidade). A primeira versão, que
+    // apresentava o ClassLink como "aplicativo de comunicação da escola", foi recusada pela
+    // Meta como categoria incorreta (INCORRECT_CATEGORY) — soava como divulgação.
     corpo:
-      "Olá, {{1}}! A escola cadastrou você no ClassLink, o aplicativo de comunicação da escola.\n\n" +
-      "Para receber agora seu login e sua senha provisória, toque no botão ACESSO abaixo.",
+      "Olá, {{1}}! Seu cadastro na escola foi concluído e sua conta no ClassLink está ativa.\n\n" +
+      "Para receber seus dados de entrada, toque no botão ACESSO abaixo.",
     exemplo: ["Maria"],
     botoes: ["ACESSO"],
   },
@@ -55,6 +58,8 @@ export interface StatusModelo {
   nome: string;
   status: "APPROVED" | "PENDING" | "REJECTED" | "PAUSED" | "DISABLED" | "NAO_CADASTRADO" | "DESCONHECIDO";
   motivo?: string | null;
+  /** ID do modelo na Meta (para editar e reenviar um modelo recusado). */
+  id?: string;
 }
 
 function base() {
@@ -82,6 +87,12 @@ export function payloadCriacao(tipo: TipoModelo) {
   return { name: nomeDoModelo(tipo), language: IDIOMA_MODELOS(), category: "UTILITY", components };
 }
 
+/** Corpo da edição de um modelo existente (POST /{id}): só categoria e componentes. */
+export function payloadEdicao(tipo: TipoModelo) {
+  const { category, components } = payloadCriacao(tipo);
+  return { category, components };
+}
+
 // Cache curto por instância: o status muda raramente e cada envio consultaria a Meta.
 const cache = new Map<string, { status: StatusModelo; em: number }>();
 const CACHE_MS = 5 * 60 * 1000;
@@ -102,7 +113,7 @@ export async function consultarModelo(tipo: TipoModelo): Promise<StatusModelo> {
   if (guardado && Date.now() - guardado.em < CACHE_MS) return guardado.status;
 
   try {
-    const url = `${base()}/${waba}/message_templates?name=${encodeURIComponent(nome)}&fields=name,status,language,rejected_reason`;
+    const url = `${base()}/${waba}/message_templates?name=${encodeURIComponent(nome)}&fields=id,name,status,language,rejected_reason`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${process.env.WHATSAPP_API_TOKEN}` },
       signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
@@ -110,10 +121,16 @@ export async function consultarModelo(tipo: TipoModelo): Promise<StatusModelo> {
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error?.message ?? `HTTP ${res.status}`);
     const idioma = IDIOMA_MODELOS();
-    const itens: { name: string; status: string; language: string; rejected_reason?: string }[] = data?.data ?? [];
+    const itens: { id?: string; name: string; status: string; language: string; rejected_reason?: string }[] = data?.data ?? [];
     const item = itens.find((i) => i.name === nome && i.language === idioma) ?? itens.find((i) => i.name === nome);
     const status: StatusModelo = item
-      ? { tipo, nome, status: (item.status as StatusModelo["status"]) ?? "DESCONHECIDO", motivo: item.rejected_reason ?? null }
+      ? {
+          tipo,
+          nome,
+          status: (item.status as StatusModelo["status"]) ?? "DESCONHECIDO",
+          motivo: item.rejected_reason && item.rejected_reason !== "NONE" ? item.rejected_reason : null,
+          id: item.id,
+        }
       : { tipo, nome, status: "NAO_CADASTRADO" };
     cache.set(chave, { status, em: Date.now() });
     return status;
@@ -139,7 +156,11 @@ export async function modeloDisponivel(tipo: TipoModelo): Promise<{ name: string
   return null;
 }
 
-/** Cadastra na Meta os modelos que ainda não existem. Os que já existem ficam como estão. */
+/**
+ * Cadastra na Meta os modelos que ainda não existem e reenvia, com o texto atual, os que
+ * foram recusados (edição do mesmo modelo — o nome de um modelo apagado fica bloqueado
+ * por 30 dias). Aprovados e em análise ficam como estão.
+ */
 export async function cadastrarModelos(): Promise<StatusModelo[]> {
   const waba = wabaId();
   if (!waba) throw new Error("Informe WHATSAPP_BUSINESS_ACCOUNT_ID (ID da conta do WhatsApp Business) na Vercel.");
@@ -149,14 +170,16 @@ export async function cadastrarModelos(): Promise<StatusModelo[]> {
   for (const tipo of Object.keys(MODELOS) as TipoModelo[]) {
     limparCacheModelos();
     const atual = await consultarModelo(tipo);
-    if (atual.status !== "NAO_CADASTRADO" && atual.status !== "DESCONHECIDO") {
+    const reenviar = atual.status === "REJECTED" && atual.id;
+    if (atual.status !== "NAO_CADASTRADO" && atual.status !== "DESCONHECIDO" && !reenviar) {
       resultado.push(atual);
       continue;
     }
-    const res = await fetch(`${base()}/${waba}/message_templates`, {
+    const res = await fetch(reenviar ? `${base()}/${atual.id}` : `${base()}/${waba}/message_templates`, {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.WHATSAPP_API_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify(payloadCriacao(tipo)),
+      // Edição aceita só categoria e componentes; criação leva também nome e idioma.
+      body: JSON.stringify(reenviar ? payloadEdicao(tipo) : payloadCriacao(tipo)),
       signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
     });
     const data = await res.json();
