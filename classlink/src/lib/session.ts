@@ -7,7 +7,13 @@ export async function getSession(): Promise<AccessTokenPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(ACCESS_COOKIE)?.value;
   if (!token) return null;
-  return verifyAccessToken(token);
+  const session = await verifyAccessToken(token);
+  if (!session) return null;
+  // O token vale 15 min; conferir no banco faz a exclusão/desativação valer na hora,
+  // sem esperar o token expirar.
+  const user = await prisma.user.findUnique({ where: { id: session.sub }, select: { active: true, deletedAt: true } });
+  if (!user || !user.active || user.deletedAt) return null;
+  return session;
 }
 
 export async function requireSession(): Promise<AccessTokenPayload> {

@@ -28,6 +28,7 @@ function AlunosContent() {
     Record<string, { email: string; guardianName: string; phone: string; relation: string }>
   >({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
+  const [aviso, setAviso] = useState<string | null>(null);
   // Link wa.me com a mensagem de acesso, para a escola enviar do próprio WhatsApp.
   const [billingForms, setBillingForms] = useState<Record<string, { mensalidadeValor: string; diaVencimento: string }>>({});
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
@@ -53,10 +54,32 @@ function AlunosContent() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Remover este aluno?")) return;
-    await apiJson(`/api/admin/students/${id}`, { method: "DELETE" });
-    load();
+  async function handleDelete(id: string, nome: string) {
+    if (
+      !confirm(
+        `Excluir ${nome}? O aluno sai das listas e das turmas. Notas, frequência e financeiro ficam guardados no histórico da escola.`,
+      )
+    ) {
+      return;
+    }
+    // Irmãos que continuam na escola mantêm o acesso da família (o servidor confere).
+    const excluirResponsaveis = confirm(
+      "Excluir também o acesso dos responsáveis que não têm outro aluno na escola?\n\nOK = excluir o acesso · Cancelar = manter o acesso",
+    );
+    try {
+      const res = await apiJson<{ responsaveisExcluidos: string[]; responsaveisMantidos: string[] }>(
+        `/api/admin/students/${id}${excluirResponsaveis ? "" : "?responsaveis=manter"}`,
+        { method: "DELETE" },
+      );
+      setAviso(
+        `${nome} excluído(a).` +
+          (res.responsaveisExcluidos.length ? ` Acesso excluído: ${res.responsaveisExcluidos.join(", ")}.` : "") +
+          (res.responsaveisMantidos.length ? ` Continuam com acesso: ${res.responsaveisMantidos.join(", ")}.` : ""),
+      );
+      load();
+    } catch (err) {
+      setAviso(err instanceof Error ? err.message : "Erro ao excluir aluno");
+    }
   }
 
   function guardianForm(studentId: string) {
@@ -98,10 +121,26 @@ function AlunosContent() {
     }
   }
 
-  async function handleUnlinkGuardian(studentId: string, guardianId: string) {
-    if (!confirm("Revogar vínculo com este responsável?")) return;
-    await apiJson(`/api/admin/students/${studentId}/guardians/${guardianId}`, { method: "DELETE" });
-    load();
+  async function handleUnlinkGuardian(studentId: string, guardianId: string, nome: string) {
+    if (!confirm(`Revogar o vínculo de ${nome} com este aluno?`)) return;
+    const excluir = confirm(
+      `Se ${nome} não tiver outro aluno na escola, excluir também o acesso ao ClassLink?\n\nOK = excluir o acesso · Cancelar = só desvincular`,
+    );
+    try {
+      const res = await apiJson<{ responsavelExcluido: boolean }>(
+        `/api/admin/students/${studentId}/guardians/${guardianId}${excluir ? "?excluir=1" : ""}`,
+        { method: "DELETE" },
+      );
+      setFeedback((prev) => ({
+        ...prev,
+        [studentId]: res.responsavelExcluido
+          ? `Vínculo revogado e acesso de ${nome} excluído.`
+          : `Vínculo revogado.${excluir ? ` ${nome} continua com acesso por ter outro aluno na escola.` : ""}`,
+      }));
+      load();
+    } catch (err) {
+      setFeedback((prev) => ({ ...prev, [studentId]: err instanceof Error ? err.message : "Erro ao revogar vínculo" }));
+    }
   }
 
   async function handleResetGuardianPassword(studentId: string, guardianId: string) {
@@ -208,6 +247,12 @@ function AlunosContent() {
         {error && <p className="text-sm text-red-600">{error}</p>}
       </form>
 
+      {aviso && (
+        <p className="rounded-md bg-slate-100 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200" role="status">
+          {aviso}
+        </p>
+      )}
+
       <ul className="space-y-3">
         {students?.map((s) => {
           const form = guardianForm(s.id);
@@ -217,8 +262,8 @@ function AlunosContent() {
                 <span className="font-medium">
                   {s.name} <span className="text-xs text-slate-500">({s.class.name})</span>
                 </span>
-                <button onClick={() => handleDelete(s.id)} className="text-xs text-red-600 hover:underline">
-                  Remover
+                <button onClick={() => handleDelete(s.id, s.name)} className="text-xs text-red-600 hover:underline">
+                  Excluir
                 </button>
               </div>
 
@@ -271,7 +316,7 @@ function AlunosContent() {
                           Redefinir senha
                         </button>
                         <button
-                          onClick={() => handleUnlinkGuardian(s.id, g.guardian.id)}
+                          onClick={() => handleUnlinkGuardian(s.id, g.guardian.id, g.guardian.name)}
                           className="text-xs text-red-600 hover:underline"
                         >
                           Revogar vínculo

@@ -149,10 +149,20 @@ function UsuariosContent() {
     }
   }
 
-  async function handleDeactivate(id: string) {
-    if (!confirm("Desativar este usuário?")) return;
-    await apiJson(`/api/admin/users/${id}`, { method: "DELETE" });
-    load();
+  async function handleExcluir(u: UserItem) {
+    if (
+      !confirm(
+        `Excluir ${u.name}? A pessoa perde o acesso na hora, sai das listas e das turmas, e o e-mail e o celular são apagados do cadastro (ficam livres para um novo cadastro, se ela voltar). Mensagens e registros lançados continuam no histórico da escola.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await apiJson(`/api/admin/users/${u.id}`, { method: "DELETE" });
+      load();
+    } catch (err) {
+      setFeedback((prev) => ({ ...prev, [u.id]: err instanceof Error ? err.message : "Erro ao excluir" }));
+    }
   }
 
   async function handleResetPassword(id: string) {
@@ -321,11 +331,9 @@ function UsuariosContent() {
                   <button onClick={() => handleResetPassword(u.id)} className="text-xs text-indigo-600 hover:underline">
                     Redefinir senha
                   </button>
-                  {u.active && (
-                    <button onClick={() => handleDeactivate(u.id)} className="text-xs text-red-600 hover:underline">
-                      Desativar
-                    </button>
-                  )}
+                  <button onClick={() => handleExcluir(u)} className="text-xs text-red-600 hover:underline">
+                    Excluir
+                  </button>
                 </div>
               </div>
               {feedback[u.id] && <p className="mt-1 text-xs text-slate-500">{feedback[u.id]}</p>}
