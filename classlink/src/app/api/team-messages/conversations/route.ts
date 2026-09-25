@@ -13,13 +13,19 @@ export async function GET() {
 
     const conversations = await prisma.teamConversation.findMany({
       where:
+        // Colegas excluídos (saíram da escola) não aparecem mais na lista.
         perfil === "gestao"
-          ? { OR: [{ userAId: session.sub }, { userBId: session.sub }] }
+          ? {
+              OR: [
+                { userAId: session.sub, userB: { deletedAt: null } },
+                { userBId: session.sub, userA: { deletedAt: null } },
+              ],
+            }
           : // Professores/auxiliares: só as conversas com a direção/coordenação.
             {
               OR: [
-                { userAId: session.sub, userB: ONDE_GESTAO },
-                { userBId: session.sub, userA: ONDE_GESTAO },
+                { userAId: session.sub, userB: { ...ONDE_GESTAO, deletedAt: null } },
+                { userBId: session.sub, userA: { ...ONDE_GESTAO, deletedAt: null } },
               ],
             },
       include: {
@@ -31,7 +37,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ conversations });
+    return NextResponse.json({ conversations, podeExcluir: perfil === "gestao" });
   } catch (error) {
     return handleApiError(error);
   }

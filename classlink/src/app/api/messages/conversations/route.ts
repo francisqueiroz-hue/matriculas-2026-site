@@ -17,7 +17,8 @@ export async function GET() {
         perfil === "familia"
           ? // A família só vê as conversas com a direção/coordenação.
             { guardianId: session.sub, staff: ONDE_GESTAO }
-          : { staffId: session.sub },
+          : // Famílias excluídas (saíram da escola) não aparecem mais na lista.
+            { staffId: session.sub, guardian: { deletedAt: null } },
       include: {
         staff: { select: { id: true, name: true, role: true } },
         guardian: { select: { id: true, name: true } },
@@ -32,7 +33,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ conversations });
+    return NextResponse.json({ conversations, podeExcluir: perfil === "gestao" });
   } catch (error) {
     return handleApiError(error);
   }

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { assertConversationParticipant } from "@/lib/messaging";
-import { exigirPodeConversar } from "@/lib/permissoes-mensagens";
+import { exigirPodeConversar, exigirPodeExcluirConversa } from "@/lib/permissoes-mensagens";
 import { sendMessageSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTextMessage } from "@/lib/whatsapp";
@@ -103,6 +103,20 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     });
 
     return NextResponse.json({ message }, { status: 201 });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+/** Exclui a conversa e todas as mensagens dela, para os dois lados (só direção/coordenação). */
+export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
+  try {
+    const session = await requireSession();
+    const { id } = await ctx.params;
+    await assertConversationParticipant(id, session.sub);
+    await exigirPodeExcluirConversa(session.sub);
+    await prisma.conversation.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     return handleApiError(error);
   }
