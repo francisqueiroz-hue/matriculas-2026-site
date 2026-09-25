@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiJson } from "@/lib/api-client";
 
 interface Diagnostico {
-  push: { navegador: boolean; chaveVapid: boolean; servidor: boolean; dispositivosRegistrados: number };
+  push: { navegador: boolean; chaveVapid: boolean; servidor: boolean; servidorErro: string | null; dispositivosRegistrados: number };
   whatsapp: {
     api: boolean;
     webhookAssinatura: boolean;
@@ -50,11 +50,17 @@ function Item({ ok, titulo, dica }: { ok: boolean; titulo: string; dica: string 
 /** Quadro "o que está configurado" para os avisos — sem mostrar nenhum segredo. */
 export function DiagnosticoAvisos() {
   const [d, setD] = useState<Diagnostico | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
   const [cadastrando, setCadastrando] = useState(false);
   const [retorno, setRetorno] = useState<string | null>(null);
 
   const carregar = useCallback(() => {
-    apiJson<Diagnostico>("/api/admin/diagnostico").then(setD).catch(() => setD(null));
+    apiJson<Diagnostico>("/api/admin/diagnostico")
+      .then((dados) => {
+        setD(dados);
+        setErro(null);
+      })
+      .catch((err) => setErro(err instanceof Error ? err.message : "Falha ao carregar"));
   }, []);
 
   useEffect(carregar, [carregar]);
@@ -77,7 +83,23 @@ export function DiagnosticoAvisos() {
     }
   }
 
-  if (!d) return null;
+  if (!d) {
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+        <h2 className="font-semibold">Configuração dos avisos</h2>
+        {erro ? (
+          <p className="mt-1 text-red-600">
+            Não foi possível conferir a configuração ({erro}).{" "}
+            <button type="button" onClick={carregar} className="font-semibold underline">
+              Tentar de novo
+            </button>
+          </p>
+        ) : (
+          <p className="mt-1 text-slate-500">Conferindo...</p>
+        )}
+      </section>
+    );
+  }
   const modelos = [d.whatsapp.modelos.convite, d.whatsapp.modelos.aviso];
   const faltaCadastrar = modelos.some((m) => m.status === "NAO_CADASTRADO" || m.status === "DESCONHECIDO");
 
@@ -93,7 +115,15 @@ export function DiagnosticoAvisos() {
           <ul className="space-y-1.5">
             <Item ok={d.push.navegador} titulo="Firebase no navegador" dica="Preencha as variáveis NEXT_PUBLIC_FIREBASE_* (README, passo 2)." />
             <Item ok={d.push.chaveVapid} titulo="Chave VAPID" dica="Preencha NEXT_PUBLIC_FIREBASE_VAPID_KEY (README, passo 3)." />
-            <Item ok={d.push.servidor} titulo="Conta de serviço do Firebase" dica="Preencha FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL e FIREBASE_PRIVATE_KEY (README, passo 5)." />
+            <Item
+              ok={d.push.servidor}
+              titulo="Conta de serviço do Firebase"
+              dica={
+                d.push.servidorErro
+                  ? `As variáveis estão preenchidas, mas a chave foi recusada (${d.push.servidorErro}). Cole de novo o valor de "private_key" do arquivo JSON inteiro, de -----BEGIN PRIVATE KEY----- até -----END PRIVATE KEY-----, sem aspas.`
+                  : "Preencha FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL e FIREBASE_PRIVATE_KEY (README, passo 5)."
+              }
+            />
             <li className="text-xs text-slate-500">Dispositivos registrados para push: {d.push.dispositivosRegistrados}</li>
           </ul>
         </div>

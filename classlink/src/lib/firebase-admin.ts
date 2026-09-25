@@ -1,6 +1,13 @@
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 
 let cachedApp: App | null | undefined;
+let erroConfiguracao: string | null = null;
+
+/** Motivo de o Firebase Admin não ter iniciado (ex.: chave privada mal colada), sem expor valores. */
+export function erroFirebaseAdmin(): string | null {
+  getFirebaseAdminApp();
+  return erroConfiguracao;
+}
 
 /**
  * Instância única do Firebase Admin SDK, compartilhada entre push (FCM) e
@@ -21,6 +28,14 @@ export function getFirebaseAdminApp(): App | null {
     return null;
   }
 
-  cachedApp = getApps()[0] ?? initializeApp({ credential: cert({ projectId, clientEmail, privateKey }), storageBucket });
+  try {
+    cachedApp = getApps()[0] ?? initializeApp({ credential: cert({ projectId, clientEmail, privateKey }), storageBucket });
+  } catch (err) {
+    // Chave privada colada errada (sem as linhas BEGIN/END, aspas extras, etc.) não pode
+    // derrubar as rotas que dependem do Firebase — elas degradam como "não configurado".
+    erroConfiguracao = err instanceof Error ? err.message : "credenciais inválidas";
+    console.error("Firebase Admin não iniciou — confira FIREBASE_PRIVATE_KEY/FIREBASE_CLIENT_EMAIL", err);
+    cachedApp = null;
+  }
   return cachedApp;
 }
