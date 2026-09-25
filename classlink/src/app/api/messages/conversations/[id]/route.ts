@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { assertConversationParticipant } from "@/lib/messaging";
+import { exigirPodeConversar } from "@/lib/permissoes-mensagens";
 import { sendMessageSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTextMessage } from "@/lib/whatsapp";
@@ -13,7 +14,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
   try {
     const session = await requireSession();
     const { id } = await ctx.params;
-    await assertConversationParticipant(id, session.sub);
+    const participante = await assertConversationParticipant(id, session.sub);
+    await exigirPodeConversar(participante.staffId, participante.guardianId);
 
     const [conversation, messages] = await Promise.all([
       prisma.conversation.findUniqueOrThrow({
@@ -46,6 +48,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     const session = await requireSession();
     const { id } = await ctx.params;
     const conversation = await assertConversationParticipant(id, session.sub);
+    // Regra da escola: família ↔ direção/coordenação apenas (inclusive conversas antigas).
+    await exigirPodeConversar(conversation.staffId, conversation.guardianId);
     const { body, channel } = sendMessageSchema.parse(await request.json());
 
     // WhatsApp/e-mail só fazem sentido enviados pela equipe ao responsável — o responsável

@@ -3,19 +3,21 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
-import { shareClass } from "@/lib/messaging";
+import { MENSAGEM_BLOQUEIO, ONDE_GESTAO, perfilDoUsuario, podeConversar, perfilMensagens } from "@/lib/permissoes-mensagens";
 
 export async function GET() {
   try {
     const session = await requireSession();
+    const perfil = await perfilDoUsuario(session.sub);
+    // Professores e auxiliares não conversam com famílias (conversas antigas ficam ocultas).
+    if (perfil === "professor") return NextResponse.json({ conversations: [] });
 
     const conversations = await prisma.conversation.findMany({
       where:
-        session.role === "GUARDIAN"
-          ? { guardianId: session.sub }
-          : session.role === "ADMIN"
-            ? { OR: [{ staffId: session.sub }] }
-            : { staffId: session.sub },
+        perfil === "familia"
+          ? // A família só vê as conversas com a direção/coordenação.
+            { guardianId: session.sub, staff: ONDE_GESTAO }
+          : { staffId: session.sub },
       include: {
         staff: { select: { id: true, name: true, role: true } },
         guardian: { select: { id: true, name: true } },
@@ -44,32 +46,25 @@ export async function POST(request: NextRequest) {
     const { counterpartUserId } = startSchema.parse(await request.json());
 
     const counterpart = await prisma.user.findFirst({
-      where: { id: counterpartUserId, schoolId: session.schoolId, active: true },
+      where: { id: counterpartUserId, schoolId: session.schoolId, active: true, deletedAt: null },
+      select: { id: true, role: true, isCoordenacao: true, funcao: true },
     });
     if (!counterpart) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
 
-    let staffId: string;
-    let guardianId: string;
-
-    if (session.role === "GUARDIAN") {
-      if (counterpart.role === "GUARDIAN") {
-        return NextResponse.json({ error: "Selecione um funcionário para conversar" }, { status: 400 });
-      }
-      staffId = counterpart.id;
-      guardianId = session.sub;
-      if (!(await shareClass(staffId, guardianId, counterpart.role as "ADMIN" | "STAFF"))) {
-        return NextResponse.json({ error: "Este funcionário não atende a turma do seu filho(a)" }, { status: 403 });
-      }
-    } else {
-      if (counterpart.role !== "GUARDIAN") {
-        return NextResponse.json({ error: "Selecione um responsável para conversar" }, { status: 400 });
-      }
-      staffId = session.sub;
-      guardianId = counterpart.id;
-      if (!(await shareClass(staffId, guardianId, session.role as "ADMIN" | "STAFF"))) {
-        return NextResponse.json({ error: "Você não atende a turma deste responsável" }, { status: 403 });
-      }
+    const meuPerfil = await perfilDoUsuario(session.sub);
+    const perfilOutro = perfilMensagens(counterpart);
+    // Conversa família ↔ escola: um lado é a família, o outro a equipe.
+    if ((meuPerfil === "familia") === (perfilOutro === "familia")) {
+      return NextResponse.json(
+        { error: meuPerfil === "familia" ? "Selecione alguém da escola para conversar" : "Selecione um responsável para conversar" },
+        { status: 400 },
+      );
     }
+    if (!podeConversar(meuPerfil, perfilOutro)) {
+      return NextResponse.json({ error: MENSAGEM_BLOQUEIO }, { status: 403 });
+    }
+    const staffId = meuPerfil === "familia" ? counterpart.id : session.sub;
+    const guardianId = meuPerfil === "familia" ? session.sub : counterpart.id;
 
     const conversation = await prisma.conversation.upsert({
       where: { staffId_guardianId: { staffId, guardianId } },

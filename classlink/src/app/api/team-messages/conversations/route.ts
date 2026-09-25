@@ -4,13 +4,24 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ordenarDupla } from "@/lib/messaging";
+import { MENSAGEM_BLOQUEIO, ONDE_GESTAO, perfilDoUsuario, perfilMensagens, podeConversar } from "@/lib/permissoes-mensagens";
 
 export async function GET() {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    const perfil = await perfilDoUsuario(session.sub);
 
     const conversations = await prisma.teamConversation.findMany({
-      where: { OR: [{ userAId: session.sub }, { userBId: session.sub }] },
+      where:
+        perfil === "gestao"
+          ? { OR: [{ userAId: session.sub }, { userBId: session.sub }] }
+          : // Professores/auxiliares: só as conversas com a direção/coordenação.
+            {
+              OR: [
+                { userAId: session.sub, userB: ONDE_GESTAO },
+                { userBId: session.sub, userA: ONDE_GESTAO },
+              ],
+            },
       include: {
         userA: { select: { id: true, name: true, role: true } },
         userB: { select: { id: true, name: true, role: true } },
@@ -38,9 +49,13 @@ export async function POST(request: NextRequest) {
     }
 
     const counterpart = await prisma.user.findFirst({
-      where: { id: counterpartUserId, schoolId: session.schoolId, active: true, role: { in: ["ADMIN", "STAFF"] } },
+      where: { id: counterpartUserId, schoolId: session.schoolId, active: true, deletedAt: null, role: { in: ["ADMIN", "STAFF"] } },
+      select: { id: true, role: true, isCoordenacao: true, funcao: true },
     });
     if (!counterpart) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+    if (!podeConversar(await perfilDoUsuario(session.sub), perfilMensagens(counterpart))) {
+      return NextResponse.json({ error: MENSAGEM_BLOQUEIO }, { status: 403 });
+    }
 
     const [userAId, userBId] = ordenarDupla(session.sub, counterpartUserId);
 
