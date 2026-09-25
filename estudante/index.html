@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fokus Estudo — Assistente do Estudante</title>
+  <meta name="description" content="Assistente de estudos do Instituto Fokus: tira-dúvidas passo a passo, quiz, flashcards, modo foco e progresso. Funciona sem internet.">
+  <meta name="theme-color" content="#6b2a86">
+  <link rel="icon" href="assets/logo-instituto-fokus.png">
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+  <header class="topo">
+    <div class="topo-inner">
+      <a class="marca" href="#inicio" data-ir="inicio">
+        <img src="assets/logo-instituto-fokus.png" alt="" width="36" height="36">
+        <span>Fokus <strong>Estudo</strong></span>
+      </a>
+      <nav class="menu" aria-label="Seções">
+        <button data-ir="inicio" aria-current="page">Início</button>
+        <button data-ir="tutor">Tira-dúvidas</button>
+        <button data-ir="quiz">Quiz</button>
+        <button data-ir="cards">Flashcards</button>
+        <button data-ir="foco">Foco</button>
+        <button data-ir="progresso">Progresso</button>
+      </nav>
+      <div class="topo-acoes">
+        <span class="chip-xp" title="Pontos de experiência"><span aria-hidden="true">⚡</span> <b id="xp-topo">0</b> XP</span>
+        <button class="btn-icone" id="tema" aria-label="Alternar tema claro/escuro">🌓</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="conteudo">
+    <!-- INÍCIO -->
+    <section id="inicio" class="secao ativa" aria-labelledby="t-inicio">
+      <div class="hero">
+        <div class="hero-texto">
+          <p class="selo">Assistente de estudos · 6º ao 9º ano</p>
+          <h1 id="t-inicio">Entenda o <em>porquê</em>, não só a resposta.</h1>
+          <p class="lead">Digite uma conta ou uma dúvida e veja a explicação passo a passo. Depois, treine com quiz e flashcards e acompanhe sua evolução.</p>
+          <form class="hero-busca" id="hero-form">
+            <label class="sr" for="hero-input">Sua dúvida</label>
+            <input id="hero-input" type="text" placeholder="Ex.: 3x + 5 = 20  ou  O que é fotossíntese?" autocomplete="off">
+            <button class="btn btn-prim" type="submit">Perguntar</button>
+          </form>
+          <p class="hero-nota">Funciona sem internet. Seus dados ficam só neste computador.</p>
+        </div>
+        <div class="hero-demo" aria-hidden="true">
+          <div class="demo-balao eu">x² − 5x + 6 = 0</div>
+          <div class="demo-balao tutor">
+            <b>Equação do 2º grau</b>
+            <ol><li>a = 1, b = −5, c = 6</li><li>Δ = 25 − 24 = 1</li><li>x = (5 ± 1) ÷ 2</li></ol>
+            <span class="demo-resp">x₁ = 3 e x₂ = 2</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grade-recursos">
+        <button class="recurso" data-ir="tutor"><span class="ic">💬</span><h3>Tira-dúvidas</h3><p>Equações, frações, porcentagem, MMC, MDC e conceitos de todas as matérias.</p></button>
+        <button class="recurso" data-ir="quiz"><span class="ic">🎯</span><h3>Quiz</h3><p>Questões de 6 matérias com correção e explicação na hora.</p></button>
+        <button class="recurso" data-ir="cards"><span class="ic">🃏</span><h3>Flashcards</h3><p>Crie cartões e revise no momento certo para memorizar de verdade.</p></button>
+        <button class="recurso" data-ir="foco"><span class="ic">⏱️</span><h3>Modo foco</h3><p>Ciclos de estudo e pausa (Pomodoro) para render mais.</p></button>
+      </div>
+
+      <div class="como">
+        <h2>Como usar</h2>
+        <ol class="passos-como">
+          <li><b>Pergunte</b><span>Escreva a conta como no caderno: 2x + 3 = 11, 1/2 + 1/3, 20% de 150.</span></li>
+          <li><b>Entenda</b><span>Leia cada passo e tente refazer sozinho antes de olhar a resposta.</span></li>
+          <li><b>Pratique</b><span>Faça um quiz e transforme o que errou em flashcard.</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- TUTOR -->
+    <section id="tutor" class="secao" aria-labelledby="t-tutor" hidden>
+      <div class="cab-secao">
+        <h2 id="t-tutor">Tira-dúvidas</h2>
+        <button class="btn btn-sec btn-peq" id="limpar-chat">Limpar conversa</button>
+      </div>
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <div class="sugestoes" id="sugestoes"></div>
+      <form class="chat-form" id="chat-form">
+        <label class="sr" for="chat-input">Digite sua dúvida</label>
+        <input id="chat-input" type="text" placeholder="Digite uma conta ou dúvida…" autocomplete="off" maxlength="200">
+        <button class="btn btn-prim" type="submit">Enviar</button>
+      </form>
+      <div class="teclado" id="teclado" aria-label="Símbolos matemáticos"></div>
+    </section>
+
+    <!-- QUIZ -->
+    <section id="quiz" class="secao" aria-labelledby="t-quiz" hidden>
+      <div class="cab-secao"><h2 id="t-quiz">Quiz</h2></div>
+      <div id="quiz-area"></div>
+    </section>
+
+    <!-- FLASHCARDS -->
+    <section id="cards" class="secao" aria-labelledby="t-cards" hidden>
+      <div class="cab-secao">
+        <h2 id="t-cards">Flashcards</h2>
+        <span class="info" id="cards-info"></span>
+      </div>
+      <div id="cards-area"></div>
+      <details class="novo-card">
+        <summary>➕ Criar novo cartão</summary>
+        <form id="card-form">
+          <label>Matéria <select id="card-materia"></select></label>
+          <label>Frente (pergunta) <input id="card-frente" required maxlength="140"></label>
+          <label>Verso (resposta) <textarea id="card-verso" required maxlength="300" rows="2"></textarea></label>
+          <button class="btn btn-prim" type="submit">Salvar cartão</button>
+        </form>
+      </details>
+      <div id="cards-lista"></div>
+    </section>
+
+    <!-- FOCO -->
+    <section id="foco" class="secao" aria-labelledby="t-foco" hidden>
+      <div class="cab-secao"><h2 id="t-foco">Modo foco</h2></div>
+      <div class="foco-box">
+        <div class="foco-modos" role="group" aria-label="Tipo de ciclo">
+          <button data-modo="foco" class="ativo">Foco</button>
+          <button data-modo="pausa">Pausa curta</button>
+          <button data-modo="longa">Pausa longa</button>
+        </div>
+        <div class="relogio">
+          <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="trilho" cx="60" cy="60" r="54"/><circle class="arco" id="arco" cx="60" cy="60" r="54"/></svg>
+          <div class="tempo" id="tempo" role="timer" aria-live="off">25:00</div>
+        </div>
+        <div class="foco-botoes">
+          <button class="btn btn-prim" id="foco-iniciar">Iniciar</button>
+          <button class="btn btn-sec" id="foco-zerar">Reiniciar</button>
+        </div>
+        <label class="foco-cfg">Minutos de foco
+          <input type="number" id="foco-min" min="5" max="90" value="25">
+        </label>
+        <p class="info" id="foco-info"></p>
+      </div>
+    </section>
+
+    <!-- PROGRESSO -->
+    <section id="progresso" class="secao" aria-labelledby="t-prog" hidden>
+      <div class="cab-secao">
+        <h2 id="t-prog">Seu progresso</h2>
+        <button class="btn btn-sec btn-peq" id="zerar-tudo">Apagar meus dados</button>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <h3>Acertos no quiz por matéria</h3>
+      <div id="barras"></div>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <p>Fokus Estudo · Instituto Fokus · Ferramenta de apoio: confira sempre com seu professor.</p>
+  </footer>
+
+  <script src="js/tutor.js"></script>
+  <script src="js/dados.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
