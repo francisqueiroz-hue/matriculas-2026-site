@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
-import { getFirebaseAdminApp } from "@/lib/firebase-admin";
+import { erroFirebaseAdmin, getFirebaseAdminApp } from "@/lib/firebase-admin";
 import { getAccessTemplate, isWhatsAppConfigured } from "@/lib/whatsapp";
 import { consultarModelo, wabaId } from "@/lib/whatsapp-modelos";
 
@@ -31,6 +31,7 @@ export async function GET() {
           env("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
         chaveVapid: env("NEXT_PUBLIC_FIREBASE_VAPID_KEY"),
         servidor: getFirebaseAdminApp() !== null,
+        servidorErro: erroFirebaseAdmin(),
         dispositivosRegistrados: dispositivosPush,
       },
       whatsapp: {

@@ -85,6 +85,8 @@ export function payloadCriacao(tipo: TipoModelo) {
 // Cache curto por instância: o status muda raramente e cada envio consultaria a Meta.
 const cache = new Map<string, { status: StatusModelo; em: number }>();
 const CACHE_MS = 5 * 60 * 1000;
+// A Meta às vezes demora; sem limite, a rota ficaria presa até o timeout da Vercel.
+const TEMPO_LIMITE_MS = 8000;
 
 export function limparCacheModelos() {
   cache.clear();
@@ -101,7 +103,10 @@ export async function consultarModelo(tipo: TipoModelo): Promise<StatusModelo> {
 
   try {
     const url = `${base()}/${waba}/message_templates?name=${encodeURIComponent(nome)}&fields=name,status,language,rejected_reason`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.WHATSAPP_API_TOKEN}` } });
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${process.env.WHATSAPP_API_TOKEN}` },
+      signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error?.message ?? `HTTP ${res.status}`);
     const idioma = IDIOMA_MODELOS();
@@ -152,6 +157,7 @@ export async function cadastrarModelos(): Promise<StatusModelo[]> {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.WHATSAPP_API_TOKEN}`, "Content-Type": "application/json" },
       body: JSON.stringify(payloadCriacao(tipo)),
+      signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
     });
     const data = await res.json();
     if (!res.ok) {
