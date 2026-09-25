@@ -237,6 +237,20 @@ padronizado (login por telefone) e não pode repetir entre usuários. A equipe t
 o acesso mandando **ACESSO** para o WhatsApp da escola, e a tela **Acessos** tem a aba
 **Equipe** com quem ainda não entrou.
 
+## Quem conversa com quem (Mensagens)
+
+| Quem | Pode enviar e responder para |
+|---|---|
+| **Direção e coordenação** | todos: famílias e toda a equipe |
+| **Professores e auxiliares** | só a direção e a coordenação |
+| **Famílias** | só a direção e a coordenação (nunca professores) |
+
+A regra vale no servidor (`src/lib/permissoes-mensagens.ts`), inclusive para conversas
+antigas: uma conversa família ↔ professor ou professor ↔ professor criada antes fica
+oculta e não aceita novas mensagens. Resposta da família pelo WhatsApp ou e-mail cai na
+conversa dela com a gestão (a mais recente, ou uma nova com a direção). "Coordenação" é a
+função Coordenação do cadastro da equipe.
+
 ## Saída de alunos, famílias e equipe (excluir)
 
 - **Equipe → Excluir:** a pessoa perde o acesso **na hora** (a sessão aberta também cai),

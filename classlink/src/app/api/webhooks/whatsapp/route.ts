@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { avisarEquipePorWhatsApp } from "@/lib/avisos-equipe";
 import { prisma } from "@/lib/prisma";
+import { conversaDaFamiliaComGestao } from "@/lib/permissoes-mensagens";
 import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
 import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "@/lib/whatsapp";
@@ -62,24 +63,18 @@ interface WhatsAppWebhookPayload {
   }[];
 }
 
-/** Encontra a conversa de destino: pelo contexto de resposta direta, ou a mais recente do responsável, ou uma nova com a direção. */
+/**
+ * Conversa de destino: a da resposta direta (se for com a direção/coordenação), senão a
+ * mais recente da família com a gestão, senão uma nova com a direção — famílias só
+ * conversam com a gestão (lib/permissoes-mensagens).
+ */
 async function resolveConversationId(guardianId: string, schoolId: string, context?: { id: string }) {
+  let preferida: string | null = null;
   if (context?.id) {
     const original = await prisma.message.findUnique({ where: { externalId: context.id }, select: { conversationId: true } });
-    if (original) return original.conversationId;
+    preferida = original?.conversationId ?? null;
   }
-
-  const ultima = await prisma.conversation.findFirst({
-    where: { guardianId },
-    orderBy: { createdAt: "desc" },
-  });
-  if (ultima) return ultima.id;
-
-  const admin = await prisma.user.findFirst({ where: { schoolId, role: "ADMIN", deletedAt: null }, orderBy: { createdAt: "asc" } });
-  if (!admin) return null;
-
-  const nova = await prisma.conversation.create({ data: { staffId: admin.id, guardianId } });
-  return nova.id;
+  return conversaDaFamiliaComGestao(guardianId, schoolId, preferida);
 }
 
 export async function POST(request: NextRequest) {

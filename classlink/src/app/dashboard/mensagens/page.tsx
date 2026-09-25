@@ -25,6 +25,8 @@ interface Contact {
   id: string;
   name: string;
   role: string;
+  /** "Direção", "Coordenação", "Professor(a)", "Responsável". */
+  cargo?: string;
 }
 
 /** Item já normalizado para exibição na lista, seja ele uma conversa com responsável ou com colega de equipe. */
@@ -37,7 +39,14 @@ interface ConversaExibida {
   criadaEm: string;
 }
 
-const ROLE_LABEL: Record<string, string> = { GUARDIAN: "responsável", STAFF: "professor(a)", ADMIN: "direção" };
+const ROLE_LABEL: Record<string, string> = { GUARDIAN: "responsável", STAFF: "equipe", ADMIN: "direção" };
+
+/** Regra da escola, mostrada ao abrir "Nova conversa" (a mesma aplicada pelo servidor). */
+const REGRA_MENSAGENS: Record<string, string> = {
+  familia: "As mensagens da família são atendidas pela direção e pela coordenação.",
+  gestao: "Direção e coordenação conversam com as famílias e com toda a equipe.",
+  professor: "Professores e auxiliares conversam com a direção e a coordenação. Assuntos com as famílias passam pela coordenação.",
+};
 
 export default function MensagensPage() {
   const user = useCurrentUser();
@@ -47,6 +56,7 @@ export default function MensagensPage() {
   const [conversas, setConversas] = useState<ConversaExibida[] | null>(null);
   const [contatosResponsaveis, setContatosResponsaveis] = useState<Contact[]>([]);
   const [contatosEquipe, setContatosEquipe] = useState<Contact[]>([]);
+  const [perfil, setPerfil] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [starting, setStarting] = useState(false);
 
@@ -112,7 +122,10 @@ export default function MensagensPage() {
   async function openNew() {
     if (contatosResponsaveis.length === 0 && contatosEquipe.length === 0) {
       const pedidos: Promise<void>[] = [
-        apiJson<{ contacts: Contact[] }>("/api/messages/contacts").then((data) => setContatosResponsaveis(data.contacts)),
+        apiJson<{ contacts: Contact[]; perfil: string }>("/api/messages/contacts").then((data) => {
+          setContatosResponsaveis(data.contacts);
+          setPerfil(data.perfil);
+        }),
       ];
       if (podeFalarComEquipe) {
         pedidos.push(
@@ -137,7 +150,8 @@ export default function MensagensPage() {
 
       {showNew && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-          <p className="mb-2 text-sm font-medium">Com quem você quer falar?</p>
+          <p className="text-sm font-medium">Com quem você quer falar?</p>
+          {perfil && <p className="mb-2 text-xs text-slate-500">{REGRA_MENSAGENS[perfil]}</p>}
           {semContatos && <p className="text-sm text-slate-500">Nenhum contato disponível.</p>}
 
           {contatosEquipe.length > 0 && (
@@ -151,7 +165,7 @@ export default function MensagensPage() {
                       onClick={() => startConversation(c.id, "equipe")}
                       className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
-                      {c.name} <span className="text-xs text-slate-400">({ROLE_LABEL[c.role] ?? c.role})</span>
+                      {c.name} <span className="text-xs text-slate-400">({(c.cargo ?? ROLE_LABEL[c.role] ?? c.role).toLowerCase()})</span>
                     </button>
                   </li>
                 ))}
@@ -172,7 +186,7 @@ export default function MensagensPage() {
                       onClick={() => startConversation(c.id, "responsavel")}
                       className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
-                      {c.name} <span className="text-xs text-slate-400">({ROLE_LABEL[c.role] ?? c.role})</span>
+                      {c.name} <span className="text-xs text-slate-400">({(c.cargo ?? ROLE_LABEL[c.role] ?? c.role).toLowerCase()})</span>
                     </button>
                   </li>
                 ))}

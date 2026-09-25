@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { conversaDaFamiliaComGestao } from "@/lib/permissoes-mensagens";
 import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
 import { parseConversationIdFromRecipient, verifyMailgunSignature } from "@/lib/email";
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
-      include: { guardian: { select: { id: true, name: true, email: true } } },
+      include: { guardian: { select: { id: true, name: true, email: true, schoolId: true } } },
     });
     if (!conversation) return NextResponse.json({ ok: true });
 
@@ -55,8 +56,12 @@ export async function POST(request: NextRequest) {
     const corpo = (field(form, "stripped-text") || field(form, "body-plain")).trim();
     if (!corpo) return NextResponse.json({ ok: true });
 
+    // Famílias só conversam com a direção/coordenação: resposta a uma conversa antiga com
+    // professor vai para a conversa da família com a gestão.
+    const destino = (await conversaDaFamiliaComGestao(conversation.guardian.id, conversation.guardian.schoolId, conversationId)) ?? conversationId;
+
     await prisma.message.create({
-      data: { conversationId, senderId: conversation.guardian.id, body: corpo, channel: "EMAIL", externalId },
+      data: { conversationId: destino, senderId: conversation.guardian.id, body: corpo, channel: "EMAIL", externalId },
     });
 
     // after: na Vercel, trabalho solto com "void" pode ser cortado ao responder.
