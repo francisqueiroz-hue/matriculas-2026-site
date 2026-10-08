@@ -20,10 +20,10 @@
 - Aprendizado: sugerido automaticamente, publicado só após aprovação humana; nenhum dado pessoal na base compartilhada.
 - Provedor padrão Workers AI (R$0); Gemini free tier proibido; Claude opcional com modelo `claude-haiku-5-5`, escolhido só por variável de ambiente.
 - Workers Free: CPU de 10 ms por requisição, webhook responde 200 imediatamente e processa em `ctx.waitUntil`.
-- **Equipe atende só pelo celular:** o painel é um PWA mobile-first (instalável, toque grande, sem rolagem horizontal, 16px de margem); o humano lê a conversa inteira e responde pelo número público, e a família vê tudo na mesma conversa do WhatsApp.
-- Quando um humano responde ou clica em "Assumir", a Lia fica **pausada naquela conversa** por 12 horas (`conversas.humano_ate`); só guarda as mensagens e notifica a equipe. "Devolver à Lia" encerra a pausa.
+- **Atendimento humano pelo aplicativo:** a equipe usa **um único celular da escola** com o app WhatsApp Business no número público, em modo de **coexistência** (app + Cloud API). A família vê a conversa única. Quando a equipe responde pelo app, a Meta envia o evento `smb_message_echoes`; a Lia registra a mensagem como `humano` e **pausa naquela conversa por 12 horas** (`conversas.humano_ate`). Nomes de campos e requisitos da coexistência devem ser confirmados na documentação oficial da Meta antes de implementar.
+- **Painel só do dono (1 pessoa)**, responsivo para computador e celular, protegido por **Cloudflare Access** (login por e-mail/Google, gratuito) com validação do JWT `Cf-Access-Jwt-Assertion` no Worker; sem sistema próprio de senhas. Serve para aprovar a base, acompanhar chamados, custos e conversas, pausar/retomar a Lia por conversa e **desligar a Lia inteira** (chave geral).
 - Histórico de mensagens guardado por 90 dias e depois apagado (cron), para atendimento e LGPD.
-- Notificação à equipe: Web Push (gratuito) é o canal principal; aviso por WhatsApp (número interno, modelo aprovado) só para prioridade `urgente`, porque modelo fora da janela de 24h é cobrado.
+- Notificação ao dono: Web Push no celular e no computador (gratuito); aviso por WhatsApp ao celular da escola (número interno, modelo aprovado) só para prioridade `urgente`, porque modelo fora da janela de 24h é cobrado.
 - Segredos só em variáveis do Worker; assinatura `X-Hub-Signature-256` obrigatória.
 - Verificar antes do go-live: preço oficial de mensagens de serviço na Meta, limites do D1 e do Workers AI, spec atual do transporte MCP.
 
@@ -34,7 +34,7 @@
 3. Rajada de mensagens seguidas da mesma pessoa: uma resposta consolidada, não várias.
 4. Pergunta sem nenhum trecho na base: escala em vez de responder de memória do modelo.
 5. Pedido "ACESSO"/"SENHA" no número público: não é tratado como conversa comum (orienta usar o canal de acesso) e jamais envia senha.
-6. Humano responde enquanto a família ainda está falando com a Lia: a Lia para na hora e não duplica a resposta (Task 10A, 13).
+6. A equipe responde pelo app enquanto a família ainda fala com a Lia: o eco pausa a Lia e ela não duplica a resposta; eco de mensagem da própria Lia não pausa (Task 10A, 13).
 
 ---
 
@@ -59,14 +59,15 @@ agente-whatsapp/
     limites.ts            contadores mensais e diários
     whatsapp.ts           enviarTexto (Cloud API)
     fila.ts               chamados, rascunhos, sugestões
-    conversa.ts           histórico, pausa da Lia (humano_ate), retenção de 90 dias
-    push.ts               Web Push para a equipe (VAPID) e aviso urgente por WhatsApp
+    conversa.ts           histórico, pausa da Lia por eco do app (humano_ate), chave geral, retenção de 90 dias
+    push.ts               Web Push ao dono (VAPID) e aviso urgente por WhatsApp
+    acesso.ts             valida o JWT do Cloudflare Access (painel)
     ferramentas.ts        ferramentas do agente + registro MCP
     mcp.ts                JSON-RPC mínimo (initialize, tools/list, tools/call)
     agente.ts             prompt mínimo, laço de ferramentas, guarda de saída
     aprendizado.ts        cron: agrupa perguntas e sugere itens
     fluxo.ts              orquestra um turno completo
-  painel/                 PWA da Fila da Lia: index.html manifest.json sw.js (celular primeiro)
+  painel/                 painel do dono (computador e celular): index.html manifest.json sw.js
   scripts/semear-base.ts  conhecimento/*.md -> D1
   scripts/definir-webhook.sh
   test/                   um arquivo por módulo + e2e.test.ts
@@ -83,7 +84,7 @@ agente-whatsapp/
 
 **Interfaces:**
 - Produces: `interface Db { all<T>(sql: string, p?: unknown[]): Promise<T[]>; first<T>(sql: string, p?: unknown[]): Promise<T | null>; run(sql: string, p?: unknown[]): Promise<void> }`; `d1Db(d: D1Database): Db`; `sqliteDb(): Db` (só testes, `better-sqlite3` em memória aplicando `migrations/*.sql`); `interface Env` com `DB`, `AI`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_API_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `MCP_TOKEN`, `PROVEDOR` (`"workers-ai"|"claude"`), `MODELO`, `ANTHROPIC_API_KEY?`, `LIMITE_MENSAGENS_MES` (default `900`).
-- Tabelas em `0001_init.sql`: `processadas(wamid PK, em)`, `contatos(telefone PK, tipo, nome, ultima_msg_em)`, `fatos(id, telefone, texto, criado_em, usado_em)`, `base(id, pergunta, resposta, aprovado INT)`, `base_fts` (FTS5 sobre pergunta+resposta), `visitas_horarios(id, data, turno, vagas)`, `visitas(id, telefone, horario_id, serie, criado_em)`, `chamados(id, telefone, categoria, prioridade, resumo, rascunho, status, criado_em)`, `sugestoes(id, pergunta, resposta, frequencia, status)`, `uso(chave PK, valor)`, `mensagens(id, telefone, direcao "entrada"|"lia"|"humano", texto, wamid, ts)`, `conversas(telefone PK, humano_ate, ultima_msg_em)`, `assinaturas_push(id, endpoint UNIQUE, chaves, criado_em)`.
+- Tabelas em `0001_init.sql`: `processadas(wamid PK, em)`, `contatos(telefone PK, tipo, nome, ultima_msg_em)`, `fatos(id, telefone, texto, criado_em, usado_em)`, `base(id, pergunta, resposta, aprovado INT)`, `base_fts` (FTS5 sobre pergunta+resposta), `visitas_horarios(id, data, turno, vagas)`, `visitas(id, telefone, horario_id, serie, criado_em)`, `chamados(id, telefone, categoria, prioridade, resumo, rascunho, status, criado_em)`, `sugestoes(id, pergunta, resposta, frequencia, status)`, `uso(chave PK, valor)`, `mensagens(id, telefone, direcao "entrada"|"lia"|"humano", texto, wamid, ts)`, `conversas(telefone PK, humano_ate, ultima_msg_em)`, `assinaturas_push(id, endpoint UNIQUE, chaves, criado_em)`, `config(chave PK, valor)` (inclui `lia_ligada`, padrão `1`).
 
 - [ ] **Step 1:** Escrever `db.test.ts`: `sqliteDb()` aplica a migração; `run` insere em `base` e `first` devolve a linha; `base_fts` casa a palavra "matrícula" inserida em `base`.
 - [ ] **Step 2:** Rodar `npm test -- db` e confirmar FAIL (módulo inexistente).
@@ -107,9 +108,9 @@ agente-whatsapp/
 
 **Interfaces:**
 - Consumes: `Db`, `Env`.
-- Produces: `verificarAssinatura(corpo: string, cabecalho: string | null, segredo: string): Promise<boolean>` (HMAC-SHA256 via Web Crypto, comparação em tempo constante); `extrairMensagens(payload: unknown, phoneNumberId: string): MensagemEntrada[]` onde `MensagemEntrada = { wamid: string; de: string; tipo: string; texto: string; ts: number }` (texto vem de `text`, `button` ou `interactive`; outros tipos têm `texto = ""`); `marcarProcessada(db: Db, wamid: string): Promise<boolean>` (true só na primeira vez); `verificarDesafio(params: URLSearchParams, token: string): string | null`.
+- Produces: `verificarAssinatura(corpo: string, cabecalho: string | null, segredo: string): Promise<boolean>` (HMAC-SHA256 via Web Crypto, comparação em tempo constante); `extrairMensagens(payload: unknown, phoneNumberId: string): MensagemEntrada[]` onde `MensagemEntrada = { wamid: string; de: string; tipo: string; texto: string; ts: number }` (texto vem de `text`, `button` ou `interactive`; outros tipos têm `texto = ""`); `marcarProcessada(db: Db, wamid: string): Promise<boolean>` (true só na primeira vez); `verificarDesafio(params: URLSearchParams, token: string): string | null`; `extrairEcos(payload: unknown, phoneNumberId: string): { para: string; wamid: string; texto: string; ts: number }[]` (lê as mudanças do campo `smb_message_echoes`, enviadas pelo app; confirmar nome e formato na documentação oficial).
 
-- [ ] **Step 1:** Testes: assinatura válida passa e adulterada falha; payload com `metadata.phone_number_id` diferente devolve `[]`; mensagem de tipo `audio` volta com `tipo: "audio"` e `texto: ""`; `marcarProcessada` devolve `true` e depois `false` para o mesmo `wamid`, inclusive em duas chamadas concorrentes (`INSERT ... ON CONFLICT DO NOTHING` decide); `verificarDesafio` devolve o `hub.challenge` só com o token certo.
+- [ ] **Step 1:** Testes: um payload `smb_message_echoes` vira um eco com o telefone da família em `para`; eco de outro `phone_number_id` é ignorado; assinatura válida passa e adulterada falha; payload com `metadata.phone_number_id` diferente devolve `[]`; mensagem de tipo `audio` volta com `tipo: "audio"` e `texto: ""`; `marcarProcessada` devolve `true` e depois `false` para o mesmo `wamid`, inclusive em duas chamadas concorrentes (`INSERT ... ON CONFLICT DO NOTHING` decide); `verificarDesafio` devolve o `hub.challenge` só com o token certo.
 - [ ] **Step 2:** Rodar e ver FAIL; **Step 3:** implementar; **Step 4:** rodar e ver PASS.
 - [ ] **Step 5:** Commit `feat(lia): webhook com assinatura, filtro de número e deduplicação`.
 
@@ -188,17 +189,17 @@ agente-whatsapp/
 - [ ] **Step 2:** Rodar e ver FAIL; **Step 3:** implementar; **Step 4:** rodar e ver PASS.
 - [ ] **Step 5:** Commit `feat(lia): envio WhatsApp e Fila de atendimento`.
 
-### Task 10A: Conversas, assunção humana e notificação
+### Task 10A: Conversas, pausa por resposta humana e notificação ao dono
 
 **Files:** Create `src/conversa.ts`, `src/push.ts`; Test `test/conversa.test.ts`, `test/push.test.ts`
 
 **Interfaces:**
-- Produces: `registrarMensagem(db: Db, m: { telefone: string; direcao: "entrada" | "lia" | "humano"; texto: string; wamid?: string }): Promise<void>`; `historico(db: Db, telefone: string, limite = 50): Promise<Mensagem[]>`; `listarConversas(db: Db): Promise<{ telefone: string; ultima: string; ts: number; humano: boolean; chamadosAbertos: number }[]>`; `assumir(db: Db, telefone: string, horas = 12, agora?: Date): Promise<void>`; `devolver(db: Db, telefone: string): Promise<void>`; `liaPausada(db: Db, telefone: string, agora?: Date): Promise<boolean>`; `responderComoHumano(env: Env, db: Db, telefone: string, texto: string): Promise<{ wamid: string }>` (envia pelo número público, registra como `humano` e chama `assumir`); `apagarAntigas(db: Db, dias = 90, agora?: Date): Promise<number>`.
-- `notificarEquipe(env: Env, db: Db, n: { titulo: string; corpo: string; url: string; prioridade: string }): Promise<void>` (Web Push com VAPID para todas as `assinaturas_push`, removendo assinaturas expiradas; se `prioridade === "urgente"` e `env.TEMPLATE_AVISO_EQUIPE` existir, também envia o modelo aprovado pelo número interno); `salvarAssinatura(db: Db, sub: PushSubscriptionJSON): Promise<void>`.
+- Produces: `registrarMensagem(db: Db, m: { telefone: string; direcao: "entrada" | "lia" | "humano"; texto: string; wamid?: string }): Promise<void>`; `historico(db: Db, telefone: string, limite = 50): Promise<Mensagem[]>`; `listarConversas(db: Db): Promise<{ telefone: string; ultima: string; ts: number; humano: boolean; chamadosAbertos: number }[]>`; `registrarEco(db: Db, eco: { para: string; wamid: string; texto: string; ts: number }, horas = 12): Promise<void>` (grava como `humano`, ignora ecos de mensagens que a própria Lia enviou — comparando `wamid` — e pausa a Lia); `assumir(db: Db, telefone: string, horas = 12, agora?: Date): Promise<void>`; `devolver(db: Db, telefone: string): Promise<void>`; `liaPausada(db: Db, telefone: string, agora?: Date): Promise<boolean>`; `liaLigada(db: Db): Promise<boolean>`; `definirLiaLigada(db: Db, ligada: boolean): Promise<void>`; `apagarAntigas(db: Db, dias = 90, agora?: Date): Promise<number>`.
+- `notificarDono(env: Env, db: Db, n: { titulo: string; corpo: string; url: string; prioridade: string }): Promise<void>` (Web Push com VAPID para todas as `assinaturas_push`, removendo as expiradas; se `prioridade === "urgente"` e `env.TEMPLATE_AVISO_EQUIPE` existir, também envia o modelo aprovado ao celular da escola pelo número interno); `salvarAssinatura(db: Db, sub: PushSubscriptionJSON): Promise<void>`.
 
-- [ ] **Step 1:** Testes: `responderComoHumano` envia, grava `humano` e `liaPausada` passa a `true`; após 12h volta `false`; `devolver` encerra a pausa; `apagarAntigas` remove só mensagens com mais de 90 dias; `notificarEquipe` envia 1 push por assinatura, remove a que respondeu 410 e **não** envia modelo de WhatsApp para prioridade `normal`.
+- [ ] **Step 1:** Testes: um eco do app grava `humano` e `liaPausada` passa a `true`; após 12h volta `false`; eco com `wamid` de mensagem enviada pela Lia **não** pausa; `devolver` encerra a pausa; `definirLiaLigada(false)` faz `liaLigada` devolver `false`; `apagarAntigas` remove só o que tem mais de 90 dias; `notificarDono` envia 1 push por assinatura, remove a que respondeu 410 e **não** envia modelo de WhatsApp para prioridade `normal`.
 - [ ] **Step 2:** Rodar e ver FAIL; **Step 3:** implementar (Web Push com VAPID; confirmar na documentação atual a biblioteca compatível com Workers); **Step 4:** rodar e ver PASS.
-- [ ] **Step 5:** Commit `feat(lia): conversas, assunção humana e notificações da equipe`.
+- [ ] **Step 5:** Commit `feat(lia): conversas, pausa por resposta humana e avisos ao dono`.
 
 ### Task 11: Ferramentas e servidor MCP
 
@@ -232,9 +233,9 @@ agente-whatsapp/
 **Interfaces:**
 - Consumes: todas as anteriores.
 - Produces: `processarTurno(env: Env, db: Db, msgs: MensagemEntrada[], deps?: { provedor?: Provedor; fetch?: typeof fetch }): Promise<void>`; `export default { fetch, scheduled }`.
-- Ordem do turno (por telefone, agrupando mensagens do mesmo lote): deduplicar → ignorar equipe/interno → `registrarMensagem(entrada)` → se `liaPausada`: apenas `notificarEquipe` ("Maria respondeu…") e encerrar → tipo não-texto: pedir texto → pedido de acesso: orientar o canal oficial, sem senha → `triar` → `acolher` (envia acolhimento, abre chamado com resumo e rascunho) ou `responder` → `podeEnviar` (se falso, abre chamado em vez de enviar) → `enviarTexto` → `registrarMensagem(lia)` → `registrarEnvio`; no `acolher`, também `notificarEquipe` com o link do chamado. `fetch` responde 200 imediatamente e usa `ctx.waitUntil(processarTurno(...))`.
+- Ordem do turno (por telefone, agrupando mensagens do mesmo lote): deduplicar → ignorar equipe/interno → se `!liaLigada`: só registrar e encerrar → `registrarMensagem(entrada)` → se `liaPausada`: apenas registrar e encerrar (a equipe está atendendo pelo app) → tipo não-texto: pedir texto → pedido de acesso: orientar o canal oficial, sem senha → `triar` → `acolher` (envia acolhimento, abre chamado com resumo e rascunho) ou `responder` → `podeEnviar` (se falso, abre chamado em vez de enviar) → `enviarTexto` → `registrarMensagem(lia)` → `registrarEnvio`; no `acolher`, também `notificarDono` com o link do chamado. Eventos `smb_message_echoes` passam por `registrarEco` antes de qualquer outra lógica. `fetch` responde 200 imediatamente e usa `ctx.waitUntil(processarTurno(...))`.
 
-- [ ] **Step 1:** Testes e2e com webhook assinado simulado e fetch simulado: família escreve após um humano ter assumido = Lia não responde e a equipe é notificada; pergunta trivial gera exatamente 1 chamada de envio; "estou com a mensalidade atrasada" gera só o acolhimento + 1 chamado e **nenhuma** resposta de conteúdo; áudio gera pedido de texto; "ACESSO" não gera senha; limite mensal esgotado não envia e abre chamado; mensagem de outro `phone_number_id` não gera nada; reentrega do mesmo `wamid` não responde duas vezes.
+- [ ] **Step 1:** Testes e2e com webhook assinado simulado e fetch simulado: a equipe responde pelo app (eco) e a família escreve depois = Lia não responde; chave geral desligada = Lia não responde a ninguém; pergunta trivial gera exatamente 1 chamada de envio; "estou com a mensalidade atrasada" gera só o acolhimento + 1 chamado e **nenhuma** resposta de conteúdo; áudio gera pedido de texto; "ACESSO" não gera senha; limite mensal esgotado não envia e abre chamado; mensagem de outro `phone_number_id` não gera nada; reentrega do mesmo `wamid` não responde duas vezes.
 - [ ] **Step 2:** Rodar e ver FAIL; **Step 3:** implementar; **Step 4:** rodar `npm test` completo e `npx tsc --noEmit`; esperado: PASS.
 - [ ] **Step 5:** Commit `feat(lia): fluxo completo do turno e entrada do Worker`.
 
@@ -248,16 +249,16 @@ agente-whatsapp/
 - [ ] **Step 2:** Rodar e ver FAIL; **Step 3:** implementar e ligar em `scheduled`; **Step 4:** rodar e ver PASS.
 - [ ] **Step 5:** Commit `feat(lia): sugestões de base geradas à noite`.
 
-### Task 15: Painel "Fila da Lia" para celular (PWA)
+### Task 15: Painel do dono (computador e celular)
 
-**Files:** Create `painel/index.html`, `painel/manifest.json`, `painel/sw.js`; rotas `/painel/api/*` em `src/index.ts`; Test `test/painel.test.ts`
+**Files:** Create `src/acesso.ts`, `painel/index.html`, `painel/manifest.json`, `painel/sw.js`; rotas `/painel/api/*` em `src/index.ts`; Test `test/acesso.test.ts`, `test/painel.test.ts`
 
-**Interfaces:** API autenticada por login simples da equipe (código de acesso por pessoa guardado em variável do Worker, cookie `HttpOnly`/`Secure`; Cloudflare Access opcional): `GET /painel/api/conversas`, `GET /painel/api/conversas/:telefone` (histórico + chamados + rascunho), `POST /painel/api/conversas/:telefone/responder` (usa `responderComoHumano`), `POST .../assumir`, `POST .../devolver`, `POST /painel/api/chamados/:id/resolver`, `GET /painel/api/sugestoes`, `POST /painel/api/sugestoes/:id/decidir`, `POST /painel/api/push` (salva assinatura).
-Tela pensada para o polegar: lista de conversas com bolinha de chamado aberto e selo "Lia"/"Humano"; conversa em formato de WhatsApp, caixa de resposta fixa embaixo, rascunho da Lia pré-preenchido e editável, botões grandes "Enviar", "Assumir", "Devolver à Lia"; aba de sugestões com Aprovar/Editar/Rejeitar; estados vazio, carregando e erro; instalável na tela inicial; o toque na notificação abre direto a conversa (`url` do push).
+**Interfaces:** `validarAcesso(req: Request, env: Env): Promise<{ email: string } | null>` (valida a assinatura, o `aud` e a expiração do JWT em `Cf-Access-Jwt-Assertion` com as chaves públicas do time; só aceita o e-mail em `env.DONO_EMAIL`); rotas, todas exigindo `validarAcesso`: `GET /painel/api/resumo` (mensagens do mês vs limite, tokens do dia, chamados abertos, estado da Lia), `GET /painel/api/conversas`, `GET /painel/api/conversas/:telefone`, `POST .../assumir`, `POST .../devolver`, `POST /painel/api/lia` (`{ ligada: boolean }`), `GET /painel/api/chamados`, `POST /painel/api/chamados/:id/resolver`, `GET /painel/api/sugestoes`, `POST /painel/api/sugestoes/:id/decidir`, `GET/POST /painel/api/base`, `POST /painel/api/push`.
+Página única responsiva (computador e celular, margem de 16 px, sem rolagem horizontal), em português: resumo com custos e chave "Lia ligada", conversas em formato de WhatsApp (somente leitura; a resposta humana é feita no app), chamados com o rascunho da Lia para copiar, sugestões com Aprovar/Editar/Rejeitar, edição da base; estados vazio, carregando e erro; instalável na tela inicial.
 
-- [ ] **Step 1:** Testes das rotas: sem login = 401; responder envia pelo número público e pausa a Lia; devolver reativa; decidir sugestão aprova/rejeita; telefone de outra conversa não vaza no histórico.
-- [ ] **Step 2:** Rodar e ver FAIL; **Step 3:** implementar rotas e PWA; **Step 4:** rodar e ver PASS; testar a página em tela de celular (viewport 390 px) com o simulador, incluindo envio de resposta e recebimento de push.
-- [ ] **Step 5:** Commit `feat(lia): painel mobile para a equipe responder`.
+- [ ] **Step 1:** Testes: sem JWT, com JWT adulterado, expirado, de outro `aud` ou de outro e-mail = 401/403; com JWT válido o resumo retorna; desligar a Lia muda `liaLigada`; decidir sugestão aprova/rejeita; telefone de outra conversa não vaza no histórico.
+- [ ] **Step 2:** Rodar e ver FAIL; **Step 3:** implementar; **Step 4:** rodar e ver PASS; abrir a página em viewport de 390 px e de 1280 px com o simulador, conferindo estados vazio e erro.
+- [ ] **Step 5:** Commit `feat(lia): painel do dono protegido por Cloudflare Access`.
 
 ### Task 16: Skill do projeto com o skill-creator
 
@@ -274,11 +275,11 @@ Tela pensada para o polegar: lista de conversas com bolinha de chamado aberto e 
 
 **Files:** Create `scripts/definir-webhook.sh`, `agente-whatsapp/README.md` (runbook em português); Modify nada em `classlink/`
 
-**Interfaces:** `definir-webhook.sh <PHONE_NUMBER_ID> <URL> <VERIFY_TOKEN>` faz `POST` em `/<PHONE_NUMBER_ID>` com `webhook_configuration.override_callback_uri` (apenas o número público); `README` lista: criar D1, `wrangler secret put`, `npm run semear`, Cloudflare Access no painel, conferir preços oficiais da Meta e limites do D1/Workers AI, revisar LGPD com `legal:compliance-check`.
+**Interfaces:** `definir-webhook.sh <PHONE_NUMBER_ID> <URL> <VERIFY_TOKEN>` faz `POST` em `/<PHONE_NUMBER_ID>` com `webhook_configuration.override_callback_uri` (apenas o número público); o `README` inclui o **passo de coexistência**: o número público precisa operar com app + Cloud API juntos (onboarding pelo Embedded Signup de coexistência; app WhatsApp Business atualizado e aberto ao menos a cada 13 dias; confirmar requisitos e se o número, hoje já na Cloud API, precisa ser reintegrado) e a assinatura do campo `smb_message_echoes` no aplicativo da Meta. **Plano B se a coexistência não for possível:** a equipe responde pelo painel no celular da escola (acrescentar `POST /painel/api/conversas/:telefone/responder` usando `enviarTexto` + `assumir`), com um segundo acesso no Cloudflare Access; `README` lista: criar D1, `wrangler secret put`, `npm run semear`, Cloudflare Access no painel, conferir preços oficiais da Meta e limites do D1/Workers AI, revisar LGPD com `legal:compliance-check`.
 
 - [ ] **Step 1:** Rodar `npm test` e `npx tsc --noEmit` na pasta inteira; esperado: tudo PASS.
 - [ ] **Step 2:** Subir com `wrangler dev` e disparar o simulador (`test/e2e` com payloads reais anonimizados): confirmar que "mensalidade atrasada" nunca recebe resposta de conteúdo e que 20 perguntas triviais recebem 20 respostas ancoradas.
-- [ ] **Step 3:** Deploy em staging (outro número de teste, se houver) antes de apontar o override do número público; só então rodar `definir-webhook.sh`. Confirmar com o responsável antes do go-live.
+- [ ] **Step 3:** Deploy em staging (outro número de teste, se houver) antes de apontar o override do número público; só então rodar `definir-webhook.sh`. Testar a coexistência no número de staging: uma resposta digitada no app deve gerar o eco e pausar a Lia. Confirmar com o responsável antes do go-live.
 - [ ] **Step 4:** Commit `docs(lia): runbook de implantação`.
 
 ---

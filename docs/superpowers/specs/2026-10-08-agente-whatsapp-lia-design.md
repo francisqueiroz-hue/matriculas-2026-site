@@ -95,9 +95,12 @@ A tabela de envio do ClassLink (convites, senhas e avisos pelo número interno) 
 - Estilo: retoma o contexto, não repete cumprimento nem refaz pergunta já respondida, mensagens curtas, português do Brasil informal e acolhedor.
 - Isolamento: nenhum dado de uma família entra no contexto de outra; fatos pessoais nunca vão para a base compartilhada.
 
-## 6A. Atendimento humano pelo celular (informado em 2026-10-08)
+## 6A. Quem atende e quem administra (informado em 2026-10-08)
 
-A equipe **não usa computador**. Portanto: (1) o painel é um PWA mobile-first, instalável, com conversa em formato de WhatsApp, caixa de resposta fixa e rascunho da Lia pré-preenchido; (2) o humano responde pelo **número público**, então a família vê tudo na mesma conversa; (3) quando um humano responde ou clica em "Assumir", a Lia **pausa naquela conversa por 12 horas** e só guarda e notifica; "Devolver à Lia" a reativa; (4) a equipe é avisada por Web Push (gratuito); aviso por WhatsApp (modelo aprovado, número interno) só para prioridade urgente, porque modelo fora da janela de 24h é cobrado; (5) histórico guardado por 90 dias e então apagado. Alternativa avaliada e não adotada por ora: coexistência com o app WhatsApp Business (a equipe responderia direto no app), que depende de re-onboarding do número e de requisitos ainda não confirmados na documentação oficial da Meta.
+- **Equipe:** um único celular da escola, respondendo **direto pelo aplicativo WhatsApp Business** no número público. Isso exige o modo de **coexistência** (app + Cloud API no mesmo número). Quando a equipe responde, a Meta avisa o Worker (evento `smb_message_echoes`) e a Lia **pausa naquela conversa por 12 horas**. Requisitos (app atualizado, abrir o app ao menos a cada 13 dias, onboarding por fluxo próprio de coexistência, necessidade de reintegrar um número que já esteja na Cloud API) vêm de fontes de terceiros e **precisam ser confirmados na documentação oficial da Meta**. Plano B: resposta pelo painel.
+- **Dono (1 pessoa):** painel responsivo para computador e celular, protegido por **Cloudflare Access** (login por e-mail/Google) com validação do JWT no Worker. Aprova a base, acompanha chamados, custos e conversas, pausa/retoma a Lia por conversa e tem uma **chave geral para desligar a Lia**.
+- Avisos ao dono: Web Push (gratuito); aviso por WhatsApp ao celular da escola só em casos urgentes (modelo fora da janela de 24h é cobrado).
+- Histórico guardado por 90 dias e depois apagado.
 
 ## 7. Aprendizado supervisionado
 
