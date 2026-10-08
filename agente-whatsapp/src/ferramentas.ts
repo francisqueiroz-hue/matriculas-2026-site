@@ -45,7 +45,12 @@ export function criarFerramentas(db: Db, telefone: string) {
     },
     reservar_visita: {
       def: { nome: "reservar_visita", descricao: "Reserva uma visita. Confirme série e período com a família antes.", parametros: objeto({ horario_id: { type: "integer" }, serie: texto }, ["horario_id", "serie"]) },
-      executar: async (a) => reservar(db, telefone, Number(a.horario_id), str(a.serie)),
+      executar: async (a) => {
+        const r = await reservar(db, telefone, Number(a.horario_id), str(a.serie));
+        if (!r.ok) return r;
+        const h = await db.first<{ data: string; turno: string }>("SELECT data, turno FROM visitas_horarios WHERE id = ?", [Number(a.horario_id)]);
+        return { ...r, ...h };
+      },
     },
     encaminhar_humano: {
       def: { nome: "encaminhar_humano", descricao: "Abre um chamado para a equipe quando faltar informação ou o assunto exigir uma pessoa.", parametros: objeto({ motivo: texto, resumo: texto, prioridade: { type: "string", enum: ["normal", "alta", "urgente"] } }, ["motivo", "resumo"]) },

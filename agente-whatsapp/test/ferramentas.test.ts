@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sqliteDb } from "./sqlite-db";
-import { adicionar } from "../src/conhecimento";
-import { criarFerramentas, criarFerramentasAdmin } from "../src/ferramentas";
+
+import { criarFerramentas } from "../src/ferramentas";
 import { tratarMcp } from "../src/mcp";
 import type { Env } from "../src/tipos";
 
@@ -65,5 +65,3 @@ describe("MCP", () => {
     expect(r.result.capabilities.tools).toBeDefined();
   });
 });
-void adicionar;
-void criarFerramentasAdmin;
