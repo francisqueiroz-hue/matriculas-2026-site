@@ -14,7 +14,7 @@ const PALAVRAS_COMUNS = new Set([
 ]);
 
 /** Termos de busca seguros para FTS5: sem operadores, com prefixo e plural simplificado. */
-function termos(consulta: string): string[] {
+export function termos(consulta: string): string[] {
   const palavras = normalizar(consulta).match(/[a-z0-9]{2,}/g) ?? [];
   const unicos = new Set<string>();
   for (const p of palavras) {

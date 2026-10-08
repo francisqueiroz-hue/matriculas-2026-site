@@ -1,6 +1,8 @@
 import { d1Db, type Db } from "./db";
 import { processarEcos, processarTurno, type Deps } from "./fluxo";
 import { apagarAntigas } from "./conversa";
+import { gerarSugestoes } from "./aprendizado";
+import { escolherProvedor } from "./provedor";
 import { tratarMcp } from "./mcp";
 import type { Env } from "./tipos";
 import { extrairEcos, extrairMensagens, verificarAssinatura, verificarDesafio } from "./webhook";
@@ -46,7 +48,10 @@ export function criarApp(opcoes: OpcoesApp = {}) {
     },
     async scheduled(_evento: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
       const db = obterDb(env);
-      ctx.waitUntil(apagarAntigas(db).then(() => undefined));
+      ctx.waitUntil((async () => {
+        await apagarAntigas(db);
+        await gerarSugestoes(db, opcoes.provedor ?? escolherProvedor(env), new Date(Date.now() - 7 * 24 * 3600_000));
+      })().catch((e) => console.error("cron falhou", (e as Error).message)));
     },
   };
 }
