@@ -21,6 +21,8 @@ export interface Env {
   WHATSAPP_INTERNO_PHONE_NUMBER_ID?: string;
   WHATSAPP_INTERNO_API_TOKEN?: string;
   TELEFONE_ESCOLA?: string;
+  TELEFONES_IGNORADOS?: string;
+  TELEFONE_CLASSLINK?: string;
 }
 
 export interface MensagemEntrada {

@@ -13,11 +13,12 @@ export interface Mensagem {
 }
 const HORA = 3600_000;
 
-export async function registrarMensagem(db: Db, m: { telefone: string; direcao: Direcao; texto: string; wamid?: string; ts?: number }): Promise<void> {
+export async function registrarMensagem(db: Db, m: { telefone: string; direcao: Direcao; texto: string; wamid?: string; ts?: number }): Promise<number> {
   const tel = chaveTelefone(m.telefone);
   const ts = m.ts ?? Date.now();
-  await db.run("INSERT INTO mensagens (telefone, direcao, texto, wamid, ts) VALUES (?, ?, ?, ?, ?)", [tel, m.direcao, m.texto, m.wamid ?? null, ts]);
+  const r = await db.run("INSERT INTO mensagens (telefone, direcao, texto, wamid, ts) VALUES (?, ?, ?, ?, ?)", [tel, m.direcao, m.texto, m.wamid ?? null, ts]);
   await db.run("INSERT INTO conversas (telefone, ultima_msg_em) VALUES (?, ?) ON CONFLICT(telefone) DO UPDATE SET ultima_msg_em = MAX(ultima_msg_em, excluded.ultima_msg_em)", [tel, ts]);
+  return r.lastId;
 }
 
 export function historico(db: Db, telefone: string, limite = 50): Promise<Mensagem[]> {
