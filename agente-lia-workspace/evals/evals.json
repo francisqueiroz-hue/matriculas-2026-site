@@ -1,0 +1,8 @@
+{
+  "skill_name": "agente-lia",
+  "evals": [
+    { "id": 1, "prompt": "A Lia respondeu a uma mãe que o desconto para irmãos é de 10%. De onde saiu isso e como evito que aconteça de novo?", "expected_output": "Explica a guarda de saída (valores só da base) e a triagem de 'desconto'; aponta src/agente.ts e src/triagem.ts; não inventa o valor." },
+    { "id": 2, "prompt": "Preciso cadastrar que a visita de sábado tem 3 vagas de manhã e atualizar a resposta sobre horário de visita.", "expected_output": "Usa a tabela visitas_horarios / painel / MCP; lembra de A_PREENCHER e de rodar semear; não toca no classlink." },
+    { "id": 3, "prompt": "Quero que a Lia também escale mensagens que falam de 'piolho'. Como faço e como provo que funciona?", "expected_output": "Edita REGRAS em src/triagem.ts, adiciona caso em triagem-casos.json, espelha triagem.md, roda npm test." }
+  ]
+}
