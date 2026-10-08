@@ -22,6 +22,7 @@
 - Workers Free: CPU de 10 ms por requisição, webhook responde 200 imediatamente e processa em `ctx.waitUntil`.
 - **Atendimento humano pelo aplicativo:** a equipe usa **um único celular da escola** com o app WhatsApp Business no número público, em modo de **coexistência** (app + Cloud API). A família vê a conversa única. Quando a equipe responde pelo app, a Meta envia o evento `smb_message_echoes`; a Lia registra a mensagem como `humano` e **pausa naquela conversa por 12 horas** (`conversas.humano_ate`). Nomes de campos e requisitos da coexistência devem ser confirmados na documentação oficial da Meta antes de implementar.
 - **Painel só do dono (1 pessoa)**, responsivo para computador e celular, protegido por **Cloudflare Access** (login por e-mail/Google, gratuito) com validação do JWT `Cf-Access-Jwt-Assertion` no Worker; sem sistema próprio de senhas. Serve para aprovar a base, acompanhar chamados, custos e conversas, pausar/retomar a Lia por conversa e **desligar a Lia inteira** (chave geral).
+- **Estado atual do número público (informado em 2026-10-08):** (21) 96469-9441 roda **só no aplicativo**, no celular da escola, espelhado nos dispositivos do dono (computador e celular); **não está na API**. O caminho é o *onboarding de coexistência* (Task 0). Respostas digitadas em dispositivo vinculado **não suportado** (fontes indicam: WhatsApp para Windows) podem não gerar o evento `smb_message_echoes`; nesse caso a Lia não pausa. Regra operacional: o dono responde pelo celular ou pelo WhatsApp Web, e o painel tem o botão "Assumir" como segurança.
 - Histórico de mensagens guardado por 90 dias e depois apagado (cron), para atendimento e LGPD.
 - Notificação ao dono: Web Push no celular e no computador (gratuito); aviso por WhatsApp ao celular da escola (número interno, modelo aprovado) só para prioridade `urgente`, porque modelo fora da janela de 24h é cobrado.
 - Segredos só em variáveis do Worker; assinatura `X-Hub-Signature-256` obrigatória.
@@ -75,6 +76,17 @@ agente-whatsapp/
 ```
 
 ---
+
+### Task 0: Portão de canal — coexistência do número público (ação do dono, sem código)
+
+**Files:** Create `agente-whatsapp/CANAL.md` (checklist e decisão registrada)
+
+**Objetivo:** decidir com evidência se o número público opera em coexistência (app + Cloud API) antes de qualquer go-live. As Tasks 1 a 16 não dependem disso (rodam contra simulador).
+
+- [ ] **Step 1:** Confirmar que o número usa o app **WhatsApp Business** (não o WhatsApp comum). Se for o comum, migrar para o Business antes (mantém conversas).
+- [ ] **Step 2:** Ler a documentação oficial da Meta (*Embedded Signup — Onboard WhatsApp Business app users*) e registrar em `CANAL.md`: requisitos (versão do app, tempo de uso do número, abrir o app ao menos a cada 13 dias), nome do campo de eco, e **se uma empresa pode fazer o onboarding por conta própria ou precisa de um Tech Provider/BSP e qual o custo**. Esse custo é o principal risco ao objetivo "custo zero".
+- [ ] **Step 3:** Registrar o impacto nos dispositivos vinculados (computador do dono): após o onboarding, rever quais continuam funcionando e confirmar que respostas digitadas neles geram o eco.
+- [ ] **Step 4:** Decidir e registrar: **A) coexistência** (equipe e dono respondem pelo app) ou **B) Plano B** (número só na API; equipe responde pelo painel no celular da escola, o que perde o app para esse número) ou **C)** usar outro número para a Lia. Commit `docs(lia): decisão de canal`.
 
 ### Task 1: Esqueleto, banco e adaptador de testes
 
