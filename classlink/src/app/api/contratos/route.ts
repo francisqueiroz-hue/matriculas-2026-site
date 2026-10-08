@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import type { ContratoStatus } from "@/lib/contratos";
 
-const STATUS_VALIDOS: ContratoStatus[] = ["AGUARDANDO_ASSINATURA", "EM_CONFERENCIA", "AGUARDANDO_ORIGINAL", "COMPLETO", "DEVOLVIDO"];
+const STATUS_VALIDOS: ContratoStatus[] = ["AGUARDANDO_DADOS", "AGUARDANDO_ASSINATURA", "EM_CONFERENCIA", "AGUARDANDO_ORIGINAL", "COMPLETO", "DEVOLVIDO"];
 
 // Metadados dos arquivos — nunca o conteúdo (`conteudo` fica fora de toda listagem).
 const arquivoSelect = {
@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
           metodoAssinatura: true,
           assinadoEnviadoEm: true,
           motivoDevolucao: true,
+          modelo: true,
           createdAt: true,
           student: { select: { id: true, name: true, class: { select: { name: true } } } },
           arquivos: { select: { id: true, tipo: true, nomeArquivo: true, createdAt: true }, orderBy: { createdAt: "desc" } },
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
           metodoAssinatura: true,
           assinadoEnviadoEm: true,
           motivoDevolucao: true,
+          modelo: true,
           createdAt: true,
           student: {
             select: {

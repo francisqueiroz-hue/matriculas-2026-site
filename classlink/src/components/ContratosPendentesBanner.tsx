@@ -39,7 +39,7 @@ export function ContratosPendentesBanner() {
     apiJson<{ contratos: ContratoResumo[] }>("/api/contratos")
       .then((data) =>
         setPendentes(
-          data.contratos.filter((c) => c.status === "AGUARDANDO_ASSINATURA" || c.status === "DEVOLVIDO" || c.status === "AGUARDANDO_ORIGINAL"),
+          data.contratos.filter((c) => c.status === "AGUARDANDO_DADOS" || c.status === "AGUARDANDO_ASSINATURA" || c.status === "DEVOLVIDO" || c.status === "AGUARDANDO_ORIGINAL"),
         ),
       )
       .catch(() => setPendentes([]))

@@ -113,6 +113,7 @@ model School {
   teamConversations     TeamConversation[]
   solicitacoesMatricula SolicitacaoMatricula[]
   contratos             Contrato[]
+  contratoConfigs       ContratoConfig[]
 }
 
 model User {
@@ -182,6 +183,7 @@ model User {
 
   // Contratos de matrícula: criados pela direção, arquivos enviados e trilha de auditoria
   contratosCriados         Contrato[]        @relation("ContratoCriadoPor")
+  contratoConfigsEditadas  ContratoConfig[]  @relation("ContratoConfigEditadaPor")
   contratoArquivosEnviados ContratoArquivo[] @relation("ContratoArquivoEnviadoPor")
   contratoEventos          ContratoEvento[]  @relation("ContratoEventoUsuario")
 
@@ -618,6 +620,7 @@ model SolicitacaoMatricula {
 // quando, de qual IP e o hash SHA-256 do arquivo, todos atribuídos pelo servidor).
 
 enum ContratoStatus {
+  AGUARDANDO_DADOS // contrato do modelo do app: a família ainda vai conferir os dados para o app gerar o PDF
   AGUARDANDO_ASSINATURA // enviado à família, aguardando o PDF assinado
   EM_CONFERENCIA // família enviou o PDF assinado; secretaria precisa conferir
   AGUARDANDO_ORIGINAL // assinatura à mão conferida; falta entregar a via original em papel
@@ -637,6 +640,7 @@ enum ContratoArquivoTipo {
 
 enum ContratoEventoTipo {
   CRIADO
+  DADOS_PREENCHIDOS // família conferiu os dados e o app gerou o PDF do contrato
   ASSINADO_ENVIADO
   DEVOLVIDO
   CONFERIDO
@@ -659,6 +663,13 @@ model Contrato {
   metodoAssinatura  ContratoMetodoAssinatura?
   assinadoEnviadoEm DateTime?
   motivoDevolucao   String? // último motivo informado pela secretaria ao devolver
+
+  // Contratos do modelo do app (ex.: "ESPACO_KIDS_2027"): o PDF é gerado a partir das
+  // condições fixadas no envio (cópia da configuração do ano) e dos dados que a família
+  // confere. Nulo para contratos enviados como PDF avulso.
+  modelo       String?
+  condicoes    Json?
+  dadosFamilia Json?
 
   criadoPor   User?   @relation("ContratoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
   criadoPorId String?
@@ -711,4 +722,22 @@ model ContratoEvento {
   createdAt     DateTime @default(now())
 
   @@index([contratoId])
+}
+
+// Configuração do contrato da escola por ano letivo: valores por período, parcelas, hora
+// excedente e dados da escola que entram no contrato gerado. Preenchida pela direção no
+// painel; o envio fica bloqueado enquanto faltar algum valor obrigatório.
+model ContratoConfig {
+  id        String @id @default(cuid())
+  school    School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId  String
+  anoLetivo Int
+  dados     Json
+
+  editadoPor   User?    @relation("ContratoConfigEditadaPor", fields: [editadoPorId], references: [id], onDelete: SetNull)
+  editadoPorId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([schoolId, anoLetivo])
 }

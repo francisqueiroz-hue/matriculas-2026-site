@@ -14,6 +14,8 @@ import {
   type ContratoMetodo,
   type ContratoStatus,
 } from "@/lib/contratos";
+import { MODELO_CONTRATO_2027 } from "@/lib/contrato-modelo/tipos";
+import { FormularioDados } from "./FormularioDados";
 
 interface ArquivoResumo {
   id: string;
@@ -30,12 +32,14 @@ interface ContratoFamilia {
   metodoAssinatura: ContratoMetodo | null;
   assinadoEnviadoEm: string | null;
   motivoDevolucao: string | null;
+  modelo: string | null;
   createdAt: string;
   student: { id: string; name: string; class: { name: string } };
   arquivos: ArquivoResumo[];
 }
 
 const STATUS_COR: Record<ContratoStatus, string> = {
+  AGUARDANDO_DADOS: "bg-orange-100 text-orange-900",
   AGUARDANDO_ASSINATURA: "bg-amber-100 text-amber-900",
   DEVOLVIDO: "bg-red-100 text-red-900",
   EM_CONFERENCIA: "bg-sky-100 text-sky-900",
@@ -177,6 +181,9 @@ function FormularioEnvio({ contrato, onEnviado }: { contrato: ContratoFamilia; o
 
 function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; onAtualizar: () => void }) {
   const [enviadoAgora, setEnviadoAgora] = useState(false);
+  const [geradoAgora, setGeradoAgora] = useState(false);
+  const [corrigindo, setCorrigindo] = useState(false);
+  const doApp = contrato.modelo === MODELO_CONTRATO_2027;
   const modelo = contrato.arquivos.find((a) => a.tipo === "MODELO");
   const ultimoEnvio = contrato.arquivos.find((a) => a.tipo === "ASSINADO");
   const aguardandoFamilia = podeEnviarAssinado(contrato.status);
@@ -201,15 +208,53 @@ function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; on
         </p>
       )}
 
-      {contrato.status === "DEVOLVIDO" && contrato.motivoDevolucao && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
-          <p className="font-semibold">A secretaria pediu um ajuste:</p>
-          <p className="mt-1">{contrato.motivoDevolucao}</p>
-          <p className="mt-1">Corrija e envie o contrato assinado novamente abaixo.</p>
+      {geradoAgora && !corrigindo && aguardandoFamilia && (
+        <p role="status" className="mb-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">
+          ✓ Contrato gerado com os seus dados. Agora é só baixar, assinar e enviar.
+        </p>
+      )}
+
+      {contrato.status === "AGUARDANDO_DADOS" && (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-700">
+            <strong>Passo 1 de 2:</strong> confira os seus dados. O app preenche o contrato e, em seguida, você assina pelo gov.br (grátis) ou à mão.
+          </p>
+          <FormularioDados
+            contratoId={contrato.id}
+            onGerado={() => {
+              setGeradoAgora(true);
+              onAtualizar();
+            }}
+          />
         </div>
       )}
 
-      {aguardandoFamilia && modelo && (
+      {corrigindo && aguardandoFamilia && (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-700">Corrija o que for preciso. O app gera um contrato novo; o anterior fica só no histórico.</p>
+          <FormularioDados
+            contratoId={contrato.id}
+            onCancelar={() => setCorrigindo(false)}
+            onGerado={() => {
+              setCorrigindo(false);
+              setGeradoAgora(true);
+              onAtualizar();
+            }}
+          />
+        </div>
+      )}
+
+      {contrato.status === "DEVOLVIDO" && contrato.motivoDevolucao && !corrigindo && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+          <p className="font-semibold">A secretaria pediu um ajuste:</p>
+          <p className="mt-1">{contrato.motivoDevolucao}</p>
+          <p className="mt-1">
+            {doApp ? "Se for um dado seu, use “Corrigir meus dados”; depois assine e envie novamente abaixo." : "Corrija e envie o contrato assinado novamente abaixo."}
+          </p>
+        </div>
+      )}
+
+      {aguardandoFamilia && modelo && !corrigindo && (
         <ol className="space-y-4">
           <li>
             <h3 className="text-sm font-semibold text-slate-900">1. Baixe o contrato</h3>
@@ -221,6 +266,11 @@ function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; on
               <a href={urlArquivo(contrato.id, modelo.id)} target="_blank" rel="noopener noreferrer" className={botaoSecundario}>
                 Ler no navegador
               </a>
+              {doApp && (
+                <button type="button" onClick={() => setCorrigindo(true)} className={botaoSecundario}>
+                  Corrigir meus dados
+                </button>
+              )}
             </div>
           </li>
           <li>
