@@ -3,7 +3,7 @@ import type { Db } from "./db";
 import { decidirSugestao, listarChamados, listarSugestoes, resolverChamado, abrirChamado } from "./fila";
 import { lerFatos, salvarFato } from "./memoria";
 import type { FerramentaDef } from "./provedor";
-import { horariosLivres, reservar } from "./visitas";
+import { gerarHorariosTarde, horariosLivres, hojeBR, reservar } from "./visitas";
 
 export interface Ferramenta {
   def: FerramentaDef;
@@ -40,11 +40,14 @@ export function criarFerramentas(db: Db, telefone: string) {
       },
     },
     consultar_horarios_visita: {
-      def: { nome: "consultar_horarios_visita", descricao: "Lista os horários de visita com vaga.", parametros: objeto({}) },
-      executar: async () => (await horariosLivres(db, new Date().toISOString().slice(0, 10))).slice(0, 10),
+      def: { nome: "consultar_horarios_visita", descricao: "Lista os dias de visita com vaga. Visitas são à tarde, das 13h às 17h; a secretaria combina o horário exato.", parametros: objeto({}) },
+      executar: async () => {
+        await gerarHorariosTarde(db); // idempotente: garante dias úteis futuros mesmo antes do cron
+        return (await horariosLivres(db, hojeBR())).slice(0, 10);
+      },
     },
     reservar_visita: {
-      def: { nome: "reservar_visita", descricao: "Reserva uma visita. Confirme série e período com a família antes.", parametros: objeto({ horario_id: { type: "integer" }, serie: texto }, ["horario_id", "serie"]) },
+      def: { nome: "reservar_visita", descricao: "Reserva uma visita à tarde (13h–17h). Confirme série e dia com a família antes. Manhã (9h–11h) só a equipe combina: use encaminhar_humano.", parametros: objeto({ horario_id: { type: "integer" }, serie: texto }, ["horario_id", "serie"]) },
       executar: async (a) => {
         const r = await reservar(db, telefone, Number(a.horario_id), str(a.serie));
         if (!r.ok) return r;

@@ -220,3 +220,48 @@ describe("revisão — fluxo", () => {
     expect((await t.db.all<{ prioridade: string }>("SELECT prioridade FROM chamados")).map((c) => c.prioridade)).toEqual(["urgente"]);
   });
 });
+
+// ---- horários informados pelo dono em 2026-10-08 ----
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { lerArquivoBase } from "../src/conhecimento";
+import { gerarHorariosTarde, horariosLivres } from "../src/visitas";
+
+describe("horários da escola e das visitas", () => {
+  it("a base traz o funcionamento (7h–19h) e as visitas (13h–17h, exceção 9h–11h)", () => {
+    const itens = lerArquivoBase(readFileSync(join(import.meta.dirname, "..", "conhecimento", "visitas.md"), "utf8"));
+    const funcionamento = itens.find((i) => /funcionamento/i.test(i.pergunta))!;
+    const visitas = itens.find((i) => /visitar/i.test(i.pergunta))!;
+    expect(funcionamento.resposta).toContain("7h às 19h");
+    expect(visitas.resposta).toContain("13h às 17h");
+    expect(visitas.resposta).toContain("9h às 11h");
+  });
+  it("gera horários só de tarde, em dias úteis, sem duplicar ao rodar de novo", async () => {
+    const db = sqliteDb();
+    const segunda = new Date("2026-10-12T15:00:00Z"); // segunda-feira
+    const criados = await gerarHorariosTarde(db, segunda, 14, 3);
+    const linhas = await db.all<{ data: string; turno: string; vagas: number }>("SELECT data, turno, vagas FROM visitas_horarios ORDER BY data");
+    expect(criados).toBe(10); // 14 dias a partir de amanhã = 10 dias úteis
+    expect(linhas.every((l) => l.turno === "tarde" && l.vagas === 3)).toBe(true);
+    expect(linhas.some((l) => ["2026-10-17", "2026-10-18", "2026-10-24", "2026-10-25"].includes(l.data))).toBe(false);
+    expect(await gerarHorariosTarde(db, segunda, 14, 3)).toBe(0);
+    expect(await db.all("SELECT * FROM visitas_horarios")).toHaveLength(10);
+  });
+  it("horário com vagas esgotadas não é recriado nem some do histórico", async () => {
+    const db = sqliteDb();
+    const segunda = new Date("2026-10-12T15:00:00Z");
+    await gerarHorariosTarde(db, segunda, 3, 1);
+    const id = (await db.first<{ id: number }>("SELECT id FROM visitas_horarios ORDER BY data LIMIT 1"))!.id;
+    await db.run("UPDATE visitas_horarios SET vagas = 0 WHERE id = ?", [id]);
+    await gerarHorariosTarde(db, segunda, 3, 1);
+    expect((await db.first<{ vagas: number }>("SELECT vagas FROM visitas_horarios WHERE id = ?", [id]))!.vagas).toBe(0);
+    expect((await horariosLivres(db, "2026-10-01")).map((h) => h.id)).not.toContain(id);
+  });
+  it("a Lia não reserva manhã sozinha: manhã é exceção da equipe", async () => {
+    const db = sqliteDb();
+    const id = (await db.run("INSERT INTO visitas_horarios (data, turno, vagas) VALUES ('2099-01-10', 'manha', 2)")).lastId;
+    const r: any = await criarFerramentas(db, T).reservar_visita.executar({ horario_id: id, serie: "6º ano" });
+    expect(r.erro ?? r.motivo).toBeDefined();
+    expect(await db.all("SELECT * FROM visitas")).toHaveLength(0);
+  });
+});

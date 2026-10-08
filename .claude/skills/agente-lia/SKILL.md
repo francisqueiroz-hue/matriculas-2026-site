@@ -13,6 +13,7 @@ Cloudflare Worker (TypeScript) + D1 que atende o número público (21) 96469-944
 - **Só afirma o que está na base** (`src/agente.ts`): valor em R$, %, data que não esteja nos trechos recuperados é descartado e vira "vou confirmar" + chamado. Mensalidades **não são públicas**: a secretaria apresenta.
 - **Uma resposta por turno**, texto livre só na janela de 24h. Cada resposta pode ser cobrada pela Meta após 1.000/mês (não confirmado oficialmente); `LIMITE_MENSAGENS_MES` corta o envio (0 é válido).
 - **Equipe responde pelo app WhatsApp Business** (coexistência). O evento `smb_message_echoes` pausa a Lia na conversa por 12h. Respostas de dispositivos não suportados podem não gerar o evento: o painel tem "Assumir".
+- **Horários (informados pelo dono em 2026-10-08):** escola 7h–19h; visitas à tarde, 13h–17h (dias úteis gerados sozinhos, `VAGAS_VISITA_TARDE`, padrão 3, a secretaria combina a hora exata); manhã 9h–11h só como exceção combinada pela equipe — a Lia nunca reserva manhã (`encaminhar_humano`, motivo `visita_manha`). Endereço ainda `A_PREENCHER`.
 - **Sem dados pessoais na base compartilhada** e nada de CPF/e-mail na memória. Aprendizado é só sugestão: a publicação exige aprovação do dono.
 
 ## Como fazer as tarefas comuns

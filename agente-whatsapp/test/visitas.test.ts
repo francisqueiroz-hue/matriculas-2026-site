@@ -3,7 +3,7 @@ import { sqliteDb } from "./sqlite-db";
 import { horariosLivres, reservar } from "../src/visitas";
 
 async function horario(db: ReturnType<typeof sqliteDb>, vagas: number, data = "2099-11-10") {
-  const r = await db.run("INSERT INTO visitas_horarios (data, turno, vagas) VALUES (?, 'manha', ?)", [data, vagas]);
+  const r = await db.run("INSERT INTO visitas_horarios (data, turno, vagas) VALUES (?, 'tarde', ?)", [data, vagas]);
   return r.lastId;
 }
 

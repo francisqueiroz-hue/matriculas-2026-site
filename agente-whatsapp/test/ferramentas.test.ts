@@ -26,12 +26,13 @@ describe("ferramentas do agente", () => {
     await criarFerramentas(db, T).encaminhar_humano.executar({ motivo: "sem_base", resumo: "Pediu valores", prioridade: "normal" });
     expect((await db.first<{ telefone: string }>("SELECT telefone FROM chamados"))!.telefone).toBe(T);
   });
-  it("consultar e reservar visita", async () => {
+  it("consultar gera os dias úteis de tarde e reservar usa um deles", async () => {
     const db = sqliteDb();
-    const id = (await db.run("INSERT INTO visitas_horarios (data, turno, vagas) VALUES ('2099-01-10', 'tarde', 2)")).lastId;
     const f = criarFerramentas(db, T);
-    expect((await f.consultar_horarios_visita.executar({})) as unknown[]).toHaveLength(1);
-    expect(await f.reservar_visita.executar({ horario_id: id, serie: "6º ano" })).toMatchObject({ ok: true });
+    const dias = (await f.consultar_horarios_visita.executar({})) as { id: number; turno: string }[];
+    expect(dias.length).toBeGreaterThan(0);
+    expect(dias.every((d) => d.turno === "tarde")).toBe(true);
+    expect(await f.reservar_visita.executar({ horario_id: dias[0].id, serie: "6º ano" })).toMatchObject({ ok: true, data: expect.any(String), turno: "tarde" });
   });
 });
 
