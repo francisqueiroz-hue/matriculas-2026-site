@@ -14,6 +14,8 @@ import {
   type ContratoMetodo,
   type ContratoStatus,
 } from "@/lib/contratos";
+import { MODELO_CONTRATO_2027 } from "@/lib/contrato-modelo/tipos";
+import { FormularioDados } from "./FormularioDados";
 
 interface ArquivoResumo {
   id: string;
@@ -30,6 +32,8 @@ interface ContratoFamilia {
   metodoAssinatura: ContratoMetodo | null;
   assinadoEnviadoEm: string | null;
   motivoDevolucao: string | null;
+  modelo: string | null;
+  dadosPreenchidos: boolean;
   createdAt: string;
   student: { id: string; name: string; class: { name: string } };
   arquivos: ArquivoResumo[];
@@ -177,6 +181,9 @@ function FormularioEnvio({ contrato, onEnviado }: { contrato: ContratoFamilia; o
 
 function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; onAtualizar: () => void }) {
   const [enviadoAgora, setEnviadoAgora] = useState(false);
+  const [geradoAgora, setGeradoAgora] = useState(false);
+  const [corrigindo, setCorrigindo] = useState(false);
+  const doApp = contrato.modelo === MODELO_CONTRATO_2027;
   const modelo = contrato.arquivos.find((a) => a.tipo === "MODELO");
   const ultimoEnvio = contrato.arquivos.find((a) => a.tipo === "ASSINADO");
   const aguardandoFamilia = podeEnviarAssinado(contrato.status);
@@ -201,19 +208,52 @@ function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; on
         </p>
       )}
 
-      {contrato.status === "DEVOLVIDO" && contrato.motivoDevolucao && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
-          <p className="font-semibold">A secretaria pediu um ajuste:</p>
-          <p className="mt-1">{contrato.motivoDevolucao}</p>
-          <p className="mt-1">Corrija e envie o contrato assinado novamente abaixo.</p>
+      {geradoAgora && !corrigindo && aguardandoFamilia && (
+        <p role="status" className="mb-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">
+          ✓ Contrato gerado com os seus dados. Agora é só baixar o novo arquivo, assinar e enviar.
+        </p>
+      )}
+
+      {corrigindo && aguardandoFamilia && (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-700">
+            {contrato.dadosPreenchidos
+              ? "Corrija o que for preciso. O app gera o contrato de novo com os dados corrigidos."
+              : "Opcional: preencha aqui e o app gera o contrato já preenchido, pronto para assinar. Se preferir, cancele e preencha à mão."}
+          </p>
+          <FormularioDados
+            contratoId={contrato.id}
+            onCancelar={() => setCorrigindo(false)}
+            onGerado={() => {
+              setCorrigindo(false);
+              setGeradoAgora(true);
+              onAtualizar();
+            }}
+          />
         </div>
       )}
 
-      {aguardandoFamilia && modelo && (
+      {contrato.status === "DEVOLVIDO" && contrato.motivoDevolucao && !corrigindo && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+          <p className="font-semibold">A secretaria pediu um ajuste:</p>
+          <p className="mt-1">{contrato.motivoDevolucao}</p>
+          <p className="mt-1">
+            {doApp ? "Se for um dado seu, corrija pelo botão “Preencher meus dados”; depois assine e envie novamente abaixo." : "Corrija e envie o contrato assinado novamente abaixo."}
+          </p>
+        </div>
+      )}
+
+      {aguardandoFamilia && modelo && !corrigindo && (
         <ol className="space-y-4">
           <li>
             <h3 className="text-sm font-semibold text-slate-900">1. Baixe o contrato</h3>
-            <p className="mb-2 text-sm text-slate-600">Leia com atenção. Se tiver dúvida, fale com a secretaria em Mensagens.</p>
+            <p className="mb-2 text-sm text-slate-600">
+              Leia com atenção. Se tiver dúvida, fale com a secretaria em Mensagens.
+              {doApp &&
+                (contrato.dadosPreenchidos
+                  ? " O contrato já está com os dados que você preencheu no app."
+                  : " Os seus dados podem ser preenchidos à mão no próprio contrato ou, se preferir, aqui no app (opcional).")}
+            </p>
             <div className="flex flex-wrap gap-2">
               <a href={urlArquivo(contrato.id, modelo.id, true)} className={botaoPrimario}>
                 Baixar contrato (PDF)
@@ -221,6 +261,11 @@ function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; on
               <a href={urlArquivo(contrato.id, modelo.id)} target="_blank" rel="noopener noreferrer" className={botaoSecundario}>
                 Ler no navegador
               </a>
+              {doApp && (
+                <button type="button" onClick={() => setCorrigindo(true)} className={botaoSecundario}>
+                  {contrato.dadosPreenchidos ? "Corrigir meus dados" : "Preencher meus dados no app (opcional)"}
+                </button>
+              )}
             </div>
           </li>
           <li>

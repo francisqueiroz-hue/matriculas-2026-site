@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiJson } from "@/lib/api-client";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
+import { MODELO_CONTRATO_2027 } from "@/lib/contrato-modelo/tipos";
+import { ContratoModeloPainel } from "./ContratoModeloPainel";
 import {
   CONTRATO_MAX_BYTES,
   ContratoErro,
@@ -29,7 +31,7 @@ interface Arquivo {
 
 interface Evento {
   id: string;
-  tipo: "CRIADO" | "ASSINADO_ENVIADO" | "DEVOLVIDO" | "CONFERIDO" | "ORIGINAL_RECEBIDO";
+  tipo: "CRIADO" | "DADOS_PREENCHIDOS" | "ASSINADO_ENVIADO" | "DEVOLVIDO" | "CONFERIDO" | "ORIGINAL_RECEBIDO";
   ipOrigem: string | null;
   arquivoSha256: string | null;
   detalhe: string | null;
@@ -45,6 +47,8 @@ interface Contrato {
   metodoAssinatura: ContratoMetodo | null;
   assinadoEnviadoEm: string | null;
   motivoDevolucao: string | null;
+  modelo: string | null;
+  dadosPreenchidos: boolean;
   createdAt: string;
   student: {
     id: string;
@@ -81,6 +85,7 @@ const PRIORIDADE: Record<ContratoStatus, number> = {
 
 const EVENTO_LABEL: Record<Evento["tipo"], string> = {
   CRIADO: "Contrato enviado à família",
+  DADOS_PREENCHIDOS: "Família preencheu os dados no app (contrato gerado preenchido)",
   ASSINADO_ENVIADO: "Família enviou o contrato assinado",
   DEVOLVIDO: "Devolvido para correção",
   CONFERIDO: "Conferido e aprovado",
@@ -177,9 +182,9 @@ function NovoContrato({ ano, contratos, onCriado }: { ano: number; contratos: Co
 
   return (
     <form onSubmit={enviar} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-      <h2 className="font-semibold text-slate-900">Enviar contrato para assinatura</h2>
+      <h2 className="font-semibold text-slate-900">Enviar um PDF próprio (aditivo ou outro modelo)</h2>
       <p className="text-sm text-slate-600">
-        Anexe o PDF do contrato já preenchido com os dados do aluno. A família recebe um aviso no app e assina pelo gov.br (grátis) ou à
+        Anexe o PDF já preenchido com os dados do aluno. A família recebe um aviso no app e assina pelo gov.br (grátis) ou à
         mão.
       </p>
       <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
@@ -278,6 +283,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
   const [erro, setErro] = useState<string | null>(null);
 
   const modelo = c.arquivos.find((a) => a.tipo === "MODELO");
+  const doApp = c.modelo === MODELO_CONTRATO_2027;
   const envios = c.arquivos.filter((a) => a.tipo === "ASSINADO");
   const ultimo = envios[0];
 
@@ -315,6 +321,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
           <h3 className="text-base font-semibold text-slate-900">{c.student.name}</h3>
           <p className="text-slate-600">
             {c.student.class.name} · {c.titulo}
+            {doApp && " · modelo do app"}
           </p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_COR[c.status]}`}>{STATUS_CONTRATO_LABEL[c.status]}</span>
@@ -353,6 +360,12 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
             </p>
           )}
         </div>
+      )}
+
+      {doApp && aguardandoFamilia && (
+        <p className="mt-2 text-slate-600">
+          {c.dadosPreenchidos ? "A família preencheu os dados no app; o contrato para assinar já sai preenchido." : "Contrato em branco enviado; a família pode preencher à mão ou no app."}
+        </p>
       )}
 
       {c.status === "DEVOLVIDO" && c.motivoDevolucao && (
@@ -486,6 +499,10 @@ function ContratosContent() {
   const ordenados = [...visiveis].sort(
     (a, b) => PRIORIDADE[a.status] - PRIORIDADE[b.status] || a.student.name.localeCompare(b.student.name, "pt-BR"),
   );
+  const jaTemModelo = useMemo(
+    () => new Set((dados?.contratos ?? []).filter((c) => c.modelo === MODELO_CONTRATO_2027).map((c) => c.student.id)),
+    [dados],
+  );
   const anosDisponiveis = [...new Set([CAMPANHA_REMATRICULA.ano, ...(dados?.anos ?? [])])].sort((a, b) => b - a);
 
   return (
@@ -531,7 +548,14 @@ function ContratosContent() {
         ))}
       </div>
 
-      <NovoContrato key={ano} ano={ano} contratos={dados?.contratos ?? []} onCriado={carregar} />
+      <ContratoModeloPainel ano={ano} jaTemModelo={jaTemModelo} onEnviado={carregar} />
+
+      <details className="rounded-xl border border-slate-200 bg-white">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-700">Enviar um PDF próprio (aditivo ou outro modelo)</summary>
+        <div className="border-t border-slate-100 [&>form]:rounded-none [&>form]:border-0">
+          <NovoContrato key={ano} ano={ano} contratos={dados?.contratos ?? []} onCriado={carregar} />
+        </div>
+      </details>
 
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-slate-900">
@@ -552,7 +576,7 @@ function ContratosContent() {
       {dados === null && !erro && <p className="text-sm text-slate-500">Carregando…</p>}
       {dados && visiveis.length === 0 && (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-          Nenhum contrato {status ? "nesta situação" : `em ${ano}`}. Use o formulário acima para enviar o primeiro.
+          Nenhum contrato {status ? "nesta situação" : `em ${ano}`}. Use o envio acima para começar.
         </p>
       )}
       <ul className="space-y-3">

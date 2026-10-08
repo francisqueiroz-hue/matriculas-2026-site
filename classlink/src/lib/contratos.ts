@@ -3,7 +3,7 @@
 
 export type ContratoStatus = "AGUARDANDO_ASSINATURA" | "EM_CONFERENCIA" | "AGUARDANDO_ORIGINAL" | "COMPLETO" | "DEVOLVIDO";
 export type ContratoMetodo = "GOVBR" | "MANUSCRITA";
-export type ContratoAcao = "ENVIAR_ASSINADO" | "APROVAR" | "DEVOLVER" | "ORIGINAL_RECEBIDO";
+export type ContratoAcao = "PREENCHER_DADOS" | "ENVIAR_ASSINADO" | "APROVAR" | "DEVOLVER" | "ORIGINAL_RECEBIDO";
 
 /**
  * Limite de 4 MB por PDF: abaixo do teto de 4,5 MB por requisição das funções da Vercel
@@ -32,12 +32,16 @@ export const METODO_LABEL: Record<ContratoMetodo, string> = {
 export class ContratoErro extends Error {}
 
 const TRANSICOES: Record<Exclude<ContratoAcao, "APROVAR">, { de: ContratoStatus[]; para: ContratoStatus }> = {
+  // Contrato do modelo do app: a família confere os dados e o app gera o PDF. Pode corrigir
+  // os dados (gerando um PDF novo) enquanto ainda não enviou o contrato assinado.
+  PREENCHER_DADOS: { de: ["AGUARDANDO_ASSINATURA", "DEVOLVIDO"], para: "AGUARDANDO_ASSINATURA" },
   ENVIAR_ASSINADO: { de: ["AGUARDANDO_ASSINATURA", "DEVOLVIDO"], para: "EM_CONFERENCIA" },
   DEVOLVER: { de: ["EM_CONFERENCIA"], para: "DEVOLVIDO" },
   ORIGINAL_RECEBIDO: { de: ["AGUARDANDO_ORIGINAL"], para: "COMPLETO" },
 };
 
 const MENSAGEM_TRANSICAO_INVALIDA: Record<ContratoAcao, string> = {
+  PREENCHER_DADOS: "Os dados deste contrato não podem mais ser alterados — o contrato assinado já foi enviado.",
   ENVIAR_ASSINADO: "Este contrato não está aguardando envio da família.",
   APROVAR: "Só é possível aprovar um contrato que está em conferência.",
   DEVOLVER: "Só é possível devolver um contrato que está em conferência.",
