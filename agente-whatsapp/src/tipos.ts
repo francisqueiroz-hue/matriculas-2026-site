@@ -15,6 +15,8 @@ export interface Env {
   ACCESS_TEAM_DOMAIN?: string;
   VAPID_PUBLIC_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
+  WHATSAPP_API_URL?: string;
   TEMPLATE_AVISO_EQUIPE?: string;
   WHATSAPP_INTERNO_PHONE_NUMBER_ID?: string;
   WHATSAPP_INTERNO_API_TOKEN?: string;
