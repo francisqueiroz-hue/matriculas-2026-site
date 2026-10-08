@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { formatarDataHora, rotuloDiaRelativo } from "@/lib/datas";
+import { separarEventos } from "@/lib/agenda";
 
 interface ClassOption {
   id: string;
@@ -17,6 +19,46 @@ interface EventItem {
   endsAt: string | null;
   class: { id: string; name: string } | null;
   author: { id: string; name: string };
+}
+
+function EventoItem({
+  ev,
+  destaque = false,
+  passado = false,
+  podeRemover,
+  onRemover,
+}: {
+  ev: EventItem;
+  destaque?: boolean;
+  passado?: boolean;
+  podeRemover: boolean;
+  onRemover: (id: string) => void;
+}) {
+  const relativo = passado ? null : rotuloDiaRelativo(ev.startsAt);
+  return (
+    <li
+      className={`flex items-start justify-between gap-3 rounded-xl border p-3 ${
+        destaque
+          ? "border-indigo-300 bg-indigo-50 p-4 dark:border-indigo-800 dark:bg-indigo-950/40"
+          : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+      } ${passado ? "opacity-80" : ""}`}
+    >
+      <div className="min-w-0">
+        {destaque && <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Próximo evento</p>}
+        <h3 className={destaque ? "text-base font-semibold" : "font-medium"}>{ev.title}</h3>
+        <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+          {relativo && <span className="mr-1 rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-900">{relativo}</span>}
+          {formatarDataHora(ev.startsAt)} · {ev.class?.name ?? "Toda a escola"}
+        </p>
+        {ev.description && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{ev.description}</p>}
+      </div>
+      {podeRemover && (
+        <button type="button" onClick={() => onRemover(ev.id)} className="shrink-0 px-2 py-1 text-xs text-red-600 hover:underline">
+          Remover
+        </button>
+      )}
+    </li>
+  );
 }
 
 export default function AgendaPage() {
@@ -72,6 +114,7 @@ export default function AgendaPage() {
   }
 
   const canCreate = user.role === "ADMIN" || user.role === "STAFF";
+  const { proximos, anteriores } = separarEventos(events ?? []);
 
   return (
     <div className="space-y-4">
@@ -136,28 +179,42 @@ export default function AgendaPage() {
       {events === null && <p className="text-sm text-slate-500">Carregando agenda...</p>}
       {events?.length === 0 && <p className="text-sm text-slate-500">Nenhum evento cadastrado.</p>}
 
-      <ul className="space-y-2">
-        {events?.map((ev) => (
-          <li
-            key={ev.id}
-            className="flex items-start justify-between rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-          >
-            <div>
-              <p className="font-medium">{ev.title}</p>
-              <p className="text-xs text-slate-500">
-                {new Date(ev.startsAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} ·{" "}
-                {ev.class?.name ?? "Toda a escola"}
+      {events && events.length > 0 && (
+        <>
+          <section aria-labelledby="titulo-proximos" className="space-y-2">
+            <h2 id="titulo-proximos" className="font-semibold">
+              Próximos eventos
+            </h2>
+            {proximos.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">
+                Nenhum evento marcado daqui para a frente.
               </p>
-              {ev.description && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{ev.description}</p>}
-            </div>
-            {(user.role === "ADMIN" || user.id === ev.author.id) && (
-              <button onClick={() => handleDelete(ev.id)} className="text-xs text-red-600 hover:underline">
-                Remover
-              </button>
+            ) : (
+              <ul className="space-y-2">
+                {proximos.map((ev, i) => (
+                  <EventoItem key={ev.id} ev={ev} destaque={i === 0} podeRemover={user.role === "ADMIN" || user.id === ev.author.id} onRemover={handleDelete} />
+                ))}
+              </ul>
             )}
-          </li>
-        ))}
-      </ul>
+          </section>
+
+          {anteriores.length > 0 && (
+            <details className="group rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+              <summary className="flex min-h-11 cursor-pointer items-center justify-between px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                <span>Eventos anteriores ({anteriores.length})</span>
+                <span aria-hidden="true" className="text-slate-400 transition-transform group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <ul className="space-y-2 border-t border-slate-100 p-3 dark:border-slate-800">
+                {anteriores.map((ev) => (
+                  <EventoItem key={ev.id} ev={ev} passado podeRemover={user.role === "ADMIN" || user.id === ev.author.id} onRemover={handleDelete} />
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
+      )}
     </div>
   );
 }

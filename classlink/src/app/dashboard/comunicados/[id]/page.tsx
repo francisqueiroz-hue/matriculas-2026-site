@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { formatarDataHora } from "@/lib/datas";
 
 interface Comunicado {
   id: string;
@@ -28,14 +29,16 @@ interface PendenteEntry {
   aluno: { id: string; name: string };
 }
 
-const RESPOSTAS_POR_TIPO: Record<string, { value: string; label: string }[]> = {
+// "negativa": resposta de recusa — mesmo peso de toque, mas visual secundário para não ser
+// confundida com a resposta afirmativa.
+const RESPOSTAS_POR_TIPO: Record<string, { value: string; label: string; negativa?: boolean }[]> = {
   AUTORIZACAO_PASSEIO: [
     { value: "AUTORIZADO", label: "Autorizo" },
-    { value: "NAO_AUTORIZADO", label: "Não autorizo" },
+    { value: "NAO_AUTORIZADO", label: "Não autorizo", negativa: true },
   ],
   CONFIRMACAO_REUNIAO: [
     { value: "CONFIRMADO", label: "Confirmo presença" },
-    { value: "NAO_COMPARECERA", label: "Não poderei comparecer" },
+    { value: "NAO_COMPARECERA", label: "Não poderei comparecer", negativa: true },
   ],
   CIRCULAR: [{ value: "LIDO", label: "Confirmar leitura" }],
 };
@@ -59,6 +62,8 @@ export default function ComunicadoDetailPage() {
   const [pendentes, setPendentes] = useState<PendenteEntry[] | null>(null);
   const [enviando, setEnviando] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [respondendo, setRespondendo] = useState<string | null>(null);
+  const [erroResposta, setErroResposta] = useState<string | null>(null);
 
   function loadGuardianView() {
     apiJson<{ comunicado: Comunicado; alunos: AlunoResposta[] }>(`/api/comunicados/${id}`).then((data) => {
@@ -84,8 +89,16 @@ export default function ComunicadoDetailPage() {
   }, [id]);
 
   async function responder(alunoId: string, resposta: string) {
-    await apiJson(`/api/comunicados/${id}/responder`, { method: "POST", body: JSON.stringify({ alunoId, resposta }) });
-    loadGuardianView();
+    setRespondendo(alunoId);
+    setErroResposta(null);
+    try {
+      await apiJson(`/api/comunicados/${id}/responder`, { method: "POST", body: JSON.stringify({ alunoId, resposta }) });
+      loadGuardianView();
+    } catch (err) {
+      setErroResposta(err instanceof Error ? err.message : "Não foi possível enviar a resposta. Tente de novo.");
+    } finally {
+      setRespondendo(null);
+    }
   }
 
   async function reenviar(guardianId: string) {
@@ -114,14 +127,19 @@ export default function ComunicadoDetailPage() {
               ? `Individual — ${comunicado.aluno?.name}`
               : comunicado.class?.name}{" "}
           ·{" "}
-          {new Date(comunicado.dataCriacao).toLocaleString("pt-BR")}
-          {comunicado.prazoResposta && <> · prazo: {new Date(comunicado.prazoResposta).toLocaleString("pt-BR")}</>}
+          {formatarDataHora(comunicado.dataCriacao)}
+          {comunicado.prazoResposta && <> · responder até {formatarDataHora(comunicado.prazoResposta)}</>}
         </p>
         <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{comunicado.descricao}</p>
       </div>
 
       {user.role === "GUARDIAN" && alunos && (
         <div className="space-y-3">
+          {erroResposta && (
+            <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+              {erroResposta}
+            </p>
+          )}
           {alunos.map(({ aluno, resposta }) => (
             <div key={aluno.id} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p className="font-medium">{aluno.name}</p>
@@ -133,18 +151,23 @@ export default function ComunicadoDetailPage() {
                       : "text-green-600"
                   }`}
                 >
-                  {RESPOSTA_LABEL[resposta.resposta] ?? resposta.resposta} em{" "}
-                  {new Date(resposta.dataHoraResposta).toLocaleString("pt-BR")}
+                  {RESPOSTA_LABEL[resposta.resposta] ?? resposta.resposta} em {formatarDataHora(resposta.dataHoraResposta)}
                 </p>
               ) : (
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   {opcoes.map((op) => (
                     <button
                       key={op.value}
+                      type="button"
+                      disabled={respondendo === aluno.id}
                       onClick={() => responder(aluno.id, op.value)}
-                      className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+                      className={`inline-flex min-h-11 items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60 ${
+                        op.negativa
+                          ? "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                          : "bg-indigo-600 text-white hover:bg-indigo-700"
+                      }`}
                     >
-                      {op.label}
+                      {respondendo === aluno.id ? "Enviando…" : op.label}
                     </button>
                   ))}
                 </div>

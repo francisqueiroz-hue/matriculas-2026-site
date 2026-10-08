@@ -11,11 +11,14 @@ export async function GET() {
     const session = await requireSession();
 
     let visibilidadeOR: Array<Record<string, unknown>> | undefined;
+    // Responsável: alunos vinculados, para saber quantos filhos cada comunicado alcança.
+    let vinculos: { studentId: string; classId: string }[] = [];
     if (session.role === "GUARDIAN") {
       const links = await prisma.guardianStudent.findMany({
         where: { guardianId: session.sub, student: { deletedAt: null } },
         select: { studentId: true, student: { select: { classId: true } } },
       });
+      vinculos = links.map((l) => ({ studentId: l.studentId, classId: l.student.classId }));
       const classIds = [...new Set(links.map((l) => l.student.classId))];
       const studentIds = links.map((l) => l.studentId);
       // Comunicados individuais (audience STUDENT) só aparecem para o responsável do próprio aluno-alvo,
@@ -59,7 +62,16 @@ export async function GET() {
       comunicados.map(async (c) => {
         const { respostas, ...rest } = c;
         if (session.role === "GUARDIAN") {
-          return { ...rest, minhasRespostas: respostas };
+          // Irmãos na escola respondem um a um: "respondido" só quando todos têm resposta.
+          const alunosAlvo =
+            c.audience === "SCHOOL"
+              ? vinculos.length
+              : c.audience === "CLASS"
+                ? vinculos.filter((v) => v.classId === c.classId).length
+                : vinculos.some((v) => v.studentId === c.alunoId)
+                  ? 1
+                  : 0;
+          return { ...rest, minhasRespostas: respostas, alunosAlvo };
         }
         const respondidas = respostas.filter((r) => r.resposta !== "PENDENTE_EXPIRADO").length;
         const publicoAlvo = await getPublicoAlvo(c.id);

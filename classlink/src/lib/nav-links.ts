@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SessionUser } from "@/lib/types";
 import { apiJson } from "@/lib/api-client";
+import { situacaoDoComunicado } from "@/lib/comunicados-situacao";
 
 export interface NavLink {
   href: string;
@@ -87,8 +88,10 @@ export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao">): 
 }
 
 interface ComunicadoResumo {
+  dataCriacao: string;
   prazoResposta: string | null;
   minhasRespostas?: { alunoId: string; resposta: string }[];
+  alunosAlvo?: number;
   totalRespostas?: number;
   totalPublicoAlvo?: number;
 }
@@ -97,9 +100,10 @@ interface ComunicadoResumo {
 function countPendentes(comunicados: ComunicadoResumo[], role: string): number {
   const agora = Date.now();
   return comunicados.filter((c) => {
+    // Mesma regra dos cards da lista: conta só o que ainda espera resposta (irmãos incluídos).
+    if (role === "GUARDIAN") return situacaoDoComunicado(c) === "PENDENTE";
     const expirado = c.prazoResposta ? new Date(c.prazoResposta).getTime() < agora : false;
     if (expirado) return false;
-    if (role === "GUARDIAN") return (c.minhasRespostas?.length ?? 0) === 0;
     return typeof c.totalRespostas === "number" && typeof c.totalPublicoAlvo === "number" && c.totalRespostas < c.totalPublicoAlvo;
   }).length;
 }
