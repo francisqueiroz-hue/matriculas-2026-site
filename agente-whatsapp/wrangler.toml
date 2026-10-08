@@ -1,0 +1,20 @@
+name = "lia"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[triggers]
+crons = ["0 5 * * *"]
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lia"
+database_id = "PREENCHER_APOS_wrangler_d1_create"
+migrations_dir = "migrations"
+
+[vars]
+PROVEDOR = "workers-ai"
+MODELO = "PREENCHER_modelo_workers_ai"
+LIMITE_MENSAGENS_MES = "900"
