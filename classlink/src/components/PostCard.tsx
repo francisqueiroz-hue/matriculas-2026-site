@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { formatarDataHora } from "@/lib/datas";
 
 export interface PostItem {
   id: string;
@@ -35,6 +36,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   const [current, setCurrent] = useState(post);
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
 
   const canModerate = user.role === "ADMIN" || user.id === post.author.id;
   const canSeeReaders = user.role === "ADMIN" || user.role === "STAFF";
@@ -49,8 +51,15 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   }, [post.id]);
 
   async function confirmRead() {
-    await apiJson(`/api/posts/${post.id}/read`, { method: "POST" });
-    setReadByMe(true);
+    setConfirmando(true);
+    try {
+      await apiJson(`/api/posts/${post.id}/read`, { method: "POST" });
+      setReadByMe(true);
+    } catch {
+      // Sem conexão: o botão continua disponível para tentar de novo.
+    } finally {
+      setConfirmando(false);
+    }
   }
 
   async function toggleReaders() {
@@ -104,7 +113,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
           <p className="text-xs text-slate-500">
             {post.author.name} ·{" "}
             {post.audience === "SCHOOL" ? "Toda a escola" : post.class?.name ?? "Turma"} ·{" "}
-            {new Date(post.createdAt).toLocaleString("pt-BR")}
+            {formatarDataHora(post.createdAt)}
           </p>
         </div>
         {canModerate && !editing && (
@@ -154,19 +163,24 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
 
       {post.mediaUrl && post.mediaType === "image" && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={post.mediaUrl} alt="" className="mt-3 max-h-96 w-full rounded-lg object-cover" />
+        <img src={post.mediaUrl} alt={`Foto do aviso: ${current.title}`} className="mt-3 max-h-96 w-full rounded-lg object-cover" />
       )}
       {post.mediaUrl && post.mediaType === "video" && (
-        <video src={post.mediaUrl} controls className="mt-3 max-h-96 w-full rounded-lg" />
+        <video src={post.mediaUrl} controls aria-label={`Vídeo do aviso: ${current.title}`} className="mt-3 max-h-96 w-full rounded-lg" />
       )}
 
-      <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
         {user.role === "GUARDIAN" ? (
           readByMe ? (
-            <span className="text-green-600">✓ Lido</span>
+            <span className="text-sm font-medium text-green-700 dark:text-green-400">✓ Leitura confirmada</span>
           ) : (
-            <button onClick={confirmRead} className="font-medium text-indigo-600 hover:underline">
-              Confirmar leitura
+            <button
+              type="button"
+              onClick={confirmRead}
+              disabled={confirmando}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60"
+            >
+              {confirmando ? "Confirmando…" : "Confirmar leitura"}
             </button>
           )
         ) : null}
@@ -183,7 +197,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
           {readers?.length ? (
             readers.map((r) => (
               <li key={r.id}>
-                {r.user.name} — {new Date(r.readAt).toLocaleString("pt-BR")}
+                {r.user.name} — {formatarDataHora(r.readAt)}
               </li>
             ))
           ) : (
