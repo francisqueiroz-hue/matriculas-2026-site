@@ -265,3 +265,14 @@ describe("horários da escola e das visitas", () => {
     expect(await db.all("SELECT * FROM visitas")).toHaveLength(0);
   });
 });
+
+describe("endereço da escola (informado pelo dono em 2026-10-08)", () => {
+  it("a base responde o endereço e nenhum item ficou como A_PREENCHER", async () => {
+    const dir = join(import.meta.dirname, "..", "conhecimento");
+    const todos = ["visitas.md", "matriculas.md", "rotina-familias.md"].flatMap((f) => lerArquivoBase(readFileSync(join(dir, f), "utf8")));
+    const endereco = todos.find((i) => /endereço/i.test(i.pergunta))!;
+    expect(endereco.resposta).toContain("Rua Professor Carlos Nelson Ferreira dos Santos, 658");
+    expect(endereco.resposta).toContain("Camboinhas, Niterói");
+    expect(todos.filter((i) => i.resposta.includes("A_PREENCHER"))).toEqual([]);
+  });
+});

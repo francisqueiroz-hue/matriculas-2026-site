@@ -8,4 +8,4 @@ As visitas acontecem, em geral, à tarde, das 13h às 17h. Se esse horário não
 A escola funciona das 7h às 19h.
 
 ## Qual o endereço da escola?
-A_PREENCHER (a escola precisa informar o endereço para a Lia responder com segurança).
+A escola fica na Rua Professor Carlos Nelson Ferreira dos Santos, 658, Camboinhas, Niterói, RJ.

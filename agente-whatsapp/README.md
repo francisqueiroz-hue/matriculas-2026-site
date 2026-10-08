@@ -16,7 +16,7 @@ npm run gerar:painel   # depois de editar painel/*
 ## Implantação (resumo; custo-alvo R$0 nos planos gratuitos)
 1. `npx wrangler login` e `npx wrangler d1 create lia` → copie o `database_id` para `wrangler.toml`; escolha `MODELO` do Workers AI com bom português no catálogo atual.
 2. `npx wrangler d1 migrations apply lia --remote`
-3. Base inicial: `npm run semear > /tmp/semente.sql && npx wrangler d1 execute lia --remote --file /tmp/semente.sql` (preencha antes os itens `A_PREENCHER` em `conhecimento/`: endereço, horários, visitas).
+3. Base inicial: `npm run semear > /tmp/semente.sql && npx wrangler d1 execute lia --remote --file /tmp/semente.sql` (itens `A_PREENCHER` em `conhecimento/` não são semeados; hoje não há nenhum pendente).
 4. Segredos (`npx wrangler secret put NOME`): `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_API_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` (do número público), `MCP_TOKEN`, `DONO_EMAIL`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, e as chaves de `npx tsx scripts/gerar-vapid.ts` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`) mais `VAPID_SUBJECT` (`mailto:…`). Opcionais: `VAGAS_VISITA_TARDE` (vagas por dia de visita, padrão 3), `LIMITE_TOKENS_DIA`, `TELEFONE_ESCOLA`, `TELEFONES_IGNORADOS`, `TELEFONE_CLASSLINK`, `TEMPLATE_AVISO_EQUIPE` + `WHATSAPP_INTERNO_*` (aviso urgente), `ANTHROPIC_API_KEY` com `PROVEDOR=claude` e `MODELO=claude-haiku-5-5`.
 5. `npx wrangler deploy`.
 6. **Cloudflare Access** (gratuito) protegendo `/painel/*` e apenas o seu e-mail; copie o *Audience (AUD)* e o domínio do time para os segredos acima.
