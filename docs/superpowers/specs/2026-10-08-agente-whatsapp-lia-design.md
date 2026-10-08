@@ -95,6 +95,10 @@ A tabela de envio do ClassLink (convites, senhas e avisos pelo número interno) 
 - Estilo: retoma o contexto, não repete cumprimento nem refaz pergunta já respondida, mensagens curtas, português do Brasil informal e acolhedor.
 - Isolamento: nenhum dado de uma família entra no contexto de outra; fatos pessoais nunca vão para a base compartilhada.
 
+## 6A. Atendimento humano pelo celular (informado em 2026-10-08)
+
+A equipe **não usa computador**. Portanto: (1) o painel é um PWA mobile-first, instalável, com conversa em formato de WhatsApp, caixa de resposta fixa e rascunho da Lia pré-preenchido; (2) o humano responde pelo **número público**, então a família vê tudo na mesma conversa; (3) quando um humano responde ou clica em "Assumir", a Lia **pausa naquela conversa por 12 horas** e só guarda e notifica; "Devolver à Lia" a reativa; (4) a equipe é avisada por Web Push (gratuito); aviso por WhatsApp (modelo aprovado, número interno) só para prioridade urgente, porque modelo fora da janela de 24h é cobrado; (5) histórico guardado por 90 dias e então apagado. Alternativa avaliada e não adotada por ora: coexistência com o app WhatsApp Business (a equipe responderia direto no app), que depende de re-onboarding do número e de requisitos ainda não confirmados na documentação oficial da Meta.
+
 ## 7. Aprendizado supervisionado
 
 Cron noturno agrupa perguntas parecidas e sem resposta firme, propõe um item de base com a resposta sugerida e a frequência. A coordenação aprova, edita ou rejeita na Fila. Só itens aprovados entram na recuperação.
