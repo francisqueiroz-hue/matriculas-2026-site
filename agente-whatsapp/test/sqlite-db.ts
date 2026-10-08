@@ -6,7 +6,7 @@ import type { Db } from "../src/db";
 /** Banco em memória com as migrações reais aplicadas — só para testes. */
 export function sqliteDb(): Db {
   const sqlite = new DatabaseSync(":memory:");
-  const dir = join(__dirname, "..", "migrations");
+  const dir = join(import.meta.dirname, "..", "migrations");
   for (const f of readdirSync(dir).filter((n) => n.endsWith(".sql")).sort()) {
     sqlite.exec(readFileSync(join(dir, f), "utf8"));
   }
