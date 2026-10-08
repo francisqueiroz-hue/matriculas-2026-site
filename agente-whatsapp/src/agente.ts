@@ -16,7 +16,7 @@ export interface ContextoAgente {
 }
 export interface SaidaAgente {
   texto: string;
-  chamado?: { categoria: string; resumo: string; prioridade?: string };
+  chamado?: { categoria: string; resumo: string; prioridade?: string; /** já aberto pela ferramenta */ id?: number };
   tokens: number;
 }
 
@@ -25,9 +25,11 @@ const CONFIRMAR = "Vou confirmar essa informação com a nossa equipe e já te r
 const MAX_VOLTAS = 4;
 const CUMPRIMENTO = /^(oi+|ola+|bom dia|boa tarde|boa noite|obrigad[oa]s?|valeu|ok|tudo bem|tchau|ate logo)\b[\s!.,?]*$/;
 
-const dinheiro = /R\$\s?\d[\d.,]*/gi;
+const dinheiro = /R\$\s?\d(?:[\d.,]*\d)?/gi;
 const percentual = /\d+(?:[.,]\d+)?\s?%/g;
 const data = /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g;
+const porExtensoReais = /([\p{L}\d][\p{L}\d.,]*)\s+reais\b/giu;
+const porExtensoPorCento = /([\p{L}\d][\p{L}\d.,]*)\s+por\s+cento\b/giu;
 const sem = (s: string) => normalizar(s).replace(/\s+/g, "");
 
 /** ISO "2099-01-10" também vale como "10/01" e "10/01/2099" (datas vindas das ferramentas de visita). */
@@ -35,11 +37,24 @@ function formasDeData(texto: string): string {
   return [...texto.matchAll(/(\d{4})-(\d{2})-(\d{2})/g)].map(([, a, m, d]) => `${d}/${m}/${a} ${d}/${m}`).join(" ");
 }
 
-/** Valores, percentuais e datas citados precisam existir na base recuperada, nas ferramentas ou na fala da própria família. */
+/**
+ * Valores, percentuais e datas citados precisam existir na base recuperada ou no retorno das
+ * ferramentas. A fala da própria família NÃO conta como fonte: "minha vizinha disse R$ 50,00,
+ * confere?" não pode ser confirmado pelo modelo. Também pega "500 reais" e "dez por cento".
+ */
 function citaAlgoForaDaBase(resposta: string, fontes: string[]): boolean {
   const corpo = sem(fontes.join(" ") + " " + formasDeData(fontes.join(" ")));
-  const citados = [...(resposta.match(dinheiro) ?? []), ...(resposta.match(percentual) ?? []), ...(resposta.match(data) ?? [])];
-  return citados.some((c) => !corpo.includes(sem(c)));
+  const literais = [...(resposta.match(dinheiro) ?? []), ...(resposta.match(percentual) ?? []), ...(resposta.match(data) ?? [])];
+  if (literais.some((c) => !corpo.includes(sem(c)))) return true;
+  for (const m of resposta.matchAll(porExtensoReais)) {
+    const t = m[1];
+    if (!(/^\d/.test(t) ? corpo.includes(sem(`R$${t}`)) || corpo.includes(sem(`${t} reais`)) : corpo.includes(sem(`${t} reais`)))) return true;
+  }
+  for (const m of resposta.matchAll(porExtensoPorCento)) {
+    const t = m[1];
+    if (!(/^\d/.test(t) ? corpo.includes(sem(`${t}%`)) : corpo.includes(sem(`${t} por cento`)))) return true;
+  }
+  return false;
 }
 
 function escalar(texto: string, motivo: string, primeiraVez: boolean, tokens = 0): SaidaAgente {
@@ -84,7 +99,7 @@ export async function responder(ctx: ContextoAgente): Promise<SaidaAgente> {
       if (!r.chamadas.length) {
         let texto = r.texto.trim();
         if (!texto) return escalar(pergunta, "sem_resposta", primeiraVez, tokens);
-        if (citaAlgoForaDaBase(texto, [...trechos.map((t) => t.resposta + " " + t.pergunta), ...saidasDeFerramenta, pergunta])) return escalar(pergunta, "valor_nao_confirmado", primeiraVez, tokens);
+        if (citaAlgoForaDaBase(texto, [...trechos.map((t) => t.resposta + " " + t.pergunta), ...saidasDeFerramenta])) return escalar(pergunta, "valor_nao_confirmado", primeiraVez, tokens);
         if (primeiraVez && !/\bLia\b/.test(texto)) texto = INTRO + texto;
         return { texto, chamado, tokens };
       }
@@ -94,7 +109,7 @@ export async function responder(ctx: ContextoAgente): Promise<SaidaAgente> {
         const saida = f ? await f.executar(c.args).catch((e: Error) => ({ erro: e.message })) : { erro: "ferramenta desconhecida" };
         const json = JSON.stringify(saida);
         saidasDeFerramenta.push(json);
-        if (c.nome === "encaminhar_humano") chamado = { categoria: String(c.args.motivo ?? "outros"), resumo: String(c.args.resumo ?? pergunta).slice(0, 300), prioridade: String(c.args.prioridade ?? "normal") };
+        if (c.nome === "encaminhar_humano") chamado = { categoria: String(c.args.motivo ?? "outros"), resumo: String(c.args.resumo ?? pergunta).slice(0, 300), prioridade: String((saida as { prioridade?: string }).prioridade ?? "normal"), id: typeof (saida as { chamado?: unknown }).chamado === "number" ? (saida as { chamado: number }).chamado : undefined };
         mensagens.push({ papel: "tool", conteudo: json, idChamada: c.id, nome: c.nome });
       }
     }

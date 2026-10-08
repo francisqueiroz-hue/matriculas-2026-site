@@ -10,6 +10,7 @@ export interface Env {
   MODELO: string;
   ANTHROPIC_API_KEY?: string;
   LIMITE_MENSAGENS_MES?: string;
+  LIMITE_TOKENS_DIA?: string;
   DONO_EMAIL?: string;
   ACCESS_AUD?: string;
   ACCESS_TEAM_DOMAIN?: string;

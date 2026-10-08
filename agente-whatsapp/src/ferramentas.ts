@@ -53,9 +53,9 @@ export function criarFerramentas(db: Db, telefone: string) {
       },
     },
     encaminhar_humano: {
-      def: { nome: "encaminhar_humano", descricao: "Abre um chamado para a equipe quando faltar informação ou o assunto exigir uma pessoa.", parametros: objeto({ motivo: texto, resumo: texto, prioridade: { type: "string", enum: ["normal", "alta", "urgente"] } }, ["motivo", "resumo"]) },
+      def: { nome: "encaminhar_humano", descricao: "Abre um chamado para a equipe quando faltar informação ou o assunto exigir uma pessoa.", parametros: objeto({ motivo: texto, resumo: texto, prioridade: { type: "string", enum: ["normal", "alta"] } }, ["motivo", "resumo"]) },
       executar: async (a) => {
-        const id = await abrirChamado(db, { telefone, categoria: str(a.motivo) || "outros", prioridade: str(a.prioridade) || "normal", resumo: str(a.resumo).slice(0, 500) });
+        const id = await abrirChamado(db, { telefone, categoria: str(a.motivo) || "outros", prioridade: str(a.prioridade) === "normal" || !str(a.prioridade) ? "normal" : "alta", resumo: str(a.resumo).slice(0, 500) });
         return { chamado: id };
       },
     },

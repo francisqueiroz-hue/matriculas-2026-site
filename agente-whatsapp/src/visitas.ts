@@ -16,7 +16,8 @@ export function horariosLivres(db: Db, aPartirDe: string): Promise<Horario[]> {
 /** A vaga é tomada por um UPDATE condicional (atômico no D1); só então a reserva é gravada. */
 export async function reservar(db: Db, telefone: string, horarioId: number, serie: string): Promise<ResultadoReserva> {
   const chave = chaveTelefone(telefone);
-  if (!(await db.first("SELECT id FROM visitas_horarios WHERE id = ?", [horarioId]))) return { ok: false, motivo: "inexistente" };
+  const horario = await db.first<{ data: string }>("SELECT data FROM visitas_horarios WHERE id = ?", [horarioId]);
+  if (!horario || horario.data < new Date().toISOString().slice(0, 10)) return { ok: false, motivo: "inexistente" };
   if (await db.first("SELECT id FROM visitas WHERE telefone = ? AND horario_id = ?", [chave, horarioId])) return { ok: false, motivo: "duplicada" };
   const tomou = await db.run("UPDATE visitas_horarios SET vagas = vagas - 1 WHERE id = ? AND vagas > 0", [horarioId]);
   if (tomou.changes === 0) return { ok: false, motivo: "lotado" };

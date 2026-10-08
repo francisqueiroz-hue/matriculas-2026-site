@@ -79,7 +79,7 @@ async function inicio() {
     <h2 style="font-size:16px">Conversas</h2>
     ${conversas.length ? conversas.map((c) => `<a class="card conv" href="#/c/${esc(c.telefone)}"><b>${esc(mascara(c.telefone))}</b>
       ${c.humano ? '<span class="tag">Equipe</span>' : '<span class="tag">Lia</span>'}${c.chamadosAbertos ? '<span class="tag alta">' + c.chamadosAbertos + ' chamado(s)</span>' : ""}
-      <div class="mut">${esc(c.ultima).slice(0, 90)} · ${hora(c.ts)}</div></a>`).join("") : '<div class="vazio">Nenhuma conversa ainda.</div>'}`);
+      <div class="mut">${esc(String(c.ultima).slice(0, 90))} · ${hora(c.ts)}</div></a>`).join("") : '<div class="vazio">Nenhuma conversa ainda.</div>'}`);
   $("#avisos").onclick = ativarAvisos(r.vapidPublicKey);
 }
 

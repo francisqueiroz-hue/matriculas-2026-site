@@ -10,7 +10,7 @@ export interface ItemBase {
 const PALAVRAS_COMUNS = new Set([
   "de", "da", "do", "das", "dos", "a", "o", "as", "os", "e", "em", "no", "na", "um", "uma", "que", "qual", "quais", "como",
   "quando", "onde", "para", "por", "com", "voce", "voces", "tem", "ter", "tenho", "vai", "vao", "ser", "sao", "meu", "minha",
-  "se", "eu", "me", "ao", "ou", "mais", "ja", "nao", "sim", "pode", "posso", "gostaria", "queria", "quero", "bom", "boa", "dia", "tarde", "noite",
+  "se", "eu", "me", "ao", "ou", "mais", "ja", "nao", "sim", "pode", "posso", "gostaria", "queria", "quero", "bom", "boa", "dia", "tarde", "noite", "pro", "pra", "filho", "filha", "escola", "aula", "aulas",
 ]);
 
 /** Termos de busca seguros para FTS5: sem operadores, com prefixo e plural simplificado. */
@@ -39,13 +39,20 @@ export async function buscar(db: Db, consulta: string, limite = 4): Promise<Item
   const t = termos(consulta);
   if (!t.length) return [];
   const match = t.map((x) => `"${x}"*`).join(" OR ");
-  return db.all<ItemBase>(
+  const candidatos = await db.all<ItemBase>(
     `SELECT b.id AS id, b.pergunta AS pergunta, b.resposta AS resposta
        FROM base_fts JOIN base b ON b.id = base_fts.rowid
       WHERE base_fts MATCH ? AND b.aprovado = 1
       ORDER BY bm25(base_fts) LIMIT ?`,
-    [match, limite],
+    [match, limite * 3],
   );
+  // Um OR de prefixos puxa trechos sem relação (ex.: "filho"); exige uma fração mínima dos termos.
+  const minimo = t.length <= 2 ? 1 : 2;
+  const acertos = (i: ItemBase) => {
+    const texto = normalizar(`${i.pergunta} ${i.resposta}`);
+    return t.filter((x) => new RegExp(`\\b${x}`).test(texto)).length;
+  };
+  return candidatos.filter((i) => acertos(i) >= minimo).slice(0, limite);
 }
 
 /** Formato dos arquivos em conhecimento/: "## Pergunta" seguido da resposta. */

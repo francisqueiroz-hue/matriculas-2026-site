@@ -26,7 +26,7 @@ const REGRAS: { categoria: Categoria; prioridade: Prioridade; re: RegExp }[] = [
   { categoria: "cancelamento", prioridade: "normal", re: /\b(cancel|trancar|transferir|transferenci|tirar (meu|minha|o|a) (filh|aluno|crianca)|desistir|desistenc|desmatricul|rescis|distrato)/ },
   { categoria: "desconto", prioridade: "normal", re: /\b(desconto|abatiment|negoci|bolsa|isenc|parcel|pagar menos|baixar o valor|abaixar o valor|mais barato)/ },
   { categoria: "reclamacao", prioridade: "normal", re: /\b(reclam|insatisf|absurd|descaso|pessim|inaceitav|queixa|falta de respeito|desrespeit|reembols|revolt|vergonha|indignad)/ },
-  { categoria: "outros_delicados", prioridade: "normal", re: /\b(ignore (as|todas as|todos os) (regras|instrucoes)|esqueca (as )?instrucoes|system prompt|a partir de agora voce|voce agora e|finja que|fingir que|me (passe|de|diga) (o )?(cpf|senha|telefone)|dados de outr|senha do|revele (suas|as) regras)/ },
+  { categoria: "outros_delicados", prioridade: "normal", re: /\b((ignor|desconsider|descart|esquec)\w*\b[^.?!\n]{0,40}\b(regras|instrucoes|instrucao|orientacoes|diretrizes|restricoes|prompt)|system prompt|a partir de agora voce|voce agora e|finja que|fingir que|me (passe|de|diga) (o )?(cpf|senha|telefone)|dados de outr|senha d[oa]s? (wifi|wi-fi|diretoria|coordenacao|secretaria|sistema|professor\w*)|revele (suas|as) regras)/ },
 ];
 
 const CATEGORIAS = new Set<string>(REGRAS.map((r) => r.categoria));
@@ -49,13 +49,18 @@ function lerClassificacao(texto: string): { categoria: string | null; risco: str
   }
 }
 
-/** Decide, antes de qualquer resposta, se a Lia pode responder ou deve só acolher e escalar. */
-export async function triar(texto: string, provedor: Provedor): Promise<Decisao> {
+/** Só as regras duras (sem IA, sem custo). `null` = nenhuma regra casou. */
+export function triarPorRegras(texto: string): Decisao | null {
   const limpo = normalizar(texto).trim();
   if (!limpo) return { acao: "acolher", categoria: "outros_delicados", prioridade: "normal" };
-
   const regra = REGRAS.find((r) => r.re.test(limpo));
-  if (regra) return { acao: "acolher", categoria: regra.categoria, prioridade: regra.prioridade };
+  return regra ? { acao: "acolher", categoria: regra.categoria, prioridade: regra.prioridade } : null;
+}
+
+/** Decide, antes de qualquer resposta, se a Lia pode responder ou deve só acolher e escalar. */
+export async function triar(texto: string, provedor: Provedor): Promise<Decisao> {
+  const dura = triarPorRegras(texto);
+  if (dura) return dura;
 
   try {
     const r = await provedor.gerar({ sistema: SISTEMA_CLASSIFICADOR, mensagens: [{ papel: "user", conteudo: texto }], json: true });

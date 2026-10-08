@@ -39,6 +39,8 @@ function textoDe(m: Json): string {
     const r = obj(obj(m.interactive)?.button_reply) ?? obj(obj(m.interactive)?.list_reply);
     return String(r?.title ?? r?.id ?? "");
   }
+  // Legenda de foto/vídeo/documento é texto da família e precisa passar pela triagem.
+  if (m.type === "image" || m.type === "video" || m.type === "document") return String(obj(m[m.type as string])?.caption ?? "");
   return "";
 }
 

@@ -32,7 +32,10 @@ export async function tratarPainel(req: Request, env: Env, db: Db, deps: DepsPai
   // Exigir JSON impede que um formulário de outro site dispare ações com o login do dono.
   let corpo: Record<string, any> = {};
   if (req.method === "POST") {
-    if (!(req.headers.get("content-type") ?? "").includes("application/json")) return erro("use application/json", 415);
+    const site = req.headers.get("sec-fetch-site");
+    const origem = req.headers.get("origin");
+    if ((site && site !== "same-origin" && site !== "none") || (origem && origem !== url.origin)) return erro("origem não permitida", 403);
+    if ((req.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase() !== "application/json") return erro("use application/json", 415);
     corpo = (await req.json().catch(() => ({}))) ?? {};
   } else if (req.method !== "GET") return erro("método não permitido", 405);
 

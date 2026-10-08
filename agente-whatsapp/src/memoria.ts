@@ -1,5 +1,6 @@
 import type { Db } from "./db";
 import { chaveTelefone } from "./telefone";
+import { triarPorRegras } from "./triagem";
 
 const MAX_FATOS = 12;
 const MAX_TEXTO = 200;
@@ -7,7 +8,9 @@ export const SENSIVEL = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b|[\w.+-]+@[\w-]+\.[\w.]
 
 /** Fatos curtos e privados de uma família (série do filho, período preferido, último assunto). */
 export async function salvarFato(db: Db, telefone: string, texto: string, agora = Date.now()): Promise<void> {
-  if (SENSIVEL.test(texto)) throw new Error("dado sensível não pode ir para a memória");
+  const dura = triarPorRegras(texto);
+  const delicado = dura?.acao === "acolher" && ["saude", "laudo", "risco_crianca"].includes(dura.categoria);
+  if (SENSIVEL.test(texto) || delicado) throw new Error("dado sensível não pode ir para a memória");
   const chave = chaveTelefone(telefone);
   await db.run("INSERT INTO fatos (telefone, texto, criado_em, usado_em) VALUES (?, ?, ?, ?)", [chave, texto.trim().slice(0, MAX_TEXTO), agora, agora]);
   await db.run(

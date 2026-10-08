@@ -129,7 +129,7 @@ export function escolherProvedor(env: Env): Provedor {
 }
 
 /** Só para testes: devolve o roteiro em ordem (ou calcula a resposta por requisição). */
-export function provedorFake(roteiro: Resposta[] | ((req: Requisicao) => Resposta)): Provedor & { chamadas: Requisicao[] } {
+export function provedorFake(roteiro: Resposta[] | ((req: Requisicao) => Resposta | Promise<Resposta>)): Provedor & { chamadas: Requisicao[] } {
   const chamadas: Requisicao[] = [];
   let i = 0;
   return {

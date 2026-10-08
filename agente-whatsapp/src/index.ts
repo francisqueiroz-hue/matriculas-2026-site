@@ -3,6 +3,7 @@ import { processarEcos, processarTurno, type Deps } from "./fluxo";
 import { apagarAntigas } from "./conversa";
 import { gerarSugestoes } from "./aprendizado";
 import { escolherProvedor } from "./provedor";
+import { contandoTokens } from "./limites";
 import { tratarMcp } from "./mcp";
 import { tratarPainel } from "./painel";
 import type { Env } from "./tipos";
@@ -52,7 +53,7 @@ export function criarApp(opcoes: OpcoesApp = {}) {
       const db = obterDb(env);
       ctx.waitUntil((async () => {
         await apagarAntigas(db);
-        await gerarSugestoes(db, opcoes.provedor ?? escolherProvedor(env), new Date(Date.now() - 7 * 24 * 3600_000));
+        await gerarSugestoes(db, contandoTokens(db, opcoes.provedor ?? escolherProvedor(env)), new Date(Date.now() - 7 * 24 * 3600_000));
       })().catch((e) => console.error("cron falhou", (e as Error).message)));
     },
   };

@@ -68,7 +68,24 @@ export async function listarConversas(db: Db, agora = new Date()) {
   return linhas.map((l) => ({ telefone: l.telefone, ultima: l.ultima ?? "", ts: l.ts, humano: l.humano_ate > agora.getTime(), chamadosAbertos: l.abertos }));
 }
 
+/** Retenção: mensagens, chamados resolvidos e perguntas anonimizadas após `dias`; deduplicação após 30 dias; contadores por contato após 2 dias. */
 export async function apagarAntigas(db: Db, dias = 90, agora = new Date()): Promise<number> {
-  const r = await db.run("DELETE FROM mensagens WHERE ts < ?", [agora.getTime() - dias * 24 * HORA]);
+  const corte = agora.getTime() - dias * 24 * HORA;
+  const r = await db.run("DELETE FROM mensagens WHERE ts < ?", [corte]);
+  await db.run("DELETE FROM chamados WHERE status = 'resolvido' AND criado_em < ?", [corte]);
+  await db.run("DELETE FROM perguntas WHERE criado_em < ?", [corte]);
+  await db.run("DELETE FROM processadas WHERE em < ?", [agora.getTime() - 30 * 24 * HORA]);
+  await db.run("DELETE FROM uso WHERE chave LIKE 'c:%' AND substr(chave, -13) < ?", [new Date(agora.getTime() - 2 * 24 * HORA).toISOString().slice(0, 13)]);
   return r.changes;
+}
+
+/** Só uma chamada atende uma conversa por vez (evita duas respostas em paralelo); expira sozinha. */
+export async function reivindicar(db: Db, telefone: string, agora = new Date(), ttlMs = 90_000): Promise<boolean> {
+  const tel = chaveTelefone(telefone);
+  await db.run("INSERT INTO conversas (telefone) VALUES (?) ON CONFLICT(telefone) DO NOTHING", [tel]);
+  const r = await db.run("UPDATE conversas SET atendendo_ate = ? WHERE telefone = ? AND atendendo_ate < ?", [agora.getTime() + ttlMs, tel, agora.getTime()]);
+  return r.changes === 1;
+}
+export async function liberar(db: Db, telefone: string): Promise<void> {
+  await db.run("UPDATE conversas SET atendendo_ate = 0 WHERE telefone = ?", [chaveTelefone(telefone)]);
 }
