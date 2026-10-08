@@ -18,7 +18,7 @@ Um agente que atende pelo número de WhatsApp Business da escola (Espaço Kids e
 
 | Decisão | Escolha |
 |---|---|
-| Canal | WhatsApp Cloud API (oficial, Meta). open-wa descartado: não oficial, risco de banimento. |
+| Canal | WhatsApp Cloud API (oficial, Meta), **no número público (21) 96469-9441**. O número interno do ClassLink não muda. open-wa descartado: não oficial, risco de banimento. |
 | Persona | Um único agente, "Lia", assistente virtual do Espaço Kids e do Instituto Fokus. Sempre se identifica como assistente virtual. |
 | Mensagens delicadas | **Duas ações juntas:** acolhimento automático e curto + rascunho de resposta na fila para um humano aprovar. |
 | Aprendizado | Sugerido automaticamente, **publicado só após aprovação** da coordenação. |
@@ -36,7 +36,7 @@ Um agente que atende pelo número de WhatsApp Business da escola (Espaço Kids e
 
 ```
 Famílias → WhatsApp Cloud API → Worker "lia"
-  1. valida assinatura (X-Hub-Signature-256) e deduplica por wamid
+  1. valida assinatura (X-Hub-Signature-256), confere phone_number_id e deduplica por wamid
   2. identifica contato (família atual / interessado novo / equipe)
   3. TRIAGEM  ──► delicado → acolhimento + rascunho na Fila  (fim)
         │
@@ -63,9 +63,20 @@ Painel "Fila da Lia" (Cloudflare Pages + Access): aprovar/editar rascunhos e bas
 `buscar_conhecimento(consulta)`, `ler_memoria_familia()`, `salvar_fato_familia(fato)`, `consultar_horarios_visita()`, `reservar_visita(data, turno, serie)`, `encaminhar_humano(motivo, resumo, prioridade)`.
 O mesmo servidor permite ao gestor administrar a base e a fila pelo Claude, de qualquer lugar.
 
-### 4.3 Convivência com o ClassLink
+### 4.3 Dois números, dois papéis (informado pelo responsável em 2026-10-08)
 
-Hoje o webhook da Meta aponta para o ClassLink (`classlink/src/app/api/webhooks/whatsapp/route.ts`), e a Meta aceita **um webhook por aplicativo**. O Worker passa a ser a entrada e **repassa o payload original, com a assinatura, ao ClassLink**, para "ACESSO" e histórico continuarem funcionando. Regra: mensagens de pedido de acesso (`ehPedidoDeAcesso`) não são respondidas pela Lia, evitando resposta dupla. Risco principal; coberto por testes de contrato.
+| Número | Papel | Webhook |
+|---|---|---|
+| **(21) 99286-5778** | Interno, usado pelo ClassLink, não divulgado às famílias | Continua exatamente como está (`classlink/src/app/api/webhooks/whatsapp/route.ts`). **Não é alterado.** |
+| **(21) 96469-9441** | Público, divulgado como WhatsApp da escola | **Lia atende aqui.** |
+
+Ambos já estão aprovados na Meta. Como a Meta escolhe o destino do webhook primeiro pelo **número** (override por número, depois WABA, depois app — [documentação da Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/override/)), basta configurar para o número público um `override_callback_uri` apontando ao Worker. O ClassLink segue recebendo só o tráfego do número interno e **deixa de ser um risco**. Salvaguarda extra: o Worker confere `metadata.phone_number_id` no payload e ignora qualquer mensagem que não seja do número público.
+
+A tabela de envio do ClassLink (convites, senhas e avisos pelo número interno) não muda.
+
+**Pergunta crítica em aberto (bloqueia a implantação, não o desenho):** em que modo o número público está hoje?
+- **Já na Cloud API:** a Lia assume. Quem atende hoje (se alguém) passa a usar a Fila da Lia.
+- **No app WhatsApp Business no celular:** a Cloud API normalmente exige tirar o número do app. A alternativa é o modo *coexistência*, em que app e API funcionam juntos (exige app atualizado, onboarding por QR e abrir o app ao menos a cada 13 dias; conforme provedores — [Kapso](https://kapso.ai/blog/whatsapp-business-app-coexistence-cloud-api), [8x8](https://developer.8x8.com/connect/docs/whatsapp/whatsapp-business-app-coexistence); **não confirmado em documentação oficial da Meta**). Com coexistência, a equipe continua conversando pelo app e a Lia responde pela API.
 
 ## 5. Triagem antes de qualquer resposta
 
@@ -108,7 +119,7 @@ Princípio: **uma única fonte de verdade em arquivos pequenos, carregada sob de
 ## 10. Testes e critérios de aceite
 
 - Triagem: conjunto de frases reais por categoria; **nenhum** caso delicado pode receber resposta de conteúdo (taxa de vazamento = 0 no conjunto).
-- Webhook: assinatura inválida rejeitada; reentrega deduplicada; repasse ao ClassLink idêntico ao original.
+- Webhook: assinatura inválida rejeitada; reentrega deduplicada; mensagem de `phone_number_id` diferente do número público é ignorada.
 - Telefone: variantes com e sem o nono dígito.
 - Agente: respostas ancoradas na base; sem base = escala; não inventa preço ou data.
 - Visitas: sem conflito de horário; confirmação e lembrete dentro da janela.
@@ -121,6 +132,7 @@ Envio ativo em massa, cobrança automática, áudios/imagens (a Lia pede texto e
 
 ## 12. Perguntas em aberto (não bloqueiam o plano)
 
+0. Modo atual do número público (Cloud API ou app Business) — ver 4.3.
 1. Valores oficiais de mensagens de serviço no Brasil (conferir na Meta).
 2. Limites oficiais do D1 e do Workers AI para o volume real da escola.
 3. Horários de visita, endereço, valores e documentos de matrícula: fornecidos pela escola para semear a base.
