@@ -100,7 +100,7 @@ describe("regras do contrato do app", () => {
     expect(etapaPelaTurma("Pré I")).toBe("EI");
   });
 
-  it("configuração inicial bloqueia o envio até preencher valores e dados da escola", () => {
+  it("lista o que sai em branco no contrato enquanto a configuração não for preenchida", () => {
     const p = pendenciasConfig(configInicial());
     expect(p).toContain("Parcela cheia — Integral");
     expect(p).toContain("Representante legal da escola");
@@ -158,7 +158,9 @@ describe("validação do painel", () => {
     expect(configContratoSchema.safeParse({ ...c, periodos: c.periodos.slice(0, 3) }).success).toBe(false);
   });
 
-  it("envio em lote exige ao menos um aluno e período válido", () => {
+  it("envio em lote exige ao menos um aluno; período é opcional", () => {
+    expect(envioLoteSchema.safeParse({ anoLetivo: 2027, titulo: "Contrato", itens: [{ studentId: "a", periodo: null, etapa: "EI" }] }).success).toBe(true);
+    expect(envioLoteSchema.safeParse({ anoLetivo: 2027, titulo: "Contrato", itens: [{ studentId: "a", etapa: "EI" }] }).success).toBe(true);
     expect(envioLoteSchema.safeParse({ anoLetivo: 2027, titulo: "Contrato", itens: [] }).success).toBe(false);
     expect(envioLoteSchema.safeParse({ anoLetivo: 2027, titulo: "Contrato", itens: [{ studentId: "a", periodo: "NOTURNO", etapa: "EI" }] }).success).toBe(false);
     expect(envioLoteSchema.safeParse({ anoLetivo: 2027, titulo: "Contrato", itens: [{ studentId: "a", periodo: "INTEGRAL", etapa: "EI" }] }).success).toBe(true);
@@ -186,4 +188,14 @@ describe("geração do PDF", () => {
     expect(doc.getPageCount()).toBeLessThanOrEqual(8);
   });
 
+  it("gera o contrato em branco para assinar sem valores nem dados da família", async () => {
+    const bytes = await gerarContrato2027({
+      condicoes: { modelo: MODELO_CONTRATO_2027, anoLetivo: 2027, etapa: "EF1", turma: "3º Ano A", periodo: null, parcelaBruta: 0, parcelaLiquida: 0, config: configInicial() },
+      familia: null,
+      aluno: { nome: "Davi Silva" },
+      data: null,
+    });
+    const doc = await PDFDocument.load(bytes);
+    expect(doc.getPageCount()).toBeGreaterThanOrEqual(5);
+  });
 });

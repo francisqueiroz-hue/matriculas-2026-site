@@ -135,7 +135,8 @@ export const envioLoteSchema = z.object({
     .array(
       z.object({
         studentId: z.string().min(1),
-        periodo: z.enum(["INTEGRAL", "SEMI_INTEGRAL", "PARCIAL", "ESCOLAR"]),
+        // Ausente/null = período não informado (a família marca no contrato).
+        periodo: z.enum(["INTEGRAL", "SEMI_INTEGRAL", "PARCIAL", "ESCOLAR"]).nullish(),
         etapa: z.enum(["EI", "EF1"]),
         // Ajuste individual (bolsa/desconto); ausente = valor da tabela do período.
         parcelaBruta: valor.optional(),

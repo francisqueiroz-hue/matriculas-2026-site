@@ -1,10 +1,7 @@
 -- Contrato gerado pelo app a partir do modelo 2027: configuração por ano letivo, condições
--- fixadas no envio e dados conferidos pela família. Migração somente aditiva.
+-- fixadas no envio e dados que a família opcionalmente preenche. Migração somente aditiva.
 -- (ALTER TYPE ... ADD VALUE é permitido dentro da transação no PostgreSQL 12+, desde que o
 -- valor novo não seja usado na mesma transação — esta migração não o usa.)
-
--- AlterEnum
-ALTER TYPE "ContratoStatus" ADD VALUE 'AGUARDANDO_DADOS' BEFORE 'AGUARDANDO_ASSINATURA';
 
 -- AlterEnum
 ALTER TYPE "ContratoEventoTipo" ADD VALUE 'DADOS_PREENCHIDOS' BEFORE 'ASSINADO_ENVIADO';

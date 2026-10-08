@@ -100,13 +100,9 @@ describe("transições de status do contrato", () => {
     expect(podeExcluirContrato("AGUARDANDO_ASSINATURA", 1)).toBe(false);
     expect(podeExcluirContrato("DEVOLVIDO", 1)).toBe(false);
     expect(podeExcluirContrato("COMPLETO", 1)).toBe(false);
-    expect(podeExcluirContrato("AGUARDANDO_DADOS", 0)).toBe(true);
   });
 
-  it("contrato do app: família confere os dados antes de poder enviar o assinado", () => {
-    expect(podeEnviarAssinado("AGUARDANDO_DADOS")).toBe(false);
-    expect(proximoStatus("AGUARDANDO_DADOS", "PREENCHER_DADOS")).toBe("AGUARDANDO_ASSINATURA");
-    // Correção dos dados antes de enviar o assinado (inclusive depois de devolvido).
+  it("contrato do app: preencher os dados no app é opcional e só vale antes de enviar o assinado", () => {
     expect(proximoStatus("AGUARDANDO_ASSINATURA", "PREENCHER_DADOS")).toBe("AGUARDANDO_ASSINATURA");
     expect(proximoStatus("DEVOLVIDO", "PREENCHER_DADOS")).toBe("AGUARDANDO_ASSINATURA");
     // Depois de enviado o assinado, os dados ficam travados.

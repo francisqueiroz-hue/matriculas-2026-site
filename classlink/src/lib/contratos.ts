@@ -1,7 +1,7 @@
 // Regras do módulo de contratos de matrícula. Arquivo sem dependências de servidor:
 // é usado tanto pelas rotas de API quanto pelas telas (validação antes do envio).
 
-export type ContratoStatus = "AGUARDANDO_DADOS" | "AGUARDANDO_ASSINATURA" | "EM_CONFERENCIA" | "AGUARDANDO_ORIGINAL" | "COMPLETO" | "DEVOLVIDO";
+export type ContratoStatus = "AGUARDANDO_ASSINATURA" | "EM_CONFERENCIA" | "AGUARDANDO_ORIGINAL" | "COMPLETO" | "DEVOLVIDO";
 export type ContratoMetodo = "GOVBR" | "MANUSCRITA";
 export type ContratoAcao = "PREENCHER_DADOS" | "ENVIAR_ASSINADO" | "APROVAR" | "DEVOLVER" | "ORIGINAL_RECEBIDO";
 
@@ -17,7 +17,6 @@ export const LINK_ASSINADOR_GOVBR = "https://assinador.iti.br";
 export const LINK_VALIDAR_ITI = "https://validar.iti.gov.br";
 
 export const STATUS_CONTRATO_LABEL: Record<ContratoStatus, string> = {
-  AGUARDANDO_DADOS: "Aguardando dados da família",
   AGUARDANDO_ASSINATURA: "Aguardando assinatura",
   EM_CONFERENCIA: "Em conferência",
   AGUARDANDO_ORIGINAL: "Aguardando via original",
@@ -35,7 +34,7 @@ export class ContratoErro extends Error {}
 const TRANSICOES: Record<Exclude<ContratoAcao, "APROVAR">, { de: ContratoStatus[]; para: ContratoStatus }> = {
   // Contrato do modelo do app: a família confere os dados e o app gera o PDF. Pode corrigir
   // os dados (gerando um PDF novo) enquanto ainda não enviou o contrato assinado.
-  PREENCHER_DADOS: { de: ["AGUARDANDO_DADOS", "AGUARDANDO_ASSINATURA", "DEVOLVIDO"], para: "AGUARDANDO_ASSINATURA" },
+  PREENCHER_DADOS: { de: ["AGUARDANDO_ASSINATURA", "DEVOLVIDO"], para: "AGUARDANDO_ASSINATURA" },
   ENVIAR_ASSINADO: { de: ["AGUARDANDO_ASSINATURA", "DEVOLVIDO"], para: "EM_CONFERENCIA" },
   DEVOLVER: { de: ["EM_CONFERENCIA"], para: "DEVOLVIDO" },
   ORIGINAL_RECEBIDO: { de: ["AGUARDANDO_ORIGINAL"], para: "COMPLETO" },
@@ -71,7 +70,7 @@ export function proximoStatus(status: ContratoStatus, acao: ContratoAcao, metodo
 
 /** Excluir só é permitido antes de qualquer envio da família — depois disso o histórico é prova. */
 export function podeExcluirContrato(status: ContratoStatus, totalEnviosFamilia: number): boolean {
-  return (status === "AGUARDANDO_DADOS" || status === "AGUARDANDO_ASSINATURA") && totalEnviosFamilia === 0;
+  return status === "AGUARDANDO_ASSINATURA" && totalEnviosFamilia === 0;
 }
 
 /**

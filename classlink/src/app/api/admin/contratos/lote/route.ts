@@ -4,16 +4,21 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
-import { responsaveisDoAluno } from "@/lib/contratos-server";
+import { responsaveisDoAluno, sha256Hex } from "@/lib/contratos-server";
 import { carregarConfig } from "@/lib/contrato-modelo/servidor";
+import { gerarContrato2027 } from "@/lib/contrato-modelo/gerar";
 import { envioLoteSchema } from "@/lib/contrato-modelo/validacao";
-import { MODELO_CONTRATO_2027, pendenciasConfig, type CondicoesContrato } from "@/lib/contrato-modelo/tipos";
+import { MODELO_CONTRATO_2027, type CondicoesContrato } from "@/lib/contrato-modelo/tipos";
+
+// Um PDF por aluno (~0,3 s cada): folga para a turma inteira de uma vez.
+export const maxDuration = 60;
 
 /**
- * Envia o contrato do modelo do app para vários alunos de uma vez. Cada contrato guarda
- * uma cópia das condições do momento (valores, parcelas, dados da escola): mudar a
- * configuração depois não altera contratos já enviados. A família recebe aviso para
- * conferir os dados; o PDF é gerado quando ela confirma.
+ * Envia o contrato guardado no app para vários alunos de uma vez, já pronto para assinar.
+ * O PDF sai com o nome e a turma do aluno; o resto (dados da família, e os valores se a
+ * escola não os configurou) fica em branco para preencher à mão. Se quiser, a família
+ * preenche os dados no app e recebe o contrato já preenchido.
+ * Cada contrato guarda uma cópia das condições do momento do envio.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -24,14 +29,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { config } = await carregarConfig(session.schoolId, body.anoLetivo);
-    const pendencias = pendenciasConfig(config);
-    if (pendencias.length > 0) {
-      return NextResponse.json(
-        { error: `Complete a configuração do contrato antes de enviar: ${pendencias.slice(0, 5).join("; ")}${pendencias.length > 5 ? "…" : ""}`, pendencias },
-        { status: 409 },
-      );
-    }
-
     const ids = [...new Set(body.itens.map((i) => i.studentId))];
     const [alunos, existentes] = await Promise.all([
       prisma.student.findMany({
@@ -60,23 +57,23 @@ export async function POST(request: NextRequest) {
         ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: `Já tem contrato ${body.anoLetivo} do modelo do app` });
         continue;
       }
-      const periodo = config.periodos.find((p) => p.chave === item.periodo)!;
-      const parcelaBruta = item.parcelaBruta ?? periodo.parcelaBruta;
-      const parcelaLiquida = item.parcelaLiquida ?? periodo.parcelaLiquida;
-      if (parcelaLiquida > parcelaBruta || parcelaBruta <= 0) {
-        ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: "Valores da parcela inválidos" });
-        continue;
-      }
+      // Valores só entram se a escola os configurou para o período escolhido; senão saem em branco.
+      const periodo = item.periodo ? config.periodos.find((p) => p.chave === item.periodo) : undefined;
+      const parcelaBruta = item.parcelaBruta ?? periodo?.parcelaBruta ?? 0;
+      const parcelaLiquida = item.parcelaLiquida ?? periodo?.parcelaLiquida ?? 0;
+      const valoresOk = parcelaBruta > 0 && parcelaLiquida > 0 && parcelaLiquida <= parcelaBruta;
       const condicoes: CondicoesContrato = {
         modelo: MODELO_CONTRATO_2027,
         anoLetivo: body.anoLetivo,
         etapa: item.etapa,
         turma: aluno.class.name,
-        periodo: item.periodo,
-        parcelaBruta,
-        parcelaLiquida,
+        periodo: item.periodo ?? null,
+        parcelaBruta: valoresOk ? parcelaBruta : 0,
+        parcelaLiquida: valoresOk ? parcelaLiquida : 0,
         config,
       };
+      const pdf = await gerarContrato2027({ condicoes, familia: null, aluno: { nome: aluno.name }, data: null });
+      const sha256 = sha256Hex(pdf);
       const contrato = await prisma.$transaction(async (tx) => {
         const c = await tx.contrato.create({
           data: {
@@ -84,15 +81,35 @@ export async function POST(request: NextRequest) {
             studentId: aluno.id,
             anoLetivo: body.anoLetivo,
             titulo: body.titulo,
-            status: "AGUARDANDO_DADOS",
+            status: "AGUARDANDO_ASSINATURA",
             modelo: MODELO_CONTRATO_2027,
             condicoes: JSON.parse(JSON.stringify(condicoes)),
             criadoPorId: session.sub,
           },
           select: { id: true },
         });
+        await tx.contratoArquivo.create({
+          data: {
+            contratoId: c.id,
+            tipo: "MODELO",
+            nomeArquivo: `Contrato ${body.anoLetivo} - ${aluno.name}.pdf`,
+            mimeType: "application/pdf",
+            tamanhoBytes: pdf.byteLength,
+            sha256,
+            conteudo: Uint8Array.from(pdf),
+            enviadoPorId: session.sub,
+            ipOrigem,
+          },
+        });
         await tx.contratoEvento.create({
-          data: { contratoId: c.id, tipo: "CRIADO", usuarioId: session.sub, ipOrigem, detalhe: `Modelo do app · ${periodo.nome}` },
+          data: {
+            contratoId: c.id,
+            tipo: "CRIADO",
+            usuarioId: session.sub,
+            ipOrigem,
+            arquivoSha256: sha256,
+            detalhe: `Modelo do app${periodo ? ` · ${periodo.nome}` : ""}`,
+          },
         });
         return c;
       });
@@ -100,7 +117,7 @@ export async function POST(request: NextRequest) {
       criados.push({ id: contrato.id, studentId: aluno.id, nome: aluno.name });
       await notifyUsers(await responsaveisDoAluno(aluno.id), {
         title: "Contrato de matrícula 2027",
-        body: `Confira os dados e assine o contrato de ${aluno.name.split(" ")[0]} pelo app — leva poucos minutos e é grátis pelo gov.br.`,
+        body: `O contrato de ${aluno.name.split(" ")[0]} está no app para assinar — grátis pelo gov.br ou à mão.`,
         url: "/dashboard/contratos",
       }).catch((err) => console.error("push notify failed", err));
     }

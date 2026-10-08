@@ -24,22 +24,21 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/contrat
     const achado = await carregar(id, session);
     if (!achado) return NextResponse.json({ error: "Contrato não encontrado" }, { status: 404 });
     const { contrato, condicoes: c } = achado;
-    const periodo = c.config.periodos.find((p) => p.chave === c.periodo);
+    const periodo = c.periodo ? c.config.periodos.find((p) => p.chave === c.periodo) : undefined;
     const aluno = await prisma.student.findUnique({ where: { id: contrato.studentId }, select: { name: true } });
+    const temValores = c.parcelaBruta > 0;
     return NextResponse.json({
       resumo: {
         aluno: aluno?.name ?? "",
         turma: c.turma,
         etapa: c.etapa,
-        periodo: periodo ? `${periodo.nome} (${periodo.horario})` : c.periodo,
+        periodo: periodo ? `${periodo.nome} (${periodo.horario})` : null,
+        temValores,
         parcelas: c.config.parcelas.quantidade,
         vencimentoDia: c.config.parcelas.vencimentoDia,
         parcelaBruta: c.parcelaBruta,
         parcelaLiquida: c.parcelaLiquida,
         ...calcularValores({ parcelaBruta: c.parcelaBruta, parcelaLiquida: c.parcelaLiquida, quantidade: c.config.parcelas.quantidade }),
-        portalAluno: c.config.escola.portalAluno,
-        siteEscola: c.config.escola.siteEscola,
-        redesSociais: c.config.escola.redesSociais,
       },
       dados: await sugestaoDadosFamilia(session.sub, contrato.studentId, contrato.dadosFamilia),
       jaPreenchido: Boolean(contrato.dadosFamilia),
@@ -50,9 +49,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/contrat
 }
 
 /**
- * Família confirma os dados; o app gera o PDF do contrato preenchido, que ela baixa, assina
- * (gov.br ou à mão) e envia. Correções antes do envio do assinado geram um PDF novo — o
- * anterior fica no histórico.
+ * Opcional: a família preenche os dados no app e o app gera o contrato já preenchido. O
+ * contrato em branco enviado pela escola continua valendo para quem preferir assinar direto.
+ * Correções antes do envio do assinado geram um PDF novo; o anterior fica no histórico.
  */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/contratos/[id]/dados">) {
   try {
@@ -62,9 +61,10 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/contrat
     if (!achado) return NextResponse.json({ error: "Contrato não encontrado" }, { status: 404 });
     const { contrato, condicoes } = achado;
 
-    let novoStatus;
+    // Só antes de enviar o assinado. Não muda a situação: se estava devolvido, continua
+    // devolvido (com o motivo) até a família reenviar.
     try {
-      novoStatus = proximoStatus(contrato.status, "PREENCHER_DADOS");
+      proximoStatus(contrato.status, "PREENCHER_DADOS");
     } catch (e) {
       if (e instanceof ContratoErro) return NextResponse.json({ error: e.message }, { status: 409 });
       throw e;
@@ -78,12 +78,12 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/contrat
     const pdf = await gerarContrato2027({ condicoes, familia, aluno: { nome: aluno.name }, data: agora });
     const sha256 = sha256Hex(pdf);
     const ipOrigem = getClientIp(request);
-    const nomeArquivo = `Contrato ${condicoes.anoLetivo} - ${aluno.name}.pdf`;
+    const nomeArquivo = `Contrato ${condicoes.anoLetivo} - ${aluno.name} (preenchido).pdf`;
 
     await prisma.$transaction(async (tx) => {
       const { count } = await tx.contrato.updateMany({
         where: { id, status: contrato.status },
-        data: { status: novoStatus, dadosFamilia: JSON.parse(JSON.stringify(familia)), motivoDevolucao: null },
+        data: { dadosFamilia: JSON.parse(JSON.stringify(familia)) },
       });
       if (count === 0) throw new ContratoErro("Este contrato acabou de ser atualizado. Recarregue a página.");
       await tx.contratoArquivo.create({
@@ -107,13 +107,13 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/contrat
           usuarioId: session.sub,
           ipOrigem,
           arquivoSha256: sha256,
-          detalhe: contrato.dadosFamilia ? "Dados corrigidos — contrato gerado novamente" : "Contrato gerado com os dados conferidos pela família",
+          detalhe: contrato.dadosFamilia ? "Dados corrigidos; contrato gerado novamente" : "Família preencheu os dados no app; contrato gerado preenchido",
           createdAt: agora,
         },
       });
     });
 
-    return NextResponse.json({ ok: true, status: novoStatus, sha256 }, { status: 201 });
+    return NextResponse.json({ ok: true, status: contrato.status, sha256 }, { status: 201 });
   } catch (error) {
     if (error instanceof ContratoErro) return NextResponse.json({ error: error.message }, { status: 409 });
     return handleApiError(error);

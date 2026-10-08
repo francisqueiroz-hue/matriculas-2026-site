@@ -46,7 +46,9 @@ export interface CondicoesContrato {
   anoLetivo: number;
   etapa: Etapa;
   turma: string;
-  periodo: PeriodoChave;
+  /** null = não informado no envio (sai em branco para a família marcar). */
+  periodo: PeriodoChave | null;
+  /** 0 = sem valor no contrato (os valores são combinados por mensagem; sai linha em branco). */
   parcelaBruta: number;
   parcelaLiquida: number;
   config: ConfigContrato;
@@ -136,7 +138,11 @@ const ROTULOS_ESCOLA: Record<keyof ConfigContrato["escola"], string> = {
   redesSociais: "Redes sociais (perfis)",
 };
 
-/** Lista do que falta na configuração para poder enviar contratos (vazia = pronta). */
+/**
+ * Campos da configuração ainda em branco. Não bloqueiam o envio: saem no contrato como linha
+ * para a família preencher à mão. Inconsistências (ex.: parcela com desconto maior que a cheia)
+ * também aparecem aqui.
+ */
 export function pendenciasConfig(c: ConfigContrato): string[] {
   const falta: string[] = [];
   for (const [k, rotulo] of Object.entries(ROTULOS_ESCOLA) as [keyof ConfigContrato["escola"], string][]) {

@@ -31,11 +31,36 @@ const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julh
 
 export interface EntradaContrato {
   condicoes: CondicoesContrato;
-  familia: DadosFamilia;
+  /** null = contrato em branco: a família preenche à mão (ou no app, se quiser). */
+  familia: DadosFamilia | null;
   aluno: { nome: string };
-  /** Data em que a família gerou o contrato (vai em "Niterói, __ de __ de __"). */
-  data: Date;
+  /** Data em que a família gerou o contrato preenchido; null = linha para a data à mão. */
+  data: Date | null;
 }
+
+/** Campo vazio vira linha para preencher à mão. */
+function ou(v: string | null | undefined, tamanho = 18): string {
+  return v && v.trim() ? v : "_".repeat(tamanho);
+}
+const dinheiro = (v: number) => (v > 0 ? `R$ ${formatarDinheiro(v)}` : "R$ ____________");
+const dataOuLinha = (d: Date | null) => (d ? dataPorExtenso(d) : "____ de ____________________ de ________");
+
+const PESSOA_EM_BRANCO: Pessoa = {
+  nome: "",
+  cpf: "",
+  nascimento: "",
+  rg: "",
+  orgao: "",
+  uf: "",
+  endereco: "",
+  numero: "",
+  complemento: "",
+  cep: "",
+  bairro: "",
+  cidade: "",
+  email: "",
+  telefone: "",
+};
 
 interface Fontes {
   times: PDFFont;
@@ -260,35 +285,47 @@ class Documento {
   }
 }
 
-function linhasPessoa(p: Pessoa): [string, string][] {
+function linhasPessoa(p: Pessoa, emBranco: boolean): [string, string][] {
+  const comp = emBranco ? ou("", 14) : p.complemento || "—";
   return [
-    [`Nome: ${p.nome}`, `CPF: ${formatarCpf(p.cpf)}`],
-    [`Data de nascimento: ${p.nascimento} | RG: ${p.rg}`, `Órgão: ${p.orgao} | UF: ${p.uf.toUpperCase()}`],
-    [`Endereço: ${p.endereco}`, `Nº: ${p.numero} | Complemento: ${p.complemento || "—"}`],
-    [`CEP: ${p.cep} | Bairro: ${p.bairro}`, `Cidade: ${p.cidade}`],
-    [`E-mail: ${p.email}`, `Telefone: ${p.telefone}`],
+    [`Nome: ${ou(p.nome, 40)}`, `CPF: ${ou(p.cpf && formatarCpf(p.cpf), 20)}`],
+    [`Data de nascimento: ${ou(p.nascimento, 12)} | RG: ${ou(p.rg, 16)}`, `Órgão: ${ou(p.orgao, 12)} | UF: ${ou(p.uf.toUpperCase(), 4)}`],
+    [`Endereço: ${ou(p.endereco, 40)}`, `Nº: ${ou(p.numero, 8)} | Complemento: ${comp}`],
+    [`CEP: ${ou(p.cep, 12)} | Bairro: ${ou(p.bairro, 20)}`, `Cidade: ${ou(p.cidade, 24)}`],
+    [`E-mail: ${ou(p.email, 36)}`, `Telefone: ${ou(p.telefone, 20)}`],
   ];
 }
 
 function preencher(texto: string, valores: Record<string, string>): string {
   return texto.replace(/\{\{(\w+)\}\}/g, (_, chave: string) => {
     if (!(chave in valores)) throw new Error(`Campo do contrato sem valor: ${chave}`);
-    return valores[chave];
+    return ou(valores[chave], 14);
   });
 }
 
 /** Gera o PDF do contrato 2027 preenchido com os dados da escola, do aluno e da família. */
 export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8Array> {
-  const { condicoes: c, familia: fam, aluno, data } = entrada;
+  const { condicoes: c, aluno, data } = entrada;
+  const emBranco = entrada.familia === null;
+  const fam: DadosFamilia = entrada.familia ?? {
+    financeiro: PESSOA_EM_BRANCO,
+    pedagogicoMesmo: false,
+    pedagogico: PESSOA_EM_BRANCO,
+    aluno: { nascimento: "", rg: "", orgao: "", uf: "", enderecoMesmo: false, endereco: "", numero: "", complemento: "", bairro: "", cidade: "", cep: "" },
+    responsavelLegal: { quem: "OUTRO", nome: "", cpf: "", vinculo: "", contato: "" },
+    imagem: [],
+  };
   const cfg = c.config;
-  const periodo = cfg.periodos.find((p) => p.chave === c.periodo);
-  if (!periodo) throw new Error("Período do contrato não encontrado na configuração");
+  const periodo = c.periodo ? cfg.periodos.find((p) => p.chave === c.periodo) : undefined;
+  if (c.periodo && !periodo) throw new Error("Período do contrato não encontrado na configuração");
+  const temValores = c.parcelaBruta > 0;
   const v = calcularValores({ parcelaBruta: c.parcelaBruta, parcelaLiquida: c.parcelaLiquida, quantidade: cfg.parcelas.quantidade });
   const pedagogico = fam.pedagogicoMesmo || !fam.pedagogico ? fam.financeiro : fam.pedagogico;
   const endAluno = fam.aluno.enderecoMesmo
     ? { endereco: fam.financeiro.endereco, numero: fam.financeiro.numero, complemento: fam.financeiro.complemento, bairro: fam.financeiro.bairro, cidade: fam.financeiro.cidade, cep: fam.financeiro.cep }
     : fam.aluno;
   const legal = fam.responsavelLegal;
+  const traco = (x: string) => (emBranco ? ou("", 8) : x || "—");
 
   const doc = new Documento();
   await doc.iniciar();
@@ -306,31 +343,36 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
 
   doc.y = 78;
   doc.faixa("DADOS DO RESPONSÁVEL FINANCEIRO");
-  doc.grade(linhasPessoa(fam.financeiro));
+  doc.grade(linhasPessoa(fam.financeiro, emBranco));
   doc.y += 10;
   doc.faixa("DADOS DO(A) RESPONSÁVEL PEDAGÓGICO(A)");
-  doc.grade(linhasPessoa(pedagogico));
+  doc.grade(linhasPessoa(pedagogico, emBranco));
   doc.y += 10;
   doc.faixa("DADOS DO ALUNO");
   doc.grade([
-    [`Nome: ${aluno.nome}`, `Data de nascimento: ${fam.aluno.nascimento}`],
-    [`RG (se houver): ${fam.aluno.rg || "—"} | Órgão: ${fam.aluno.orgao || "—"} | UF: ${fam.aluno.uf ? fam.aluno.uf.toUpperCase() : "—"}`, `Endereço: ${endAluno.endereco}`],
-    [`Nº: ${endAluno.numero} | Complemento: ${endAluno.complemento || "—"} | Bairro: ${endAluno.bairro}`, `Cidade: ${endAluno.cidade} | CEP: ${endAluno.cep}`],
-    [`Portal do aluno no site: ${cfg.escola.portalAluno}`, `Responsável legal: ${legal.nome}`],
+    [`Nome: ${aluno.nome}`, `Data de nascimento: ${ou(fam.aluno.nascimento, 12)}`],
+    [`RG (se houver): ${traco(fam.aluno.rg)} | Órgão: ${traco(fam.aluno.orgao)} | UF: ${traco(fam.aluno.uf.toUpperCase())}`, `Endereço: ${ou(endAluno.endereco, 40)}`],
+    [`Nº: ${ou(endAluno.numero, 8)} | Complemento: ${traco(endAluno.complemento)} | Bairro: ${ou(endAluno.bairro, 16)}`, `Cidade: ${ou(endAluno.cidade, 16)} | CEP: ${ou(endAluno.cep, 12)}`],
+    [`Portal do aluno no site: ${ou(cfg.escola.portalAluno)}`, `Responsável legal: ${ou(legal.nome, 36)}`],
   ]);
   doc.y += 10;
   doc.faixa("DADOS DO CURSO MATRICULADO");
   const marca = (sim: boolean) => (sim ? "(X)" : "( )");
   doc.texto(`Ano letivo: ${c.anoLetivo} | ${marca(c.etapa === "EI")} Educação infantil ${marca(c.etapa === "EF1")} Ensino fundamental I`, X0, doc.y + 3, f.helv, 9);
-  doc.texto(`Etapa/turma: ${c.turma} | Período contratado: ${periodo.nome} (${periodo.horario})`, X0, doc.y + 14, f.helv, 9);
+  const textoPeriodo = periodo
+    ? `${periodo.nome} (${periodo.horario})`
+    : cfg.periodos.map((p) => `( ) ${p.nome}`).join("  ");
+  doc.textoAjustado(`Etapa/turma: ${c.turma} | Período contratado: ${textoPeriodo}`, X0, doc.y + 14, X1 - X0, f.helv, 9);
   doc.y += 27;
   doc.faixa(`VALORES - ${c.anoLetivo}`);
   const linhasValores = [
-    `Valor total do contrato/anuidade: R$ ${formatarDinheiro(v.anuidade)} | Período: ${cfg.parcelas.periodoAnuidade}`,
-    `Número de parcelas: ${cfg.parcelas.quantidade} | Valor bruto da parcela: R$ ${formatarDinheiro(c.parcelaBruta)}`,
-    `Matrícula/primeira parcela, incluída na anuidade: R$ ${formatarDinheiro(v.primeiraParcela)}`,
-    `Desconto de pontualidade: ${v.descontoPct.toLocaleString("pt-BR")}% ou R$ ${formatarDinheiro(v.descontoValor)} | Valor líquido: R$ ${formatarDinheiro(c.parcelaLiquida)}`,
-    `Vencimento: dia ${cfg.parcelas.vencimentoDia} de cada mês | Primeiro/último vencimento: ${cfg.parcelas.primeiroUltimo}`,
+    `Valor total do contrato/anuidade: ${temValores ? dinheiro(v.anuidade) : dinheiro(0)} | Período: ${ou(cfg.parcelas.periodoAnuidade, 24)}`,
+    `Número de parcelas: ${cfg.parcelas.quantidade} | Valor bruto da parcela: ${dinheiro(c.parcelaBruta)}`,
+    `Matrícula/primeira parcela, incluída na anuidade: ${dinheiro(v.primeiraParcela)}`,
+    temValores
+      ? `Desconto de pontualidade: ${v.descontoPct.toLocaleString("pt-BR")}% ou ${dinheiro(v.descontoValor)} | Valor líquido: ${dinheiro(c.parcelaLiquida)}`
+      : `Desconto de pontualidade: ______% ou ${dinheiro(0)} | Valor líquido: ${dinheiro(0)}`,
+    `Vencimento: dia ${cfg.parcelas.vencimentoDia} de cada mês | Primeiro/último vencimento: ${ou(cfg.parcelas.primeiroUltimo, 24)}`,
   ];
   linhasValores.forEach((l, i) => doc.textoAjustado(l, X0, doc.y + 3 + i * 11, X1 - X0, f.helv, 9));
   doc.y += 3 + linhasValores.length * 11 + 6;
@@ -338,7 +380,7 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
   // ─── Cláusulas ───
   const valores: Record<string, string> = {
     enderecoEscola: `${cfg.escola.endereco}, CEP ${cfg.escola.cep}`,
-    horaExcedenteValor: formatarDinheiro(cfg.horaExcedente.valor),
+    horaExcedenteValor: cfg.horaExcedente.valor > 0 ? formatarDinheiro(cfg.horaExcedente.valor) : "",
     horaExcedenteUnidade: cfg.horaExcedente.unidade,
     horaExcedenteFracionamento: cfg.horaExcedente.fracionamento,
     horaExcedenteTolerancia: cfg.horaExcedente.tolerancia,
@@ -353,22 +395,22 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
     if (i === 12) {
       // Cláusula 7ª: quadros de horários e de valores por período
       doc.y += 6;
-      doc.tabela(["PERÍODOS", `HORÁRIOS - ${c.anoLetivo}`], cfg.periodos.map((p) => [p.nome, p.horario]));
-      doc.tabela(["PERÍODO", `VALOR ATÉ O VENCIMENTO - ${c.anoLetivo}`], cfg.periodos.map((p) => [p.nome, `R$ ${formatarDinheiro(p.parcelaLiquida)}`]));
+      doc.tabela(["PERÍODOS", `HORÁRIOS - ${c.anoLetivo}`], cfg.periodos.map((p) => [p.nome, ou(p.horario, 30)]));
+      doc.tabela(["PERÍODO", `VALOR ATÉ O VENCIMENTO - ${c.anoLetivo}`], cfg.periodos.map((p) => [p.nome, dinheiro(p.parcelaLiquida)]));
     }
   });
 
   // ─── Assinaturas ───
   doc.reservar(215);
   doc.y += 10;
-  doc.texto(`Niterói, ${dataPorExtenso(data)}.`, X0, doc.y, f.times, 10);
+  doc.texto(`Niterói, ${dataOuLinha(data)}.`, X0, doc.y, f.times, 10);
   doc.y += 40;
   doc.linha(X0, doc.y, 191, PRETO, 0.7);
   doc.linha(201, doc.y, 361, PRETO, 0.7);
   doc.texto("RESPONSÁVEL FINANCEIRO", X0, doc.y + 3, f.times, 10);
   doc.texto("RESPONSÁVEL PELA GUARDA", 201, doc.y + 3, f.times, 10);
   doc.texto("CONTRATANTE", X0, doc.y + 15, f.times, 10);
-  doc.texto(`CPF: ${formatarCpf(legal.cpf)}`, 201, doc.y + 15, f.times, 10);
+  doc.texto(`CPF: ${ou(legal.cpf && formatarCpf(legal.cpf), 20)}`, 201, doc.y + 15, f.times, 10);
   doc.textoAjustado(fam.financeiro.nome, X0, doc.y + 27, 160, f.times, 9);
   doc.textoAjustado(legal.nome, 201, doc.y + 27, 160, f.times, 9);
   doc.y += 62;
@@ -389,9 +431,9 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
   doc.y += 13;
   for (const l of [
     `Aluno(a): ${aluno.nome}`,
-    `Responsável legal: ${legal.nome}`,
-    `CPF: ${formatarCpf(legal.cpf)} | Vínculo/poder de representação: ${legal.vinculo}`,
-    `Contato: ${legal.contato} | Turma: ${c.turma}`,
+    `Responsável legal: ${ou(legal.nome, 50)}`,
+    `CPF: ${ou(legal.cpf && formatarCpf(legal.cpf), 20)} | Vínculo/poder de representação: ${ou(legal.vinculo, 20)}`,
+    `Contato: ${ou(legal.contato, 20)} | Turma: ${c.turma}`,
   ]) {
     doc.textoAjustado(l, X0, doc.y, X1 - X0, f.times, 10);
     doc.y += 12.8;
@@ -412,10 +454,10 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
   doc.texto("ESCOLHA", xEscolha + 5, doc.y + 5, f.helvBold, 9);
   doc.y += 18;
   const complementos = [
-    `Portal: ${cfg.escola.portalAluno}`,
+    `Portal: ${ou(cfg.escola.portalAluno)}`,
     "",
-    `Endereço do site: ${cfg.escola.siteEscola}`,
-    `Plataformas/perfis específicos: ${cfg.escola.redesSociais}`,
+    `Endereço do site: ${ou(cfg.escola.siteEscola)}`,
+    `Plataformas/perfis específicos: ${ou(cfg.escola.redesSociais)}`,
     "",
     "",
   ];
@@ -434,7 +476,9 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
   doc.pagina.drawLine({ start: { x: xEscolha, y: ALTURA - topoQuadro }, end: { x: xEscolha, y: ALTURA - doc.y }, color: GRADE, thickness: 0.6 });
   doc.y += 4;
   doc.texto(
-    `Escolhas feitas pelo responsável no aplicativo ClassLink em ${data.toLocaleDateString("pt-BR")}, uma a uma, sem opção pré-marcada.`,
+    !emBranco && data
+      ? `Escolhas feitas pelo responsável no aplicativo ClassLink em ${data.toLocaleDateString("pt-BR")}, uma a uma, sem opção pré-marcada.`
+      : "Marque à mão, ou faça as escolhas no aplicativo ClassLink (opção \"Preencher meus dados\"). Linha sem marcação = NÃO AUTORIZADO.",
     X0,
     doc.y,
     f.helvOblique,
@@ -455,11 +499,11 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
   );
   doc.reservar(90);
   doc.y += 12;
-  doc.texto(`Niterói, ${dataPorExtenso(data)}.`, X0, doc.y, f.times, 10);
+  doc.texto(`Niterói, ${dataOuLinha(data)}.`, X0, doc.y, f.times, 10);
   doc.y += 36;
   doc.linha(X0, doc.y, 311, PRETO, 0.7);
   doc.texto("Assinatura do pai, mãe ou responsável legal", X0, doc.y + 3, f.times, 10);
-  doc.textoAjustado(legal.nome, X0, doc.y + 15, 280, f.times, 9);
+  if (legal.nome) doc.textoAjustado(legal.nome, X0, doc.y + 15, 280, f.times, 9);
   doc.texto("Recebido pela escola em: ____/____/______ | Por: __________________", X0, doc.y + 32, f.times, 10);
 
   // ─── Rodapés (precisam do total de páginas) ───
@@ -467,7 +511,12 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
   paginas.forEach((pg, i) => {
     doc.pagina = pg;
     doc.centralizado(cfg.escola.endereco, 778, f.times, 7.8);
-    doc.centralizado(`CEP: ${cfg.escola.cep} - Tel. ${cfg.escola.telefones} - ${cfg.escola.email}`, 789, f.times, 7.8);
+    doc.centralizado(
+      [cfg.escola.cep && `CEP: ${cfg.escola.cep}`, cfg.escola.telefones && `Tel. ${cfg.escola.telefones}`, cfg.escola.email].filter(Boolean).join(" - "),
+      789,
+      f.times,
+      7.8,
+    );
     doc.centralizado(`Contrato ${c.anoLetivo} | Aluno(a): ${aluno.nome} | Página ${i + 1} de ${paginas.length}`, 801, f.helv, 7);
   });
 

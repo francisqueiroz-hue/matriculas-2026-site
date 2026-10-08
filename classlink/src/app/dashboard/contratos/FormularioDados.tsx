@@ -9,7 +9,8 @@ interface Resumo {
   aluno: string;
   turma: string;
   etapa: "EI" | "EF1";
-  periodo: string;
+  periodo: string | null;
+  temValores: boolean;
   parcelas: number;
   vencimentoDia: number;
   parcelaBruta: number;
@@ -222,24 +223,30 @@ export function FormularioDados({ contratoId, onGerado, onCancelar }: { contrato
   return (
     <form onSubmit={enviar} noValidate className="space-y-5">
       <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-        <p className="font-semibold text-slate-900">Condições definidas pela escola</p>
+        <p className="font-semibold text-slate-900">Contrato de {resumo.aluno}</p>
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-          <dt className="text-slate-500">Aluno(a)</dt>
-          <dd>
-            {resumo.aluno} · {resumo.turma}
-          </dd>
-          <dt className="text-slate-500">Período</dt>
-          <dd>{resumo.periodo}</dd>
-          <dt className="text-slate-500">Anuidade</dt>
-          <dd>
-            R$ {formatarDinheiro(resumo.anuidade)} em {resumo.parcelas} parcelas de R$ {formatarDinheiro(resumo.parcelaBruta)}
-          </dd>
-          <dt className="text-slate-500">Até o dia {resumo.vencimentoDia}</dt>
-          <dd>
-            R$ {formatarDinheiro(resumo.parcelaLiquida)} por parcela (desconto de R$ {formatarDinheiro(resumo.descontoValor)})
-          </dd>
+          <dt className="text-slate-500">Turma</dt>
+          <dd>{resumo.turma}</dd>
+          {resumo.periodo && (
+            <>
+              <dt className="text-slate-500">Período</dt>
+              <dd>{resumo.periodo}</dd>
+            </>
+          )}
+          {resumo.temValores && (
+            <>
+              <dt className="text-slate-500">Anuidade</dt>
+              <dd>
+                R$ {formatarDinheiro(resumo.anuidade)} em {resumo.parcelas} parcelas de R$ {formatarDinheiro(resumo.parcelaBruta)}
+              </dd>
+              <dt className="text-slate-500">Até o dia {resumo.vencimentoDia}</dt>
+              <dd>
+                R$ {formatarDinheiro(resumo.parcelaLiquida)} por parcela (desconto de R$ {formatarDinheiro(resumo.descontoValor)})
+              </dd>
+            </>
+          )}
         </dl>
-        <p className="mt-2 text-xs text-slate-500">Dúvidas sobre valores ou período? Fale com a secretaria em Mensagens antes de assinar.</p>
+        {!resumo.periodo && <p className="mt-2 text-xs text-slate-500">O período e os campos que ficarem em branco podem ser marcados à mão no contrato.</p>}
       </div>
 
       <fieldset className="space-y-3">

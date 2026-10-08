@@ -48,6 +48,7 @@ interface Contrato {
   assinadoEnviadoEm: string | null;
   motivoDevolucao: string | null;
   modelo: string | null;
+  dadosPreenchidos: boolean;
   createdAt: string;
   student: {
     id: string;
@@ -66,7 +67,6 @@ interface AlunoOpcao {
 }
 
 const STATUS_COR: Record<ContratoStatus, string> = {
-  AGUARDANDO_DADOS: "bg-orange-100 text-orange-900",
   AGUARDANDO_ASSINATURA: "bg-amber-100 text-amber-900",
   DEVOLVIDO: "bg-red-100 text-red-900",
   EM_CONFERENCIA: "bg-sky-100 text-sky-900",
@@ -79,14 +79,13 @@ const PRIORIDADE: Record<ContratoStatus, number> = {
   EM_CONFERENCIA: 0,
   AGUARDANDO_ORIGINAL: 1,
   AGUARDANDO_ASSINATURA: 2,
-  AGUARDANDO_DADOS: 3,
-  DEVOLVIDO: 4,
-  COMPLETO: 5,
+  DEVOLVIDO: 3,
+  COMPLETO: 4,
 };
 
 const EVENTO_LABEL: Record<Evento["tipo"], string> = {
   CRIADO: "Contrato enviado à família",
-  DADOS_PREENCHIDOS: "Família conferiu os dados e o app gerou o contrato",
+  DADOS_PREENCHIDOS: "Família preencheu os dados no app (contrato gerado preenchido)",
   ASSINADO_ENVIADO: "Família enviou o contrato assinado",
   DEVOLVIDO: "Devolvido para correção",
   CONFERIDO: "Conferido e aprovado",
@@ -313,7 +312,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
     }
   }
 
-  const aguardandoFamilia = c.status === "AGUARDANDO_DADOS" || c.status === "AGUARDANDO_ASSINATURA" || c.status === "DEVOLVIDO";
+  const aguardandoFamilia = c.status === "AGUARDANDO_ASSINATURA" || c.status === "DEVOLVIDO";
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
@@ -363,8 +362,10 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
         </div>
       )}
 
-      {c.status === "AGUARDANDO_DADOS" && (
-        <p className="mt-2 text-slate-600">A família ainda não conferiu os dados. O contrato é gerado quando ela confirmar.</p>
+      {doApp && aguardandoFamilia && (
+        <p className="mt-2 text-slate-600">
+          {c.dadosPreenchidos ? "A família preencheu os dados no app; o contrato para assinar já sai preenchido." : "Contrato em branco enviado; a família pode preencher à mão ou no app."}
+        </p>
       )}
 
       {c.status === "DEVOLVIDO" && c.motivoDevolucao && (
@@ -389,7 +390,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
         )}
         {modelo && (
           <a href={urlArquivo(c.id, modelo.id)} target="_blank" rel="noopener noreferrer" className={btnSecundario}>
-            {doApp ? "Ver contrato gerado" : "Ver contrato enviado"}
+            Ver contrato enviado
           </a>
         )}
         {aguardandoFamilia &&
@@ -406,7 +407,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
                 Lembrar {g.guardian.name.split(" ")[0]} no WhatsApp
               </a>
             ))}
-        {(c.status === "AGUARDANDO_DADOS" || c.status === "AGUARDANDO_ASSINATURA") && envios.length === 0 && (
+        {c.status === "AGUARDANDO_ASSINATURA" && envios.length === 0 && (
           <button type="button" onClick={excluir} className="px-2 py-2 text-xs text-red-700 hover:underline">
             Excluir (enviado por engano)
           </button>
@@ -489,8 +490,7 @@ function ContratosContent() {
   const total = (s: ContratoStatus) => dados?.resumo.find((r) => r.status === s)?.total ?? 0;
   const indicadores: { status: ContratoStatus; label: string }[] = [
     { status: "EM_CONFERENCIA", label: "Para conferir" },
-    { status: "AGUARDANDO_DADOS", label: "Família conferindo dados" },
-    { status: "AGUARDANDO_ASSINATURA", label: "Aguardando assinatura" },
+    { status: "AGUARDANDO_ASSINATURA", label: "Aguardando família" },
     { status: "AGUARDANDO_ORIGINAL", label: "Falta via original" },
     { status: "COMPLETO", label: "Completos" },
   ];
@@ -531,7 +531,7 @@ function ContratosContent() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {indicadores.map((i) => (
           <button
             key={i.status}

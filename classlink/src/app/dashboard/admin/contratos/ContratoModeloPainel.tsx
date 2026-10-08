@@ -80,7 +80,7 @@ function CampoValor({ id, label, valor, onChange }: { id: string; label: string;
   );
 }
 
-function Configuracao({ ano, onPendencias }: { ano: number; onPendencias: (p: string[]) => void }) {
+function Configuracao({ ano }: { ano: number }) {
   const [cfg, setCfg] = useState<ConfigContrato | null>(null);
   const [info, setInfo] = useState<{ salva: boolean; atualizadaEm: string | null }>({ salva: false, atualizadaEm: null });
   const [pendencias, setPendencias] = useState<string[]>([]);
@@ -93,12 +93,11 @@ function Configuracao({ ano, onPendencias }: { ano: number; onPendencias: (p: st
       .then((r) => {
         setCfg(r.config);
         setPendencias(r.pendencias);
-        onPendencias(r.pendencias);
         setInfo({ salva: Boolean(r.salva), atualizadaEm: r.atualizadaEm ?? null });
         setVersao((v) => v + 1);
       })
       .catch((e) => setMsg({ tipo: "erro", texto: e instanceof Error ? e.message : "Erro ao carregar a configuração" }));
-  }, [ano, onPendencias]);
+  }, [ano]);
 
   if (!cfg) return msg ? <p role="alert" className="text-sm text-red-700">{msg.texto}</p> : <p className="text-sm text-slate-500">Carregando configuração…</p>;
 
@@ -114,9 +113,8 @@ function Configuracao({ ano, onPendencias }: { ano: number; onPendencias: (p: st
       const r = await apiJson<RespostaConfig>(`/api/admin/contratos/config?ano=${ano}`, { method: "PUT", body: JSON.stringify(cfg) });
       setCfg(r.config);
       setPendencias(r.pendencias);
-      onPendencias(r.pendencias);
       setInfo({ salva: true, atualizadaEm: new Date().toISOString() });
-      setMsg({ tipo: "ok", texto: r.pendencias.length ? "Salvo. Ainda faltam itens para liberar o envio." : "Salvo. Configuração completa — envio liberado." });
+      setMsg({ tipo: "ok", texto: "Salvo. Vale para os próximos envios." });
     } catch (err) {
       setMsg({ tipo: "erro", texto: err instanceof Error ? err.message : "Erro ao salvar" });
     } finally {
@@ -127,7 +125,8 @@ function Configuracao({ ano, onPendencias }: { ano: number; onPendencias: (p: st
   return (
     <form onSubmit={salvar} className="space-y-4">
       <p className="text-sm text-slate-600">
-        Estes valores entram no contrato de cada aluno no momento do envio. Mudar depois não altera contratos já enviados.
+        Tudo aqui é opcional. O que ficar em branco sai no contrato como linha para preencher à mão — por exemplo, os valores, se forem
+        combinados por mensagem. O que estiver preenchido entra no contrato no momento do envio; mudar depois não altera contratos já enviados.
         {info.salva && info.atualizadaEm && ` Última alteração: ${new Date(info.atualizadaEm).toLocaleString("pt-BR")}.`}
       </p>
 
@@ -275,8 +274,8 @@ function Configuracao({ ano, onPendencias }: { ano: number; onPendencias: (p: st
       </fieldset>
 
       {pendencias.length > 0 && (
-        <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-          <p className="font-semibold">Falta preencher para liberar o envio ({pendencias.length}):</p>
+        <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+          <p className="font-semibold">Sai em branco no contrato ({pendencias.length}):</p>
           <p className="mt-1">{pendencias.join(" · ")}</p>
         </div>
       )}
@@ -293,31 +292,34 @@ function Configuracao({ ano, onPendencias }: { ano: number; onPendencias: (p: st
           Ver prévia do contrato (PDF) ↗
         </a>
       </div>
-      <p className="text-xs text-slate-500">A prévia usa a configuração salva e dados de exemplo; campos vazios aparecem como linha em branco.</p>
+      <p className="text-xs text-slate-500">A prévia mostra o contrato como a família recebe, com a configuração salva e um aluno de exemplo.</p>
     </form>
   );
 }
 
 interface Linha {
   marcado: boolean;
-  periodo: PeriodoChave;
+  /** "" = não informar: a família marca o período no contrato. */
+  periodo: PeriodoChave | "";
   etapa: Etapa;
 }
 
-function EnvioLote({
-  ano,
-  bloqueado,
-  jaTemModelo,
-  onEnviado,
-}: {
-  ano: number;
-  bloqueado: boolean;
-  jaTemModelo: Set<string>;
-  onEnviado: () => void;
-}) {
+function OpcoesPeriodo() {
+  return (
+    <>
+      <option value="">Período: família marca</option>
+      <option value="INTEGRAL">Integral</option>
+      <option value="SEMI_INTEGRAL">Semi-integral</option>
+      <option value="PARCIAL">Parcial</option>
+      <option value="ESCOLAR">Escolar</option>
+    </>
+  );
+}
+
+function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: Set<string>; onEnviado: () => void }) {
   const [alunos, setAlunos] = useState<AlunoOpcao[]>([]);
   const [linhas, setLinhas] = useState<Record<string, Linha>>({});
-  const [periodoPadrao, setPeriodoPadrao] = useState<PeriodoChave>("INTEGRAL");
+  const [periodoPadrao, setPeriodoPadrao] = useState<PeriodoChave | "">("");
   const [titulo, setTitulo] = useState(`Contrato de prestação de serviços educacionais ${ano}`);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{ criados: { nome: string }[]; ignorados: { nome: string; motivo: string }[] } | null>(null);
@@ -354,7 +356,7 @@ function EnvioLote({
 
   async function enviar() {
     if (marcados.length === 0) return;
-    if (!confirm(`Enviar o contrato ${ano} para ${marcados.length} aluno(s)? As famílias recebem aviso no app.`)) return;
+    if (!confirm(`Enviar o contrato ${ano} para assinatura de ${marcados.length} aluno(s)? As famílias recebem aviso no app.`)) return;
     setEnviando(true);
     setErro(null);
     setResultado(null);
@@ -364,7 +366,7 @@ function EnvioLote({
         body: JSON.stringify({
           anoLetivo: ano,
           titulo,
-          itens: marcados.map((a) => ({ studentId: a.id, periodo: linha(a).periodo, etapa: linha(a).etapa })),
+          itens: marcados.map((a) => ({ studentId: a.id, periodo: linha(a).periodo || null, etapa: linha(a).etapa })),
         }),
       });
       setResultado(r);
@@ -381,11 +383,6 @@ function EnvioLote({
 
   return (
     <div className="space-y-3">
-      {bloqueado && (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-          Complete e salve a configuração (aba ao lado) para liberar o envio.
-        </p>
-      )}
       <div className="grid gap-3 sm:grid-cols-[1fr_14rem]">
         <div>
           <label htmlFor="lote-titulo" className={rotulo}>
@@ -395,13 +392,10 @@ function EnvioLote({
         </div>
         <div>
           <label htmlFor="lote-periodo" className={rotulo}>
-            Período padrão dos novos marcados
+            Período (opcional)
           </label>
-          <select id="lote-periodo" value={periodoPadrao} onChange={(e) => setPeriodoPadrao(e.target.value as PeriodoChave)} className={campo}>
-            <option value="INTEGRAL">Integral</option>
-            <option value="SEMI_INTEGRAL">Semi-integral</option>
-            <option value="PARCIAL">Parcial</option>
-            <option value="ESCOLAR">Escolar</option>
+          <select id="lote-periodo" value={periodoPadrao} onChange={(e) => setPeriodoPadrao(e.target.value as PeriodoChave | "")} className={campo}>
+            <OpcoesPeriodo />
           </select>
         </div>
       </div>
@@ -448,13 +442,10 @@ function EnvioLote({
                           <select
                             id={`per-${a.id}`}
                             value={l.periodo}
-                            onChange={(e) => atualizar(a, { periodo: e.target.value as PeriodoChave })}
+                            onChange={(e) => atualizar(a, { periodo: e.target.value as PeriodoChave | "" })}
                             className="min-h-11 rounded-md border border-slate-300 bg-white px-2 text-sm"
                           >
-                            <option value="INTEGRAL">Integral</option>
-                            <option value="SEMI_INTEGRAL">Semi-integral</option>
-                            <option value="PARCIAL">Parcial</option>
-                            <option value="ESCOLAR">Escolar</option>
+                            <OpcoesPeriodo />
                           </select>
                           <label className="sr-only" htmlFor={`eta-${a.id}`}>
                             Etapa de {a.name}
@@ -486,7 +477,7 @@ function EnvioLote({
       )}
       {resultado && (
         <div role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">
-          <p className="font-semibold">✓ {resultado.criados.length} contrato(s) enviado(s). As famílias foram avisadas no app.</p>
+          <p className="font-semibold">✓ {resultado.criados.length} contrato(s) enviado(s) para assinatura. As famílias foram avisadas no app.</p>
           {resultado.ignorados.length > 0 && (
             <p className="mt-1 text-amber-900">
               Não enviados: {resultado.ignorados.map((i) => `${i.nome} (${i.motivo})`).join("; ")}
@@ -494,44 +485,35 @@ function EnvioLote({
           )}
         </div>
       )}
-      <button type="button" disabled={bloqueado || enviando || marcados.length === 0 || titulo.trim().length < 3} onClick={enviar} className={btnPrimario}>
-        {enviando ? "Enviando…" : `Enviar para ${marcados.length} aluno(s)`}
+      <button type="button" disabled={enviando || marcados.length === 0 || titulo.trim().length < 3} onClick={enviar} className={btnPrimario}>
+        {enviando ? "Gerando e enviando…" : `Enviar para assinatura (${marcados.length})`}
       </button>
     </div>
   );
 }
 
 /**
- * Contrato guardado no app: a direção configura valores uma vez e envia para os alunos;
- * cada família confere os próprios dados e o app gera o PDF preenchido para assinar.
+ * Contrato guardado no app: a escola envia pronto para assinar (nome e turma do aluno já no
+ * PDF). A família assina pelo gov.br ou à mão; se quiser, preenche os dados no app antes.
  */
 export function ContratoModeloPainel({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: Set<string>; onEnviado: () => void }) {
   const [aba, setAba] = useState<"enviar" | "config">("enviar");
-  const [pendencias, setPendencias] = useState<string[] | null>(null);
-  const aoCarregarPendencias = useCallback((p: string[]) => setPendencias(p), []);
-
-  // Carrega as pendências mesmo com a aba "Enviar" aberta, para saber se o envio está liberado.
-  useEffect(() => {
-    if (ano !== 2027) return;
-    apiJson<RespostaConfig>(`/api/admin/contratos/config?ano=${ano}`)
-      .then((r) => setPendencias(r.pendencias))
-      .catch(() => setPendencias(null));
-  }, [ano]);
 
   return (
     <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
       <div>
         <h2 className="font-semibold text-slate-900">Contrato {ano} guardado no app</h2>
         <p className="text-sm text-slate-600">
-          A família confere os próprios dados (CPF, RG, endereço, autorização de imagem) e o app gera o contrato preenchido para assinar pelo gov.br ou à mão.
+          Marque os alunos e envie. O contrato vai com o nome e a turma de cada aluno, pronto para assinar pelo gov.br (grátis) ou à mão.
+          Preencher os dados no app é opcional para a família.
         </p>
       </div>
       {ano === 2027 && (
-        <div role="tablist" aria-label="Contrato do app" className="flex gap-2">
+        <div role="tablist" aria-label="Contrato do app" className="flex flex-wrap gap-2">
           {(
             [
-              ["enviar", "Enviar para alunos"],
-              ["config", `Valores e dados${pendencias && pendencias.length ? ` (${pendencias.length} pendentes)` : ""}`],
+              ["enviar", "Enviar para assinatura"],
+              ["config", "Ajustes do contrato (opcional)"],
             ] as const
           ).map(([k, label]) => (
             <button
@@ -548,9 +530,9 @@ export function ContratoModeloPainel({ ano, jaTemModelo, onEnviado }: { ano: num
         </div>
       )}
       {aba === "config" && ano === 2027 ? (
-        <Configuracao ano={ano} onPendencias={aoCarregarPendencias} />
+        <Configuracao ano={ano} />
       ) : (
-        <EnvioLote key={ano} ano={ano} bloqueado={pendencias === null || pendencias.length > 0} jaTemModelo={jaTemModelo} onEnviado={onEnviado} />
+        <EnvioLote key={ano} ano={ano} jaTemModelo={jaTemModelo} onEnviado={onEnviado} />
       )}
     </section>
   );
