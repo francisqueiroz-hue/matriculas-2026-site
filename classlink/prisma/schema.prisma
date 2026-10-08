@@ -112,6 +112,7 @@ model School {
   disciplinas           Disciplina[]
   teamConversations     TeamConversation[]
   solicitacoesMatricula SolicitacaoMatricula[]
+  contratos             Contrato[]
 }
 
 model User {
@@ -178,6 +179,11 @@ model User {
 
   // Responsável: rematrículas confirmadas pelo aviso do painel
   solicitacoesMatricula SolicitacaoMatricula[] @relation("SolicitacaoMatriculaResponsavel")
+
+  // Contratos de matrícula: criados pela direção, arquivos enviados e trilha de auditoria
+  contratosCriados         Contrato[]        @relation("ContratoCriadoPor")
+  contratoArquivosEnviados ContratoArquivo[] @relation("ContratoArquivoEnviadoPor")
+  contratoEventos          ContratoEvento[]  @relation("ContratoEventoUsuario")
 
   @@index([schoolId])
 }
@@ -258,6 +264,7 @@ model Student {
   boletos                Boleto[]
   notas                  Nota[]
   comunicadosIndividuais Comunicado[]
+  contratos              Contrato[]
 
   @@index([schoolId])
   @@index([classId])
@@ -599,4 +606,109 @@ model SolicitacaoMatricula {
 
   @@index([schoolId, anoLetivo, tipo, status])
   @@index([ipOrigem, createdAt])
+}
+
+// ─── Contratos de matrícula ────────────────────────────────────────────────────
+// A direção envia o PDF do contrato já preenchido; a família baixa, assina (de
+// preferência pelo gov.br — assinatura eletrônica avançada, Lei 14.063/2020 — ou à
+// mão) e devolve o PDF assinado pelo app. A secretaria confere. Assinatura à mão só
+// fica COMPLETA depois que a via original em papel é entregue na escola.
+// Sem custo de plataforma de assinatura: a prova vem do próprio arquivo (gov.br,
+// verificável em validar.iti.gov.br) e da trilha de auditoria abaixo (quem enviou,
+// quando, de qual IP e o hash SHA-256 do arquivo, todos atribuídos pelo servidor).
+
+enum ContratoStatus {
+  AGUARDANDO_ASSINATURA // enviado à família, aguardando o PDF assinado
+  EM_CONFERENCIA // família enviou o PDF assinado; secretaria precisa conferir
+  AGUARDANDO_ORIGINAL // assinatura à mão conferida; falta entregar a via original em papel
+  COMPLETO
+  DEVOLVIDO // secretaria devolveu o envio com um motivo; a família pode reenviar
+}
+
+enum ContratoMetodoAssinatura {
+  GOVBR // PDF assinado no Assinador gov.br (assinatura eletrônica avançada)
+  MANUSCRITA // assinado à mão e digitalizado; exige a via original em papel
+}
+
+enum ContratoArquivoTipo {
+  MODELO // contrato preenchido enviado pela escola
+  ASSINADO // PDF assinado enviado pela família (reenvios ficam guardados para auditoria)
+}
+
+enum ContratoEventoTipo {
+  CRIADO
+  ASSINADO_ENVIADO
+  DEVOLVIDO
+  CONFERIDO
+  ORIGINAL_RECEBIDO
+}
+
+model Contrato {
+  id       String @id @default(cuid())
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId String
+
+  anoLetivo Int
+  titulo    String
+  status    ContratoStatus @default(AGUARDANDO_ASSINATURA)
+
+  // Preenchidos quando a família envia o PDF assinado (horário sempre do servidor).
+  metodoAssinatura  ContratoMetodoAssinatura?
+  assinadoEnviadoEm DateTime?
+  motivoDevolucao   String? // último motivo informado pela secretaria ao devolver
+
+  criadoPor   User?   @relation("ContratoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoPorId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  arquivos ContratoArquivo[]
+  eventos  ContratoEvento[]
+
+  @@index([schoolId, anoLetivo, status])
+  @@index([studentId])
+}
+
+// Conteúdo dos PDFs guardado no próprio banco: privado por padrão (só sai por rota
+// autenticada que confere o vínculo), sem serviço extra. Consultas de listagem nunca
+// selecionam `conteudo`. Excluído junto com o contrato (LGPD).
+model ContratoArquivo {
+  id         String              @id @default(cuid())
+  contrato   Contrato            @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  contratoId String
+  tipo       ContratoArquivoTipo
+
+  nomeArquivo  String
+  mimeType     String
+  tamanhoBytes Int
+  sha256       String // impressão digital do arquivo, calculada pelo servidor
+  conteudo     Bytes
+
+  enviadoPor   User?    @relation("ContratoArquivoEnviadoPor", fields: [enviadoPorId], references: [id], onDelete: SetNull)
+  enviadoPorId String?
+  ipOrigem     String?
+  createdAt    DateTime @default(now())
+
+  @@index([contratoId, tipo])
+}
+
+// Trilha de auditoria imutável (somente inserção) de tudo o que acontece com o contrato.
+model ContratoEvento {
+  id         String             @id @default(cuid())
+  contrato   Contrato           @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  contratoId String
+  tipo       ContratoEventoTipo
+
+  usuario       User?    @relation("ContratoEventoUsuario", fields: [usuarioId], references: [id], onDelete: SetNull)
+  usuarioId     String?
+  ipOrigem      String?
+  arquivoSha256 String?
+  detalhe       String?
+  createdAt     DateTime @default(now())
+
+  @@index([contratoId])
 }

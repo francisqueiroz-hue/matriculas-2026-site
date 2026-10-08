@@ -166,3 +166,24 @@ export const markAttendanceSchema = z.object({
     )
     .min(1),
 });
+
+// ─── Contratos de matrícula ─────────────────────────────────────────────────────
+// Campos de formulário multipart chegam como texto — por isso o coerce/enum de string.
+
+export const novoContratoSchema = z.object({
+  studentId: z.string().min(1, "Escolha o aluno"),
+  anoLetivo: z.coerce.number().int().min(2020).max(2100),
+  titulo: z.string().trim().min(3, "Informe o título do contrato").max(150),
+});
+
+export const envioAssinadoSchema = z.object({
+  metodo: z.enum(["GOVBR", "MANUSCRITA"]),
+  // O responsável precisa marcar a declaração de que o arquivo é o contrato assinado por ele.
+  declaracao: z.literal("true", { error: "Marque a declaração para enviar o contrato" }),
+});
+
+export const acaoContratoSchema = z.discriminatedUnion("acao", [
+  z.object({ acao: z.literal("APROVAR") }),
+  z.object({ acao: z.literal("ORIGINAL_RECEBIDO") }),
+  z.object({ acao: z.literal("DEVOLVER"), motivo: z.string().trim().min(3, "Informe o motivo da devolução").max(500) }),
+]);

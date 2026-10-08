@@ -34,6 +34,15 @@ export default function PrivacidadePage() {
             acessíveis apenas à administração da escola, são usados só para o atendimento da
             matrícula e podem ser excluídos a pedido da família.
           </p>
+          <p className="mt-2">
+            Contratos de matrícula: o PDF do contrato enviado pela escola e o PDF assinado
+            enviado pelo responsável ficam guardados de forma privada no banco de dados do
+            ClassLink, acessíveis apenas à direção da escola e aos responsáveis do aluno. Para
+            comprovar a assinatura, registramos quem enviou, a data e hora, o endereço IP e
+            uma impressão digital do arquivo (hash SHA-256). Por serem documentos do contrato
+            de prestação de serviços, são mantidos pelo prazo necessário ao cumprimento do
+            contrato e ao exercício regular de direitos (LGPD, art. 7º, V e VI, e art. 16).
+          </p>
         </section>
 
         <section>

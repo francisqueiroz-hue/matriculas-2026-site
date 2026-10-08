@@ -8,6 +8,7 @@ import { PushRegister } from "@/components/PushRegister";
 import { IosInstallBanner } from "@/components/IosInstallBanner";
 import { AndroidInstallBanner } from "@/components/AndroidInstallBanner";
 import { RematriculaBanner } from "@/components/RematriculaBanner";
+import { ContratosPendentesBanner } from "@/components/ContratosPendentesBanner";
 import { AvisosMensagensProvider, ConviteAtivarAvisos } from "@/components/AvisosMensagens";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -49,6 +50,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <IosInstallBanner />
             <AndroidInstallBanner />
             <ConviteAtivarAvisos />
+            <ContratosPendentesBanner />
             <RematriculaBanner />
             {children}
           </main>

@@ -37,6 +37,7 @@ const guardianLinks: NavLink[] = [
     label: "Financeiro",
     icon: "M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z M3 10h18 M7 15h3",
   },
+  { href: "/dashboard/contratos", label: "Contratos", icon: "M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z M14 3v5h5 M9 13h6 M9 17h4" },
 ];
 
 const adminLinks: NavLink[] = [
@@ -66,6 +67,7 @@ const adminLinks: NavLink[] = [
     label: "Matrículas",
     icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2 M9 5a2 2 0 002 2h2a2 2 0 002-2 M9 5a2 2 0 012-2h2a2 2 0 012 2 M9 14l2 2 4-4",
   },
+  { href: "/dashboard/admin/contratos", label: "Contratos", icon: "M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z M14 3v5h5 M9 13h6 M9 17h4" },
   {
     href: "/dashboard/admin/financeiro",
     label: "Financeiro",
