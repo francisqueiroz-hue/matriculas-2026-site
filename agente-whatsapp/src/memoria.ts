@@ -3,7 +3,7 @@ import { chaveTelefone } from "./telefone";
 
 const MAX_FATOS = 12;
 const MAX_TEXTO = 200;
-const SENSIVEL = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b|[\w.+-]+@[\w-]+\.[\w.]+/;
+export const SENSIVEL = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b|[\w.+-]+@[\w-]+\.[\w.]+/;
 
 /** Fatos curtos e privados de uma família (série do filho, período preferido, último assunto). */
 export async function salvarFato(db: Db, telefone: string, texto: string, agora = Date.now()): Promise<void> {

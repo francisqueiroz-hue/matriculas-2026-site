@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fila da Lia</title>
+<link rel="manifest" href="/painel/manifest.json">
+<meta name="theme-color" content="#7a3fc4">
+<style>
+:root{--bg:#fbf8f3;--card:#fff;--tx:#241c2e;--mut:#6b6377;--bd:#e7e0ee;--pri:#7a3fc4;--prit:#fff;--ok:#1f7a4d;--al:#b4531a;--ur:#b3261e;--eu:#efe7f8;--lia:#e9f4ee}
+:root[data-theme="dark"]{--bg:#17121d;--card:#221b2c;--tx:#f1ebf7;--mut:#a99bbb;--bd:#372c45;--pri:#b58aee;--prit:#17121d;--ok:#6fd2a0;--al:#f0a36b;--ur:#ff8b83;--eu:#2e2440;--lia:#1c3226}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17121d;--card:#221b2c;--tx:#f1ebf7;--mut:#a99bbb;--bd:#372c45;--pri:#b58aee;--prit:#17121d;--ok:#6fd2a0;--al:#f0a36b;--ur:#ff8b83;--eu:#2e2440;--lia:#1c3226}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:2;background:var(--card);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;flex:1;min-width:120px}
+main{max-width:760px;margin:0 auto;padding:16px 16px 88px}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--bd);display:flex;justify-content:center;gap:4px;padding:6px 8px;z-index:2}
+nav a{flex:1;max-width:160px;text-align:center;padding:10px 4px;border-radius:10px;color:var(--mut);text-decoration:none;font-size:14px;min-height:44px}
+nav a[aria-current="page"]{background:var(--eu);color:var(--tx);font-weight:600}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:0 0 12px}
+.grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.num{font-size:26px;font-weight:700}.mut{color:var(--mut);font-size:14px}
+button{font:inherit;min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
+button.pri{background:var(--pri);color:var(--prit);border-color:var(--pri)}
+button.ur{color:var(--ur)}
+textarea,input{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx)}
+textarea{min-height:90px}
+.linha{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.sel{display:flex;align-items:center;gap:8px;font-size:14px}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--bd);margin-right:6px}
+.tag.urgente{color:var(--ur);border-color:var(--ur)}.tag.alta{color:var(--al);border-color:var(--al)}
+.conv{display:block;text-decoration:none;color:inherit}
+.bolha{max-width:85%;padding:8px 12px;border-radius:14px;margin:6px 0;white-space:pre-wrap;word-wrap:break-word;background:var(--eu)}
+.bolha.lia,.bolha.humano{margin-left:auto;background:var(--lia)}
+.bolha small{display:block;color:var(--mut);font-size:12px}
+.vazio,.erro{text-align:center;color:var(--mut);padding:32px 8px}.erro{color:var(--ur)}
+a{color:var(--pri)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Fila da Lia</h1>
+  <label class="sel"><input id="lia" type="checkbox" style="width:22px;height:22px"> <span id="liaTxt">Lia</span></label>
+</header>
+<main id="app" aria-live="polite"><div class="vazio">Carregando…</div></main>
+<nav aria-label="Seções">
+  <a href="#/" data-r="inicio">Início</a>
+  <a href="#/chamados" data-r="chamados">Chamados</a>
+  <a href="#/sugestoes" data-r="sugestoes">Sugestões</a>
+  <a href="#/base" data-r="base">Base</a>
+</nav>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const hora = (ts) => new Date(ts).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const mascara = (t) => (t.length > 8 ? "+" + t.slice(0, 2) + " " + t.slice(2, 4) + " …" + t.slice(-4) : t);
+
+async function api(caminho, corpo) {
+  const r = await fetch("/painel/api" + caminho, corpo === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corpo) });
+  if (!r.ok) throw new Error(r.status === 401 ? "Sessão expirada: entre de novo." : "Erro " + r.status);
+  return r.json();
+}
+const tela = (html) => { $("#app").innerHTML = html; };
+const falha = (e) => tela('<div class="erro">' + esc(e.message || e) + '</div><div class="vazio"><button onclick="rota()">Tentar de novo</button></div>');
+
+async function inicio() {
+  const [r, conversas] = await Promise.all([api("/resumo"), api("/conversas")]);
+  $("#lia").checked = r.liaLigada;
+  $("#liaTxt").textContent = r.liaLigada ? "Lia ligada" : "Lia desligada";
+  tela(`
+    <div class="grade">
+      <div class="card"><div class="num">${r.mensagensMes}<span class="mut"> / ${r.limiteMensagens}</span></div><div class="mut">mensagens enviadas no mês</div></div>
+      <div class="card"><div class="num">${r.chamadosAbertos}</div><div class="mut">chamados abertos</div></div>
+      <div class="card"><div class="num">${r.tokensHoje}</div><div class="mut">tokens de IA hoje</div></div>
+    </div>
+    <div class="card"><b>Avisos neste aparelho</b><p class="mut">Receba um aviso quando a Lia passar um caso para a equipe.</p><button id="avisos">Ativar avisos</button></div>
+    <h2 style="font-size:16px">Conversas</h2>
+    ${conversas.length ? conversas.map((c) => `<a class="card conv" href="#/c/${esc(c.telefone)}"><b>${esc(mascara(c.telefone))}</b>
+      ${c.humano ? '<span class="tag">Equipe</span>' : '<span class="tag">Lia</span>'}${c.chamadosAbertos ? '<span class="tag alta">' + c.chamadosAbertos + ' chamado(s)</span>' : ""}
+      <div class="mut">${esc(c.ultima).slice(0, 90)} · ${hora(c.ts)}</div></a>`).join("") : '<div class="vazio">Nenhuma conversa ainda.</div>'}`);
+  $("#avisos").onclick = ativarAvisos(r.vapidPublicKey);
+}
+
+async function conversa(tel) {
+  const c = await api("/conversas/" + encodeURIComponent(tel));
+  tela(`<p><a href="#/">← Voltar</a></p><h2 style="font-size:16px">${esc(mascara(tel))} ${c.pausada ? '<span class="tag">Equipe atendendo</span>' : '<span class="tag">Lia atendendo</span>'}</h2>
+    <p class="mut">Para responder, use o WhatsApp Business da escola: a Lia fica em silêncio nesta conversa por 12 horas depois da sua resposta.</p>
+    <div class="linha"><button id="assumir">Assumir (pausar Lia)</button><button id="devolver">Devolver à Lia</button></div>
+    ${c.chamados.filter((x) => x.status === "aberto").map(chamadoHtml).join("")}
+    <div>${c.mensagens.map((m) => `<div class="bolha ${esc(m.direcao)}"><small>${m.direcao === "entrada" ? "Família" : m.direcao === "lia" ? "Lia" : "Equipe"} · ${hora(m.ts)}</small>${esc(m.texto)}</div>`).join("") || '<div class="vazio">Sem mensagens.</div>'}</div>`);
+  $("#assumir").onclick = async () => { await api("/conversas/" + encodeURIComponent(tel) + "/assumir", {}); rota(); };
+  $("#devolver").onclick = async () => { await api("/conversas/" + encodeURIComponent(tel) + "/devolver", {}); rota(); };
+  ligarChamados();
+}
+
+function chamadoHtml(c) {
+  return `<div class="card"><span class="tag ${esc(c.prioridade)}">${esc(c.prioridade)}</span><b>${esc(c.categoria)}</b> <span class="mut">· ${hora(c.criado_em)}</span>
+    <p>${esc(c.resumo)}</p>
+    ${c.rascunho ? `<div class="mut">Rascunho de resposta (copie e ajuste no WhatsApp):</div><textarea readonly>${esc(c.rascunho)}</textarea><div class="linha"><button data-copiar="${esc(c.rascunho)}">Copiar rascunho</button>` : '<div class="linha">'}
+    <a href="#/c/${esc(c.telefone)}"><button>Ver conversa</button></a><button class="pri" data-resolver="${c.id}">Resolver</button></div></div>`;
+}
+function ligarChamados() {
+  document.querySelectorAll("[data-copiar]").forEach((b) => (b.onclick = () => { navigator.clipboard.writeText(b.dataset.copiar); b.textContent = "Copiado!"; }));
+  document.querySelectorAll("[data-resolver]").forEach((b) => (b.onclick = async () => { await api("/chamados/" + b.dataset.resolver + "/resolver", {}); rota(); }));
+}
+async function chamados() {
+  const lista = await api("/chamados?status=aberto");
+  tela(lista.length ? lista.map(chamadoHtml).join("") : '<div class="vazio">Nenhum chamado aberto. 🎉</div>');
+  ligarChamados();
+}
+
+async function sugestoes() {
+  const lista = await api("/sugestoes");
+  tela(lista.length ? lista.map((s) => `<div class="card"><b>${esc(s.pergunta)}</b> <span class="mut">· perguntada ${s.frequencia}×</span>
+    <textarea data-r="${s.id}">${esc(s.resposta)}</textarea><p class="mut">Corrija os trechos [CONFIRMAR] antes de aprovar.</p>
+    <div class="linha"><button class="pri" data-ap="${s.id}">Aprovar</button><button class="ur" data-rej="${s.id}">Rejeitar</button></div></div>`).join("") : '<div class="vazio">Sem sugestões por enquanto. A Lia sugere respostas quando uma dúvida se repete.</div>');
+  document.querySelectorAll("[data-ap]").forEach((b) => (b.onclick = async () => { await api("/sugestoes/" + b.dataset.ap + "/decidir", { aprovar: true, resposta: document.querySelector('textarea[data-r="' + b.dataset.ap + '"]').value }); rota(); }));
+  document.querySelectorAll("[data-rej]").forEach((b) => (b.onclick = async () => { await api("/sugestoes/" + b.dataset.rej + "/decidir", { aprovar: false }); rota(); }));
+}
+
+async function base() {
+  const lista = await api("/base");
+  tela(`<div class="card"><b>Novo item da base</b><p class="mut">Sem nomes, telefones ou dados de alunos.</p>
+    <input id="bp" placeholder="Pergunta (ex.: Tem uniforme?)" style="margin-bottom:8px"><textarea id="br" placeholder="Resposta oficial da escola"></textarea>
+    <div class="linha"><button class="pri" id="bs">Publicar</button></div></div>
+    ${lista.map((i) => `<div class="card"><b>${esc(i.pergunta)}</b><p>${esc(i.resposta)}</p></div>`).join("") || '<div class="vazio">A base está vazia.</div>'}`);
+  $("#bs").onclick = async () => { await api("/base", { pergunta: $("#bp").value, resposta: $("#br").value }); rota(); };
+}
+
+function ativarAvisos(chavePublica) {
+  return async () => {
+    try {
+      if (!chavePublica) return alert("Avisos ainda não configurados no servidor.");
+      if (Notification.permission !== "granted" && (await Notification.requestPermission()) !== "granted") return alert("Permita notificações para receber os avisos.");
+      const reg = await navigator.serviceWorker.register("/painel/sw.js", { scope: "/painel/" });
+      const pad = "=".repeat((4 - (chavePublica.length % 4)) % 4);
+      const chave = Uint8Array.from(atob((chavePublica + pad).replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+      const sub = await (await navigator.serviceWorker.ready).pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chave });
+      await api("/push", sub.toJSON());
+      $("#avisos").textContent = "Avisos ativos ✓";
+    } catch (e) { alert("Não foi possível ativar os avisos: " + (e.message || e)); }
+  };
+}
+
+async function rota() {
+  const h = location.hash || "#/";
+  document.querySelectorAll("nav a").forEach((a) => a.toggleAttribute("aria-current", false));
+  const nome = h.startsWith("#/chamados") ? "chamados" : h.startsWith("#/sugestoes") ? "sugestoes" : h.startsWith("#/base") ? "base" : "inicio";
+  document.querySelector('nav a[data-r="' + nome + '"]').setAttribute("aria-current", "page");
+  try {
+    if (h.startsWith("#/c/")) await conversa(decodeURIComponent(h.slice(4)));
+    else if (nome === "chamados") await chamados();
+    else if (nome === "sugestoes") await sugestoes();
+    else if (nome === "base") await base();
+    else await inicio();
+  } catch (e) { falha(e); }
+}
+$("#lia").addEventListener("change", async (e) => { try { await api("/lia", { ligada: e.target.checked }); rota(); } catch (err) { falha(err); } });
+addEventListener("hashchange", rota);
+rota();
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { apagarAntigas } from "./conversa";
 import { gerarSugestoes } from "./aprendizado";
 import { escolherProvedor } from "./provedor";
 import { tratarMcp } from "./mcp";
+import { tratarPainel } from "./painel";
 import type { Env } from "./tipos";
 import { extrairEcos, extrairMensagens, verificarAssinatura, verificarDesafio } from "./webhook";
 
@@ -44,6 +45,7 @@ export function criarApp(opcoes: OpcoesApp = {}) {
         return new Response("ok");
       }
       if (url.pathname === "/mcp") return tratarMcp(req, env, obterDb(env));
+      if (url.pathname === "/painel" || url.pathname.startsWith("/painel/")) return tratarPainel(req, env, obterDb(env));
       return new Response("não encontrado", { status: 404 });
     },
     async scheduled(_evento: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }): Promise<void> {

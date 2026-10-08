@@ -1,0 +1,11 @@
+{
+  "name": "Fila da Lia",
+  "short_name": "Lia",
+  "description": "Acompanhe a assistente virtual do Espaço Kids e do Instituto Fokus.",
+  "start_url": "/painel/",
+  "scope": "/painel/",
+  "display": "standalone",
+  "background_color": "#fbf8f3",
+  "theme_color": "#7a3fc4",
+  "lang": "pt-BR"
+}
