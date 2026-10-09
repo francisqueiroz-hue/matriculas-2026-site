@@ -280,6 +280,14 @@ horário. A publicação é única (não duplica). Cardápio da semana atual cad
 Mural; excluir tira a publicação. Semanas passadas não são publicadas. Famílias e professores
 veem só os publicados das turmas que acompanham. Código: `src/lib/cardapios.ts`.
 
+**Importar cardápios** (mesma tela) agenda de uma vez vários cardápios por segmento: o
+ClassLink já traz o pacote da nutricionista de **12/10/2026 a 01/01/2027**
+(`src/dados/cardapios-out-dez-2026.json`, montado a partir dos 13 PDFs da pasta
+"Cardápios" do Drive — Berçário, Maternalzinho/Maternal 1, Educação Infantil e
+Fundamental I). A tela sugere as turmas de cada segmento pelo nome; a gestão confere e
+confirma. Semanas passadas e combinações que já têm cardápio ficam de fora (nada é
+sobrescrito). Também aceita um pacote `.json` no mesmo formato para os próximos períodos.
+
 ## Saída de alunos, famílias e equipe (excluir)
 
 - **Equipe → Excluir:** a pessoa perde o acesso **na hora** (a sessão aberta também cai),

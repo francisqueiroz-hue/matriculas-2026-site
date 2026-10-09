@@ -48,6 +48,42 @@ export const salvarCardapioSchema = z.object({
   imagemPath: z.string().max(500).nullable().optional(),
 });
 
+/** Pacote de importação: os mesmos cardápios (por segmento) para várias semanas. */
+export const pacoteCardapiosSchema = z.object({
+  versao: z.literal(1),
+  fonte: z.string().max(300).optional(),
+  semanas: z.array(dataISO.refine((d) => ehSegunda(d), "Toda semana precisa começar numa segunda-feira")).min(1).max(60),
+  observacoes: z.string().trim().max(1000).nullable().optional(),
+  segmentos: z
+    .array(
+      z.object({
+        nome: z.string().trim().min(1).max(80),
+        sugestao: z.array(z.string()).optional(),
+        conteudo: conteudoCardapioSchema,
+      }),
+    )
+    .min(1)
+    .max(12),
+});
+export type PacoteCardapios = z.infer<typeof pacoteCardapiosSchema>;
+
+/** O que o painel envia para importar: o pacote + para quem vai cada segmento. */
+export const importarCardapiosSchema = z.object({
+  semanas: pacoteCardapiosSchema.shape.semanas,
+  observacoes: pacoteCardapiosSchema.shape.observacoes,
+  segmentos: z
+    .array(
+      z.object({
+        nome: z.string().trim().min(1).max(80),
+        conteudo: conteudoCardapioSchema,
+        /** Turmas que recebem este cardápio; vazio = segmento ignorado; null = toda a escola. */
+        classIds: z.array(z.string().min(1)).max(100).nullable(),
+      }),
+    )
+    .min(1)
+    .max(12),
+});
+
 // ─── Datas (sempre no fuso da escola) ─────────────────────────────────────────
 
 /** "AAAA-MM-DD" e hora local da escola para um instante. */
