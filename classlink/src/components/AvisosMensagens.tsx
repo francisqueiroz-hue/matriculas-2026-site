@@ -248,7 +248,7 @@ export function ConviteAtivarAvisos() {
 
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
-      <p>🔔 Ative os avisos para saber na hora quando chegar uma mensagem, mesmo com o ClassLink em outra aba.</p>
+      <p>🔔 Ative os avisos para saber na hora quando chegar uma mensagem, mesmo com o ClassLink fechado. (Dá para ativar depois em Minha conta.)</p>
       <div className="flex shrink-0 gap-2">
         <button
           type="button"

@@ -6,6 +6,7 @@ import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { AvisosWhatsAppEquipe } from "@/components/AvisosWhatsAppEquipe";
 import { NomeParaFamilias } from "@/components/NomeParaFamilias";
+import { NotificacoesAparelho } from "@/components/NotificacoesAparelho";
 
 export default function ContaPage() {
   const user = useCurrentUser();
@@ -84,6 +85,8 @@ export default function ContaPage() {
         </p>
         <p className="text-sm text-slate-500">{user.schoolName}</p>
       </div>
+
+      <NotificacoesAparelho />
 
       {!user.email && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
