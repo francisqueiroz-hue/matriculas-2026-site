@@ -10,6 +10,9 @@ interface Responsavel {
   phone: string | null;
   email: string | null;
   jaEntrou: boolean;
+  primeiroAcesso?: string | null;
+  ultimoUso?: string | null;
+  notificacoesAtivas?: boolean;
   alunos: string[];
   funcao: string | null;
   turmas: string[];
@@ -32,8 +35,17 @@ function formatarTelefone(telefone: string | null) {
   return telefone;
 }
 
+/** "08/10 às 14:32" no horário de Brasília. */
+function dataHora(iso: string) {
+  const d = new Date(iso);
+  const data = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+  const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+  return `${data} às ${hora}`;
+}
+
 function AcessosContent() {
-  const [todos, setTodos] = useState(false);
+  // Filtro da lista: nunca entraram (padrão), todos, ou sem notificações no celular.
+  const [filtro, setFiltro] = useState<"pendentes" | "todos" | "semNotificacao">("pendentes");
   const [publico, setPublico] = useState<"familias" | "equipe">("familias");
   const [dados, setDados] = useState<Dados | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -44,14 +56,18 @@ function AcessosContent() {
   const [resultadoLote, setResultadoLote] = useState<string | null>(null);
 
   const carregar = useCallback(() => {
-    const params = new URLSearchParams({ ...(todos && { todos: "1" }), ...(publico === "equipe" && { publico: "equipe" }) });
+    const params = new URLSearchParams({
+      ...(filtro === "todos" && { todos: "1" }),
+      ...(filtro === "semNotificacao" && { filtro: "sem-notificacao" }),
+      ...(publico === "equipe" && { publico: "equipe" }),
+    });
     apiJson<Dados>(`/api/admin/acessos?${params}`)
       .then((d) => {
         setDados(d);
         setErro(null);
       })
       .catch((err) => setErro(err instanceof Error ? err.message : "Erro ao carregar"));
-  }, [todos, publico]);
+  }, [filtro, publico]);
 
   useEffect(carregar, [carregar]);
 
@@ -204,20 +220,24 @@ function AcessosContent() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setTodos(false)}
-          className={`rounded-full px-3 py-1.5 text-sm font-medium ${!todos ? "bg-indigo-600 text-white" : "border border-slate-300 bg-white text-slate-700"}`}
-        >
-          Nunca entraram
-        </button>
-        <button
-          type="button"
-          onClick={() => setTodos(true)}
-          className={`rounded-full px-3 py-1.5 text-sm font-medium ${todos ? "bg-indigo-600 text-white" : "border border-slate-300 bg-white text-slate-700"}`}
-        >
-          {publico === "equipe" ? "Toda a equipe" : "Todos os responsáveis"}
-        </button>
+        {(
+          [
+            ["pendentes", "Nunca entraram"],
+            ["semNotificacao", "Sem notificações no celular"],
+            ["todos", publico === "equipe" ? "Toda a equipe" : "Todos os responsáveis"],
+          ] as const
+        ).map(([valor, rotulo]) => (
+          <button
+            key={valor}
+            type="button"
+            onClick={() => setFiltro(valor)}
+            className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+              filtro === valor ? "bg-indigo-600 text-white" : "border border-slate-300 bg-white text-slate-700"
+            }`}
+          >
+            {rotulo}
+          </button>
+        ))}
         {dados?.whatsappConfigurado && pendentes > 0 && (
           <button
             type="button"
@@ -236,12 +256,16 @@ function AcessosContent() {
       {dados?.responsaveis.length === 0 && (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
           {publico === "equipe"
-            ? todos
+            ? filtro === "todos"
               ? "Ninguém da equipe cadastrado."
-              : "🎉 Toda a equipe já entrou no ClassLink."
-            : todos
+              : filtro === "semNotificacao"
+                ? "🎉 Toda a equipe está com as notificações ativas."
+                : "🎉 Toda a equipe já entrou no ClassLink."
+            : filtro === "todos"
               ? "Nenhum responsável cadastrado."
-              : "🎉 Todos os responsáveis já entraram no ClassLink."}
+              : filtro === "semNotificacao"
+                ? "🎉 Todos os responsáveis estão com as notificações ativas."
+                : "🎉 Todos os responsáveis já entraram no ClassLink."}
         </p>
       )}
 
@@ -259,7 +283,22 @@ function AcessosContent() {
                   >
                     {r.jaEntrou ? "Já entrou" : "Nunca entrou"}
                   </span>
+                  {r.jaEntrou && (
+                    <span
+                      className={`ml-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        r.notificacoesAtivas ? "bg-sky-100 text-sky-900" : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {r.notificacoesAtivas ? "🔔 Notificações ativas" : "🔕 Sem notificações"}
+                    </span>
+                  )}
                 </p>
+                {r.primeiroAcesso && (
+                  <p className="text-xs text-slate-500">
+                    Entrou pela 1ª vez em {dataHora(r.primeiroAcesso)}
+                    {r.ultimoUso && r.ultimoUso !== r.primeiroAcesso && ` · último uso em ${dataHora(r.ultimoUso)}`}
+                  </p>
+                )}
                 <p className="text-slate-600">
                   {formatarTelefone(r.phone)}
                   {r.email && ` · ${r.email}`}

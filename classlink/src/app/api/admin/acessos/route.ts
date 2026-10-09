@@ -15,7 +15,9 @@ import { idsComNomeRepetido } from "@/lib/nomes-semelhantes";
 export async function GET(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN");
-    const somentePendentes = request.nextUrl.searchParams.get("todos") !== "1";
+    // Filtros: padrão = nunca entraram; ?todos=1 = todos; ?filtro=sem-notificacao = sem push no celular.
+    const semNotificacao = request.nextUrl.searchParams.get("filtro") === "sem-notificacao";
+    const somentePendentes = !semNotificacao && request.nextUrl.searchParams.get("todos") !== "1";
     // Famílias (padrão) ou equipe — o mesmo fluxo de acesso vale para os dois.
     const equipe = request.nextUrl.searchParams.get("publico") === "equipe";
 
@@ -26,6 +28,7 @@ export async function GET(request: NextRequest) {
         deletedAt: null,
         active: true,
         ...(somentePendentes && { refreshTokens: { none: {} } }),
+        ...(semNotificacao && { pushTokens: { none: {} } }),
       },
       select: {
         id: true,
@@ -45,6 +48,15 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { name: "asc" },
     });
+
+    // Quando entrou (1ª sessão), último uso (cada uso renova a sessão) e se ativou notificações.
+    const ids = responsaveis.map((r) => r.id);
+    const [sessoes, pushes] = await Promise.all([
+      prisma.refreshToken.groupBy({ by: ["userId"], where: { userId: { in: ids } }, _min: { createdAt: true }, _max: { createdAt: true } }),
+      prisma.pushToken.groupBy({ by: ["userId"], where: { userId: { in: ids } }, _count: { _all: true } }),
+    ]);
+    const sessaoPor = new Map(sessoes.map((x) => [x.userId, x]));
+    const pushPor = new Map(pushes.map((x) => [x.userId, x._count._all]));
 
     // Possíveis cadastros duplicados: outro responsável (ou colega) com nome parecido.
     const todos = await prisma.user.findMany({
@@ -70,6 +82,9 @@ export async function GET(request: NextRequest) {
         funcao: equipe ? FUNCAO_LABEL[funcaoDoUsuario(r) ?? "PROFESSOR"] : null,
         turmas: r.classesTeaching.map((c) => c.class.name),
         nomeRepetido: repetidos.has(r.id),
+        primeiroAcesso: sessaoPor.get(r.id)?._min.createdAt ?? null,
+        ultimoUso: sessaoPor.get(r.id)?._max.createdAt ?? null,
+        notificacoesAtivas: (pushPor.get(r.id) ?? 0) > 0,
       })),
     });
   } catch (error) {
