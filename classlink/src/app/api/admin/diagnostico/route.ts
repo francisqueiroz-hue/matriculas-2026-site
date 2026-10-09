@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { erroFirebaseAdmin, getFirebaseAdminApp } from "@/lib/firebase-admin";
 import { getAccessTemplate, isWhatsAppConfigured } from "@/lib/whatsapp";
 import { consultarModelo, wabaId } from "@/lib/whatsapp-modelos";
+import { problemasConfigPublica } from "@/lib/firebase-config-publica";
 
 /**
  * O que está configurado para os avisos (push do Firebase e WhatsApp), sem expor
@@ -33,6 +34,14 @@ export async function GET() {
         servidor: getFirebaseAdminApp() !== null,
         servidorErro: erroFirebaseAdmin(),
         dispositivosRegistrados: dispositivosPush,
+        // Só o nome da variável e o tipo de problema — nunca o valor.
+        variaveisComProblema: problemasConfigPublica({
+          NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+          NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+          NEXT_PUBLIC_FIREBASE_VAPID_KEY: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+        }),
       },
       whatsapp: {
         api: isWhatsAppConfigured(),

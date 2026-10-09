@@ -1,11 +1,6 @@
 import { initializeApp, getApps, type FirebaseOptions } from "firebase/app";
 import { getMessaging, getToken, isSupported, type Messaging } from "firebase/messaging";
-
-/** Valor de variável pública sem espaços, quebras de linha ou aspas coladas por engano. */
-function limpar(valor: string | undefined): string | undefined {
-  const v = valor?.trim().replace(/^["']|["']$/g, "").trim();
-  return v || undefined;
-}
+import { limparValorPublico as limpar } from "@/lib/firebase-config-publica";
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: limpar(process.env.NEXT_PUBLIC_FIREBASE_API_KEY),
