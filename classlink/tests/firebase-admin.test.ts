@@ -52,3 +52,29 @@ describe("chave privada colada de jeitos diferentes", () => {
     expect(normalizarChavePrivada(undefined)).toBeUndefined();
   });
 });
+
+describe("credenciaisDaConta", () => {
+  it("com o JSON inteiro colado, e-mail e projeto vêm do próprio arquivo", async () => {
+    const { credenciaisDaConta } = await import("@/lib/firebase-admin");
+    const json = JSON.stringify({
+      project_id: "classlink-certo",
+      client_email: "firebase-adminsdk@classlink-certo.iam.gserviceaccount.com",
+      private_key: "-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n",
+    });
+    const c = credenciaisDaConta({
+      FIREBASE_PRIVATE_KEY: json,
+      FIREBASE_CLIENT_EMAIL: "antigo@outro.iam.gserviceaccount.com",
+      FIREBASE_PROJECT_ID: "outro",
+    });
+    expect(c.clientEmail).toBe("firebase-adminsdk@classlink-certo.iam.gserviceaccount.com");
+    expect(c.projectId).toBe("classlink-certo");
+    expect(c.privateKey).toContain("BEGIN PRIVATE KEY");
+  });
+
+  it("sem JSON, usa as variáveis separadas, limpas", async () => {
+    const { credenciaisDaConta } = await import("@/lib/firebase-admin");
+    const c = credenciaisDaConta({ FIREBASE_CLIENT_EMAIL: " conta@p.iam.gserviceaccount.com​\n", FIREBASE_PROJECT_ID: "\"p\"" });
+    expect(c.clientEmail).toBe("conta@p.iam.gserviceaccount.com");
+    expect(c.projectId).toBe("p");
+  });
+});

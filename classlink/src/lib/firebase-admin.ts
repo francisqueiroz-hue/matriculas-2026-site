@@ -38,6 +38,29 @@ export function normalizarChavePrivada(valor: string | undefined): string | unde
 }
 
 /**
+ * Projeto, e-mail e chave da conta de serviço. Se FIREBASE_PRIVATE_KEY tiver o arquivo JSON
+ * inteiro, o e-mail e o projeto vêm dele — assim chave e e-mail são sempre do mesmo arquivo
+ * (e-mail de outra conta dá "invalid_grant: account not found"). Espaço, aspas ou caractere
+ * invisível colados junto também fazem o Google recusar a conta, então são removidos.
+ */
+export function credenciaisDaConta(env: Record<string, string | undefined>) {
+  let doJson: { client_email?: string; project_id?: string } = {};
+  const bruto = env.FIREBASE_PRIVATE_KEY?.trim();
+  if (bruto?.startsWith("{")) {
+    try {
+      doJson = JSON.parse(bruto) as typeof doJson;
+    } catch {
+      // não é JSON válido: usa as variáveis separadas
+    }
+  }
+  return {
+    projectId: limparValorPublico(doJson.project_id) ?? limparValorPublico(env.FIREBASE_PROJECT_ID),
+    clientEmail: limparValorPublico(doJson.client_email) ?? limparValorPublico(env.FIREBASE_CLIENT_EMAIL),
+    privateKey: normalizarChavePrivada(env.FIREBASE_PRIVATE_KEY),
+  };
+}
+
+/**
  * Instância única do Firebase Admin SDK, compartilhada entre push (FCM) e
  * armazenamento de mídia (Storage) — os dois usam a mesma conta de serviço.
  * Retorna null se as credenciais não estiverem configuradas (features
@@ -46,11 +69,7 @@ export function normalizarChavePrivada(valor: string | undefined): string | unde
 export function getFirebaseAdminApp(): App | null {
   if (cachedApp !== undefined) return cachedApp;
 
-  // Espaço, aspas ou caractere invisível colados junto fazem o Google recusar a conta
-  // (app/invalid-credential), mesmo com a chave certa.
-  const projectId = limparValorPublico(process.env.FIREBASE_PROJECT_ID);
-  const clientEmail = limparValorPublico(process.env.FIREBASE_CLIENT_EMAIL);
-  const privateKey = normalizarChavePrivada(process.env.FIREBASE_PRIVATE_KEY);
+  const { projectId, clientEmail, privateKey } = credenciaisDaConta(process.env);
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
   if (!projectId || !clientEmail || !privateKey) {

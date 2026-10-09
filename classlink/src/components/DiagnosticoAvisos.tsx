@@ -139,7 +139,7 @@ export function DiagnosticoAvisos() {
               dica={
                 d.push.servidorErro
                   ? `As variáveis estão preenchidas, mas a chave foi recusada (${d.push.servidorErro}). Cole de novo o valor de "private_key" do arquivo JSON inteiro, de -----BEGIN PRIVATE KEY----- até -----END PRIVATE KEY-----, sem aspas.`
-                  : "Preencha FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL e FIREBASE_PRIVATE_KEY (README, passo 5)."
+                  : "Cole o arquivo JSON inteiro da conta de serviço em FIREBASE_PRIVATE_KEY (ou preencha FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL e FIREBASE_PRIVATE_KEY)."
               }
             />
             {d.push.variaveisComProblema?.map((v) => (
