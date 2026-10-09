@@ -264,6 +264,22 @@ Mensagens. Ela apaga a conversa e todas as mensagens para as duas pessoas (sem v
 para conversas de teste ou encerradas. Professores e famílias não excluem conversas.
 Conversas com quem foi excluído do cadastro (saiu da escola) somem da lista sozinhas.
 
+## Cardápios semanais (agendados para segunda-feira)
+
+Menu **Cardápio**. A direção e a coordenação cadastram com antecedência o cardápio de cada
+semana (segunda a sexta), para a escola toda ou para uma turma: refeições com nomes
+editáveis (padrão: lanche da manhã, almoço, lanche da tarde), observações e foto opcional.
+**Repetir nas próximas semanas** copia um cardápio para até 12 semanas seguintes, já agendado.
+
+**Toda segunda-feira, às 6h (Brasília)**, o cardápio da semana é publicado no **Mural** e as
+famílias recebem notificação (push). Quem agenda o envio é o cron da Vercel
+(`/api/cron/publicar-cardapios`, `0 9 * * 1` em UTC, no `vercel.json`, com `CRON_SECRET`); como
+reserva, se o cron falhar, o cardápio sai na primeira abertura do ClassLink depois desse
+horário. A publicação é única (não duplica). Cardápio da semana atual cadastrado depois das
+6h de segunda sai na hora; **Publicar agora** antecipa; editar um já publicado atualiza o
+Mural; excluir tira a publicação. Semanas passadas não são publicadas. Famílias e professores
+veem só os publicados das turmas que acompanham. Código: `src/lib/cardapios.ts`.
+
 ## Saída de alunos, famílias e equipe (excluir)
 
 - **Equipe → Excluir:** a pessoa perde o acesso **na hora** (a sessão aberta também cai),
