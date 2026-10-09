@@ -133,3 +133,9 @@ describe("cadastrar modelos", () => {
     expect(r.map((m) => m.status)).toEqual(["PENDING", "PENDING"]);
   });
 });
+
+describe("responder pelo WhatsApp", () => {
+  it("o aviso em texto livre ensina a responder por lá", () => {
+    expect(textoAviso("Maria", "Oi", "https://x/y")).toMatch(/Responder/);
+  });
+});

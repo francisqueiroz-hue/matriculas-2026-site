@@ -68,9 +68,14 @@ export function AvisosWhatsAppEquipe() {
         Receba no seu WhatsApp, pelo número da escola, um aviso com o trecho da mensagem e o link para responder sempre
         que uma família ou um colega escrever para você no ClassLink.
       </p>
+      <p className="mt-2 rounded-md bg-emerald-50 p-2 text-xs text-emerald-900">
+        <strong>Responda direto pelo WhatsApp:</strong> toque e segure o aviso, escolha <em>Responder</em> e escreva. A
+        resposta entra na conversa do ClassLink e você recebe a confirmação &quot;✓ Resposta enviada&quot;. Só texto (áudio e foto,
+        pelo ClassLink).
+      </p>
       {!pref.disponivel && (
         <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900">
-          Ainda indisponível: a escola precisa ter o modelo de aviso aprovado pela Meta (WHATSAPP_TEMPLATE_AVISO). Você já
+          Ainda indisponível: a escola precisa ter o modelo de aviso aprovado pela Meta (Painel → Configuração dos avisos). Você já
           pode deixar sua preferência salva — os avisos começam assim que ele for configurado.
         </p>
       )}

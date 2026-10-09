@@ -106,6 +106,7 @@ model School {
   classes               Class[]
   students              Student[]
   posts                 Post[]
+  cardapios             Cardapio[]
   events                Event[]
   comunicados           Comunicado[]
   boletos               Boleto[]
@@ -158,6 +159,7 @@ model User {
   studentLinks GuardianStudent[]
 
   postsAuthored    Post[]         @relation("PostAuthor")
+  cardapiosCriados Cardapio[]     @relation("CardapioAutor")
   postReads        PostRead[]
   eventsCreated    Event[]        @relation("EventAuthor")
   refreshTokens    RefreshToken[]
@@ -186,6 +188,9 @@ model User {
   contratoConfigsEditadas  ContratoConfig[]  @relation("ContratoConfigEditadaPor")
   contratoArquivosEnviados ContratoArquivo[] @relation("ContratoArquivoEnviadoPor")
   contratoEventos          ContratoEvento[]  @relation("ContratoEventoUsuario")
+
+  // Avisos enviados pelo WhatsApp da escola e respostas recebidas por lá (responder pelo WhatsApp)
+  whatsappVinculos WhatsAppVinculoConversa[]
 
   @@index([schoolId])
 }
@@ -225,6 +230,7 @@ model Class {
   teachers    ClassTeacher[]
   students    Student[]
   posts       Post[]
+  cardapios   Cardapio[]
   events      Event[]
   comunicados Comunicado[]
 
@@ -306,7 +312,8 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  reads PostRead[]
+  reads    PostRead[]
+  cardapio Cardapio?
 
   @@index([schoolId])
   @@index([classId])
@@ -739,4 +746,69 @@ model ContratoConfig {
   updatedAt    DateTime @updatedAt
 
   @@unique([schoolId, anoLetivo])
+}
+
+/// Liga uma mensagem do WhatsApp da escola (wamid) a uma conversa do ClassLink, para que a
+/// direção/coordenação responda direto pelo WhatsApp: "AVISO" = aviso ou confirmação que a
+/// escola enviou à pessoa (a resposta a ele volta para essa conversa); "RESPOSTA" = resposta
+/// já recebida e processada (evita duplicar quando a Meta reenvia o webhook).
+model WhatsAppVinculoConversa {
+  id             String               @id @default(cuid())
+  externalId     String               @unique
+  papel          PapelVinculoWhatsApp
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  tipo           TipoConversaWhatsApp
+  conversationId String
+  createdAt      DateTime             @default(now())
+
+  @@index([userId, papel, createdAt])
+}
+
+enum PapelVinculoWhatsApp {
+  AVISO
+  RESPOSTA
+}
+
+enum TipoConversaWhatsApp {
+  FAMILIA
+  EQUIPE
+}
+
+/// Cardápio semanal (segunda a sexta), cadastrado com antecedência pela direção/coordenação
+/// e publicado automaticamente na segunda-feira da semana: vira uma publicação no Mural e
+/// as famílias recebem notificação. Sem turma = toda a escola.
+model Cardapio {
+  id       String  @id @default(cuid())
+  school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+  class    Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId  String?
+
+  /// Segunda-feira da semana (data, sem horário).
+  semanaInicio DateTime @db.Date
+  /// { refeicoes: string[], itens: { seg: string[], ter: [...], qua, qui, sex } } — itens[dia][i] é a refeição i.
+  conteudo     Json
+  observacoes  String?
+  /// Caminho da foto no armazenamento (mesmo esquema do Mural), opcional.
+  imagemPath   String?
+
+  status      StatusCardapio @default(AGENDADO)
+  publicadoEm DateTime?
+  post        Post?          @relation(fields: [postId], references: [id], onDelete: SetNull)
+  postId      String?        @unique
+
+  criadoPor   User   @relation("CardapioAutor", fields: [criadoPorId], references: [id], onDelete: Cascade)
+  criadoPorId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId, semanaInicio])
+  @@index([status, semanaInicio])
+}
+
+enum StatusCardapio {
+  AGENDADO
+  PUBLICADO
 }

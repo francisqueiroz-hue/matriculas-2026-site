@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { avisarEquipePorWhatsApp } from "@/lib/avisos-equipe";
 import { prisma } from "@/lib/prisma";
 import { conversaDaFamiliaComGestao } from "@/lib/permissoes-mensagens";
+import { processarRespostaPeloWhatsApp } from "@/lib/resposta-whatsapp";
 import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
 import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "@/lib/whatsapp";
@@ -115,15 +116,25 @@ export async function POST(request: NextRequest) {
       const guardian = await findGuardianByPhone(msg.from);
       if (guardian) await registrarUltimaMensagem(guardian.id);
       if (!guardian) {
-        // Equipe (coordenação, professores, auxiliares) também pode pedir o acesso por "ACESSO".
         const equipe = await findStaffByPhone(msg.from);
         if (equipe) {
           await registrarUltimaMensagem(equipe.id);
+          // Equipe também pode pedir o acesso por "ACESSO".
           if (pediuAcesso) {
             await responderPedidoDeAcesso(equipe, msg.from, `${request.nextUrl.origin}/login`).catch((err) =>
               console.error("Falha ao responder pedido de acesso da equipe pelo WhatsApp", err),
             );
+            continue;
           }
+          // Qualquer outra mensagem é resposta a um aviso: entra na conversa do ClassLink.
+          await processarRespostaPeloWhatsApp({
+            remetente: { id: equipe.id, name: equipe.name },
+            telefone: msg.from,
+            texto: msg.type === "text" ? textoRecebido : "",
+            mensagemId: msg.id,
+            respondendoA: msg.context?.id ?? null,
+            origem: request.nextUrl.origin,
+          }).catch((err) => console.error("Falha ao processar resposta da equipe pelo WhatsApp", err));
           continue;
         }
         console.warn(`Mensagem WhatsApp recebida de número não cadastrado: ${msg.from}`);

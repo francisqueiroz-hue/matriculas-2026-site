@@ -24,7 +24,18 @@ export function parametrosModeloAviso(remetente: string, texto: string, link: st
 
 /** Texto livre do aviso, usado quando a pessoa escreveu para a escola nas últimas 24h. */
 export function textoAviso(remetente: string, texto: string, link: string): string {
-  return `Você recebeu uma nova mensagem no ClassLink de ${remetente}:\n\n"${trechoAviso(texto)}"\n\nPara responder, abra: ${link}`;
+  return (
+    `Você recebeu uma nova mensagem no ClassLink de ${remetente}:\n\n"${trechoAviso(texto)}"\n\n` +
+    `↩️ Para responder daqui, toque e segure esta mensagem e escolha *Responder*. Ou abra: ${link}`
+  );
+}
+
+/** Liga uma mensagem enviada pelo WhatsApp da escola à conversa do ClassLink. */
+export async function registrarAviso(externalId: string, userId: string, tipo: "familia" | "equipe", conversationId: string) {
+  if (!externalId) return;
+  await prisma.whatsAppVinculoConversa
+    .create({ data: { externalId, userId, papel: "AVISO", tipo: tipo === "familia" ? "FAMILIA" : "EQUIPE", conversationId } })
+    .catch((err) => console.error("Falha ao registrar aviso do WhatsApp", err));
 }
 
 interface NovaMensagem {
@@ -72,13 +83,17 @@ export async function avisarEquipePorWhatsApp(msg: NovaMensagem): Promise<boolea
     if (recentes > 0) return false;
 
     // Conversa aberta (a pessoa falou com o número da escola nas últimas 24h): texto livre.
+    let enviado: { externalId: string };
     if (conversaAberta(destinatario.whatsappUltimaMensagemEm)) {
-      await sendWhatsAppTextMessage(telefone, textoAviso(msg.remetente, msg.texto, msg.link));
-      return true;
+      enviado = await sendWhatsAppTextMessage(telefone, textoAviso(msg.remetente, msg.texto, msg.link));
+    } else {
+      const template = await modeloDisponivel("aviso");
+      if (!template) return false;
+      enviado = await sendWhatsAppTemplateMessage(telefone, template, parametrosModeloAviso(msg.remetente, msg.texto, msg.link));
     }
-    const template = await modeloDisponivel("aviso");
-    if (!template) return false;
-    await sendWhatsAppTemplateMessage(telefone, template, parametrosModeloAviso(msg.remetente, msg.texto, msg.link));
+    // Guarda o id do aviso: se a pessoa responder a ele no WhatsApp, a resposta volta para
+    // esta conversa (lib/resposta-whatsapp).
+    await registrarAviso(enviado.externalId, msg.destinatarioId, msg.tipo, msg.conversationId);
     return true;
   } catch (err) {
     console.error("Falha ao avisar equipe pelo WhatsApp", err);

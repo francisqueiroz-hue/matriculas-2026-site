@@ -24,6 +24,11 @@ const baseLinks: NavLink[] = [
   },
   { href: "/dashboard/agenda", label: "Agenda", icon: "M3 5h18v16H3z M3 10h18 M8 3v4 M16 3v4" },
   {
+    href: "/dashboard/cardapio",
+    label: "Cardápio",
+    icon: "M7 3v8 M5 3v4a2 2 0 004 0V3 M7 11v10 M17 3c-1.7 0-3 2.2-3 5s1.3 4 3 4v9",
+  },
+  {
     href: "/dashboard/frequencia",
     label: "Frequência",
     icon: "M9 12l2 2 4-4 M12 21a9 9 0 100-18 9 9 0 000 18z",

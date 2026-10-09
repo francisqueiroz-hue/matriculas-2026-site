@@ -251,10 +251,34 @@ oculta e não aceita novas mensagens. Resposta da família pelo WhatsApp ou e-ma
 conversa dela com a gestão (a mais recente, ou uma nova com a direção). "Coordenação" é a
 função Coordenação do cadastro da equipe.
 
+**Responder pelo WhatsApp:** quem ativou os avisos em Conta pode responder direto no
+WhatsApp — toque e segure o aviso e escolha *Responder*. A resposta entra na conversa do
+ClassLink (o id de cada aviso fica em `WhatsAppVinculoConversa`) e a pessoa recebe a
+confirmação "✓ Resposta enviada para ...". Sem *Responder*, vale o aviso dos últimos 30
+minutos. A família recebe a resposta pelo app (push) ou, se escreveu pelo WhatsApp e a
+conversa de 24h está aberta, no próprio WhatsApp. Só texto; as regras de quem conversa com
+quem continuam valendo. Código: `src/lib/resposta-whatsapp.ts`.
+
 **Excluir conversa:** a direção e a coordenação têm a lixeira ao lado de cada conversa em
 Mensagens. Ela apaga a conversa e todas as mensagens para as duas pessoas (sem volta) —
 para conversas de teste ou encerradas. Professores e famílias não excluem conversas.
 Conversas com quem foi excluído do cadastro (saiu da escola) somem da lista sozinhas.
+
+## Cardápios semanais (agendados para segunda-feira)
+
+Menu **Cardápio**. A direção e a coordenação cadastram com antecedência o cardápio de cada
+semana (segunda a sexta), para a escola toda ou para uma turma: refeições com nomes
+editáveis (padrão: lanche da manhã, almoço, lanche da tarde), observações e foto opcional.
+**Repetir nas próximas semanas** copia um cardápio para até 12 semanas seguintes, já agendado.
+
+**Toda segunda-feira, às 6h (Brasília)**, o cardápio da semana é publicado no **Mural** e as
+famílias recebem notificação (push). Quem agenda o envio é o cron da Vercel
+(`/api/cron/publicar-cardapios`, `0 9 * * 1` em UTC, no `vercel.json`, com `CRON_SECRET`); como
+reserva, se o cron falhar, o cardápio sai na primeira abertura do ClassLink depois desse
+horário. A publicação é única (não duplica). Cardápio da semana atual cadastrado depois das
+6h de segunda sai na hora; **Publicar agora** antecipa; editar um já publicado atualiza o
+Mural; excluir tira a publicação. Semanas passadas não são publicadas. Famílias e professores
+veem só os publicados das turmas que acompanham. Código: `src/lib/cardapios.ts`.
 
 ## Saída de alunos, famílias e equipe (excluir)
 
