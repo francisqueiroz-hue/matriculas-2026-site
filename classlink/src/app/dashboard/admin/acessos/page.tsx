@@ -13,6 +13,7 @@ interface Responsavel {
   alunos: string[];
   funcao: string | null;
   turmas: string[];
+  nomeRepetido?: boolean;
 }
 
 interface Dados {
@@ -270,6 +271,12 @@ function AcessosContent() {
                   </p>
                 )}
                 {r.alunos.length > 0 && <p className="text-xs text-slate-500">Aluno(s): {r.alunos.join(", ")}</p>}
+                {r.nomeRepetido && (
+                  <p className="text-xs font-medium text-amber-700">
+                    Nome repetido: confira em “Todos” se é a mesma pessoa cadastrada duas vezes. Se for, vincule os filhos a um
+                    cadastro só (Alunos) e exclua o outro.
+                  </p>
+                )}
                 {publico === "familias" && r.alunos.length === 0 && (
                   <p className="text-xs text-amber-700">Sem aluno ativo na escola — se a família saiu, use Excluir.</p>
                 )}

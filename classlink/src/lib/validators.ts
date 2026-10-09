@@ -22,8 +22,12 @@ export const linkGuardianSchema = z
     guardianPhone: z.string().max(30).optional(),
     relation: z.string().max(50).optional(),
     password: z.string().min(8).optional(),
+    /** Vincular a um responsável já cadastrado (ex.: segundo filho), sem criar outro login. */
+    guardianId: z.string().min(1).optional(),
+    /** Confirma que é outra pessoa, mesmo havendo responsável com nome parecido. */
+    confirmarNovo: z.boolean().optional(),
   })
-  .refine((data) => Boolean(data.guardianEmail || data.guardianPhone), {
+  .refine((data) => Boolean(data.guardianId || data.guardianEmail || data.guardianPhone), {
     message: "Informe pelo menos um e-mail ou telefone do responsável",
     path: ["guardianEmail"],
   });

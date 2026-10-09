@@ -237,6 +237,16 @@ padronizado (login por telefone) e não pode repetir entre usuários. A equipe t
 o acesso mandando **ACESSO** para o WhatsApp da escola, e a tela **Acessos** tem a aba
 **Equipe** com quem ainda não entrou.
 
+## Família com mais de um filho (um login só)
+
+Um responsável fica ligado a todos os filhos: ao vincular o segundo filho em **Alunos** com o
+mesmo celular ou e-mail, o ClassLink reaproveita o cadastro (sem novo login nem nova senha).
+Se for digitado **outro** celular/e-mail com um nome igual ou parecido a um responsável já
+cadastrado ("Maria José da Silva" ≈ "Maria Silva"), a tela pergunta **"É a mesma pessoa?"**
+— **Usar este cadastro** vincula o filho ao login existente; **É outra pessoa** cadastra
+um novo. A checagem é do servidor (`src/lib/nomes-semelhantes.ts`). Em **Acessos**, cadastros
+com nome repetido aparecem com o aviso "Nome repetido", para conferir duplicados antigos.
+
 ## Como a equipe aparece para as famílias
 
 As famílias nunca veem o nome pessoal da equipe: nas mensagens (lista, conversa, contatos,

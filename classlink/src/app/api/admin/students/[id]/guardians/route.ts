@@ -7,6 +7,7 @@ import { linkGuardianSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
 import { normalizePhoneBR, samePhoneBR } from "@/lib/whatsapp";
 import { descreverEnvio, enviarAcessoPeloApp } from "@/lib/envio-acesso";
+import { responsaveisSemelhantes } from "@/lib/nomes-semelhantes";
 
 /** Vincula um responsável (existente ou novo) a um aluno. Vínculo explícito e revogável (LGPD). */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/students/[id]/guardians">) {
@@ -23,7 +24,9 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
     // telefone (login também funciona por telefone, ver /api/auth/login).
     const phone = body.guardianPhone ? normalizePhoneBR(body.guardianPhone) ?? body.guardianPhone : undefined;
 
-    let guardian = email
+    let guardian = body.guardianId
+      ? await prisma.user.findFirst({ where: { id: body.guardianId, schoolId: session.schoolId, role: "GUARDIAN", deletedAt: null } })
+      : email
       ? await prisma.user.findUnique({ where: { email } })
       : phone
         ? (
@@ -31,6 +34,26 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
           ).find((candidate) => candidate.phone && samePhoneBR(candidate.phone, phone)) ?? null
         : null;
     let temporaryPassword: string | undefined;
+
+    if (!guardian && body.guardianId) {
+      return NextResponse.json({ error: "Responsável não encontrado" }, { status: 404 });
+    }
+
+    // Antes de criar outro login: já existe responsável com nome parecido? Pode ser a mesma
+    // pessoa com outro celular/e-mail (ex.: cadastrando o segundo filho). A tela pergunta.
+    if (!guardian && !body.confirmarNovo) {
+      const semelhantes = await responsaveisSemelhantes(session.schoolId, body.guardianName);
+      if (semelhantes.length > 0) {
+        return NextResponse.json(
+          {
+            error: "Já existe responsável com nome parecido. Confira se é a mesma pessoa.",
+            codigo: "RESPONSAVEL_SEMELHANTE",
+            semelhantes,
+          },
+          { status: 409 },
+        );
+      }
+    }
 
     if (!guardian) {
       temporaryPassword = body.password ?? randomBytes(6).toString("hex");
