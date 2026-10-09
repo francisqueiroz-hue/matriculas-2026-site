@@ -34,6 +34,7 @@ interface UserItem {
   active: boolean;
   isCoordenacao: boolean;
   funcao: Funcao | null;
+  nomeParaFamilias: string | null;
   classesTeaching: { class: { id: string; name: string } }[];
 }
 
@@ -102,6 +103,7 @@ function UsuariosContent() {
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editFuncao, setEditFuncao] = useState<Funcao>("PROFESSOR");
+  const [editNomeFamilias, setEditNomeFamilias] = useState("");
   const [editClassIds, setEditClassIds] = useState<string[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -183,6 +185,7 @@ function UsuariosContent() {
     setEditName(u.name);
     setEditPhone(formatarTelefone(u.phone));
     setEditFuncao(funcaoDe(u));
+    setEditNomeFamilias(u.nomeParaFamilias ?? "");
     setEditClassIds(u.classesTeaching.map((c) => c.class.id));
     setEditError(null);
   }
@@ -197,6 +200,7 @@ function UsuariosContent() {
           name: editName,
           phone: editPhone,
           funcao: editFuncao,
+          nomeParaFamilias: editNomeFamilias.trim() || null,
           ...(editFuncao !== "DIRECAO" ? { classIds: editClassIds } : {}),
         }),
       });
@@ -293,6 +297,16 @@ function UsuariosContent() {
                         </option>
                       ))}
                     </select>
+                  </label>
+                  <label className="text-xs text-slate-500">
+                    Nome que as famílias veem
+                    <input
+                      value={editNomeFamilias}
+                      maxLength={60}
+                      onChange={(e) => setEditNomeFamilias(e.target.value)}
+                      placeholder={FUNCAO_LABEL[editFuncao]}
+                      className={`mt-1 block ${campo}`}
+                    />
                   </label>
                 </div>
                 {editFuncao !== "DIRECAO" && <SeletorTurmas classes={classes} value={editClassIds} onChange={setEditClassIds} />}

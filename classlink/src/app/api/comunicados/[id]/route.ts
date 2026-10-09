@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getPublicoAlvo } from "@/lib/comunicados";
+import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunicados/[id]">) {
   try {
@@ -14,7 +15,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunic
       include: {
         class: { select: { id: true, name: true } },
         aluno: { select: { id: true, name: true } },
-        criadoPor: { select: { id: true, name: true } },
+        criadoPor: { select: SELECT_PESSOA },
       },
     });
     if (!comunicado) return NextResponse.json({ error: "Comunicado não encontrado" }, { status: 404 });
@@ -43,7 +44,10 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunic
         resposta: respostaPorAluno.get(l.student.id) ?? null,
       }));
 
-      return NextResponse.json({ comunicado, alunos });
+      return NextResponse.json({
+        comunicado: { ...comunicado, criadoPor: pessoaParaQuemVe(comunicado.criadoPor, session.role) },
+        alunos,
+      });
     }
 
     const publicoAlvo = await getPublicoAlvo(id);

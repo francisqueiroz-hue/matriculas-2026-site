@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
         active: true,
         isCoordenacao: true,
         funcao: true,
+        nomeParaFamilias: true,
         classesTeaching: { select: { class: { select: { id: true, name: true } } } },
       },
       orderBy: { name: "asc" },

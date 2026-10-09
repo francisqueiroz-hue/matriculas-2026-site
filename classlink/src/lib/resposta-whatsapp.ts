@@ -4,6 +4,7 @@ import { avisarEquipePorWhatsApp, registrarAviso } from "@/lib/avisos-equipe";
 import { conversaAberta } from "@/lib/envio-acesso";
 import { perfilDoUsuario, podeConversar } from "@/lib/permissoes-mensagens";
 import { normalizePhoneBR, sendWhatsAppTextMessage } from "@/lib/whatsapp";
+import { SELECT_PESSOA, nomeInstitucional } from "@/lib/nome-institucional";
 
 /**
  * Responder pelo WhatsApp: a pessoa da equipe responde ao aviso que o número da escola
@@ -92,6 +93,11 @@ export async function processarRespostaPeloWhatsApp(r: RespostaRecebida): Promis
   return tipo === "familia" ? responderFamilia(r, aviso.conversationId, texto) : responderEquipe(r, aviso.conversationId, texto);
 }
 
+async function nomeInstitucionalDe(userId: string, fallback: string): Promise<string> {
+  const pessoa = await prisma.user.findUnique({ where: { id: userId }, select: SELECT_PESSOA });
+  return pessoa ? nomeInstitucional(pessoa) : fallback;
+}
+
 async function responderFamilia(r: RespostaRecebida, conversationId: string, texto: string): Promise<ResultadoResposta> {
   const conversa = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -137,7 +143,8 @@ async function responderFamilia(r: RespostaRecebida, conversationId: string, tex
   });
   if (channel === "APP") {
     await notifyUsers([conversa.guardianId], {
-      title: `Nova mensagem de ${r.remetente.name}`,
+      // A família vê o cargo/nome institucional, não o nome pessoal.
+      title: `Nova mensagem de ${await nomeInstitucionalDe(r.remetente.id, r.remetente.name)}`,
       body: texto.slice(0, 120),
       url: `/dashboard/mensagens/${conversationId}`,
     }).catch((err) => console.error("push notify failed", err));

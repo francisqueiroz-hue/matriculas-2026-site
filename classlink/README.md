@@ -237,6 +237,15 @@ padronizado (login por telefone) e não pode repetir entre usuários. A equipe t
 o acesso mandando **ACESSO** para o WhatsApp da escola, e a tela **Acessos** tem a aba
 **Equipe** com quem ainda não entrou.
 
+## Como a equipe aparece para as famílias
+
+As famílias nunca veem o nome pessoal da equipe: nas mensagens (lista, conversa, contatos,
+notificações), no Mural e nos comunicados aparece o **nome para as famílias** definido em
+**Conta → Como as famílias veem você** (ex.: "Secretaria") ou, em branco, o **cargo**
+("Direção", "Coordenação", "Professor(a)"). A direção também define esse nome para qualquer
+pessoa em **Equipe → Editar**. A equipe continua vendo os nomes reais. Código:
+`src/lib/nome-institucional.ts` (a troca é feita no servidor, conforme quem está vendo).
+
 ## Quem conversa com quem (Mensagens)
 
 | Quem | Pode enviar e responder para |

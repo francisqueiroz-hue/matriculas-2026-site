@@ -137,6 +137,10 @@ model User {
 
   funcao FuncaoEquipe?
 
+  // Equipe: como a pessoa aparece para as famílias (ex.: "Secretaria"). Vazio = o cargo
+  // ("Direção", "Coordenação"...). Famílias nunca veem o nome pessoal da equipe.
+  nomeParaFamilias String?
+
   // Última mensagem recebida desta pessoa no WhatsApp da escola. Nas 24h seguintes a Meta
   // entrega texto livre (senha direto); fora disso, só modelo aprovado (convite).
   whatsappUltimaMensagemEm DateTime?

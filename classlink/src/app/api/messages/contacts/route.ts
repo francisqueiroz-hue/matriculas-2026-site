@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ONDE_GESTAO, cargoParaExibir, perfilDoUsuario } from "@/lib/permissoes-mensagens";
+import { SELECT_PESSOA, nomeInstitucional } from "@/lib/nome-institucional";
 
 /**
  * Pessoas com quem o usuário atual pode iniciar uma conversa família ↔ escola (regras em
@@ -17,12 +18,13 @@ export async function GET() {
     if (perfil === "familia") {
       const gestao = await prisma.user.findMany({
         where: { schoolId: session.schoolId, active: true, deletedAt: null, ...ONDE_GESTAO },
-        select: { id: true, name: true, role: true, isCoordenacao: true, funcao: true },
+        select: SELECT_PESSOA,
         orderBy: { name: "asc" },
       });
+      // A família vê a equipe pelo cargo/nome institucional ("Secretaria", "Direção"...).
       return NextResponse.json({
         perfil,
-        contacts: gestao.map((u) => ({ id: u.id, name: u.name, role: u.role, cargo: cargoParaExibir(u) })),
+        contacts: gestao.map((u) => ({ id: u.id, name: nomeInstitucional(u), role: u.role, cargo: cargoParaExibir(u) })),
       });
     }
 

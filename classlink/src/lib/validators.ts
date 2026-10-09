@@ -58,6 +58,8 @@ export const updateUserSchema = z.object({
   classIds: z.array(z.string()).optional(),
   isCoordenacao: z.boolean().optional(),
   resetPassword: z.boolean().optional(),
+  /** Como a pessoa aparece para as famílias (vazio = o cargo). */
+  nomeParaFamilias: z.string().trim().max(60).nullable().optional(),
 });
 
 export const changePasswordSchema = z.object({

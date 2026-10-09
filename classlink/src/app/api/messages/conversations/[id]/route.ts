@@ -9,6 +9,7 @@ import { sendMessageSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { isEmailConfigured, sendEmailMessage } from "@/lib/email";
+import { SELECT_PESSOA, nomeParaQuemVe, pessoaParaQuemVe } from "@/lib/nome-institucional";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
   try {
@@ -21,14 +22,14 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
       prisma.conversation.findUniqueOrThrow({
         where: { id },
         include: {
-          staff: { select: { id: true, name: true, role: true } },
+          staff: { select: SELECT_PESSOA },
           guardian: { select: { id: true, name: true, phone: true, email: true } },
         },
       }),
       prisma.message.findMany({
         where: { conversationId: id },
         orderBy: { createdAt: "asc" },
-        include: { sender: { select: { id: true, name: true, role: true } } },
+        include: { sender: { select: SELECT_PESSOA } },
       }),
     ]);
 
@@ -37,7 +38,12 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
       data: { readAt: new Date() },
     });
 
-    return NextResponse.json({ conversation, messages });
+    // Família: a equipe aparece pelo cargo/nome institucional; e-mail e telefone da família
+    // só fazem sentido para a equipe.
+    return NextResponse.json({
+      conversation: { ...conversation, staff: pessoaParaQuemVe(conversation.staff, session.role) },
+      messages: messages.map((m) => ({ ...m, sender: pessoaParaQuemVe(m.sender, session.role) })),
+    });
   } catch (error) {
     return handleApiError(error);
   }
@@ -74,7 +80,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
 
     const message = await prisma.message.create({
       data: { conversationId: id, senderId: session.sub, body, channel: canalEfetivo, externalId },
-      include: { sender: { select: { id: true, name: true, role: true } } },
+      include: { sender: { select: SELECT_PESSOA } },
     });
 
     const recipientId = conversation.staffId === session.sub ? conversation.guardianId : conversation.staffId;
@@ -83,7 +89,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     after(async () => {
       if (canalEfetivo === "APP") {
         await notifyUsers([recipientId], {
-          title: `Nova mensagem de ${message.sender.name}`,
+          // Para a família, a notificação mostra o cargo/nome institucional de quem escreveu.
+          title: `Nova mensagem de ${nomeParaQuemVe(message.sender, recipientId === conversation.guardianId ? "GUARDIAN" : "STAFF")}`,
           body: body.slice(0, 120),
           url: `/dashboard/mensagens/${id}`,
         }).catch((err) => console.error("push notify failed", err));
@@ -102,7 +109,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
       }
     });
 
-    return NextResponse.json({ message }, { status: 201 });
+    return NextResponse.json({ message: { ...message, sender: pessoaParaQuemVe(message.sender, session.role) } }, { status: 201 });
   } catch (error) {
     return handleApiError(error);
   }

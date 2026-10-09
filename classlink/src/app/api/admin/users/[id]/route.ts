@@ -59,6 +59,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
           ...(body.name ? { name: body.name } : {}),
           ...(phone !== undefined ? { phone } : {}),
           ...(body.active !== undefined ? { active: body.active } : {}),
+          ...(body.nomeParaFamilias !== undefined ? { nomeParaFamilias: body.nomeParaFamilias || null } : {}),
           ...(perfil
             ? { role: perfil.role, isCoordenacao: perfil.isCoordenacao, funcao: body.funcao }
             : body.isCoordenacao !== undefined && existing.role === "STAFF"
