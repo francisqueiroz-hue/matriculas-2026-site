@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch, apiJson } from "@/lib/api-client";
+import { apiJson } from "@/lib/api-client";
 import { requestPushToken } from "@/lib/firebase-client";
 import { isIosDevice } from "@/lib/device";
 
@@ -46,11 +46,17 @@ export function NotificacoesAparelho() {
     try {
       const token = await requestPushToken(false);
       if (!token) {
-        setMensagem({ tipo: "erro", texto: "Não foi possível registrar este aparelho para notificações. Feche e abra o ClassLink e tente de novo." });
+        setMensagem({ tipo: "erro", texto: "As notificações deste app ainda não estão configuradas neste navegador. Feche e abra o ClassLink e tente de novo." });
         return;
       }
-      await apiFetch("/api/push/register", { method: "POST", body: JSON.stringify({ token }) });
-      const r = await apiJson<ResultadoTeste>("/api/push/teste", { method: "POST" });
+      try {
+        await apiJson("/api/push/register", { method: "POST", body: JSON.stringify({ token }) });
+      } catch (err) {
+        throw new Error(`Salvar o aparelho — ${err instanceof Error ? err.message : String(err)}`);
+      }
+      const r = await apiJson<ResultadoTeste>("/api/push/teste", { method: "POST" }).catch((err: unknown) => {
+        throw new Error(`Envio de teste — ${err instanceof Error ? err.message : String(err)}`);
+      });
       if (r.ok) {
         setMensagem({
           tipo: "ok",
@@ -62,7 +68,9 @@ export function NotificacoesAparelho() {
         setMensagem({ tipo: "erro", texto: r.motivo ?? `O envio falhou${r.erros?.length ? ` (${r.erros.join(", ")})` : ""}.` });
       }
     } catch (err) {
-      setMensagem({ tipo: "erro", texto: err instanceof Error ? err.message : "Erro ao testar as notificações." });
+      // Mostra a etapa e o erro técnico: é o que permite descobrir o problema no aparelho da pessoa.
+      const detalhe = err instanceof Error ? (err.name === "ErroPush" || err.message.includes(" — ") ? err.message : `${err.name}: ${err.message}`) : String(err);
+      setMensagem({ tipo: "erro", texto: `Não deu certo. Detalhe para o suporte: ${detalhe}` });
     } finally {
       setEnviando(false);
     }
