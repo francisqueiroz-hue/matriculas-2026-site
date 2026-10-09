@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { MENSAGEM_BLOQUEIO, ONDE_GESTAO, perfilDoUsuario, podeConversar, perfilMensagens } from "@/lib/permissoes-mensagens";
+import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 
 export async function GET() {
   try {
@@ -20,7 +21,7 @@ export async function GET() {
           : // Famílias excluídas (saíram da escola) não aparecem mais na lista.
             { staffId: session.sub, guardian: { deletedAt: null } },
       include: {
-        staff: { select: { id: true, name: true, role: true } },
+        staff: { select: SELECT_PESSOA },
         guardian: { select: { id: true, name: true } },
         messages: { orderBy: { createdAt: "desc" }, take: 1 },
         _count: {
@@ -33,7 +34,11 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ conversations, podeExcluir: perfil === "gestao" });
+    // Famílias veem a equipe pelo cargo/nome institucional, não pelo nome pessoal.
+    return NextResponse.json({
+      conversations: conversations.map((c) => ({ ...c, staff: pessoaParaQuemVe(c.staff, session.role) })),
+      podeExcluir: perfil === "gestao",
+    });
   } catch (error) {
     return handleApiError(error);
   }

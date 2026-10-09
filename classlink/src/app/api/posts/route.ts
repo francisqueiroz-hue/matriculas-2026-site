@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { createPostSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { getSignedMediaUrl } from "@/lib/firebase-storage";
+import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 
 /** Troca o caminho interno do arquivo por uma URL assinada de leitura (temporária). */
 async function withSignedMedia<T extends { mediaUrl: string | null }>(post: T): Promise<T> {
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
             : [{ audience: "SCHOOL" }, { audience: "CLASS", classId: { in: visibleClassIds } }],
       },
       include: {
-        author: { select: { id: true, name: true, role: true } },
+        author: { select: SELECT_PESSOA },
         class: { select: { id: true, name: true } },
         _count: { select: { reads: true } },
         reads: { where: { userId: session.sub }, select: { id: true } },
@@ -58,7 +59,9 @@ export async function GET(request: NextRequest) {
     });
 
     const postsWithMedia = await Promise.all(
-      posts.map((p) => withSignedMedia({ ...p, readByMe: p.reads.length > 0, reads: undefined })),
+      posts.map((p) =>
+        withSignedMedia({ ...p, author: pessoaParaQuemVe(p.author, session.role), readByMe: p.reads.length > 0, reads: undefined }),
+      ),
     );
 
     return NextResponse.json({

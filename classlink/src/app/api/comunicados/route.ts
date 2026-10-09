@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { createComunicadoSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { getPublicoAlvo } from "@/lib/comunicados";
+import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 
 export async function GET() {
   try {
@@ -49,7 +50,7 @@ export async function GET() {
       include: {
         class: { select: { id: true, name: true } },
         aluno: { select: { id: true, name: true } },
-        criadoPor: { select: { id: true, name: true } },
+        criadoPor: { select: SELECT_PESSOA },
         respostas:
           session.role === "GUARDIAN"
             ? { where: { responsavelId: session.sub }, select: { alunoId: true, resposta: true } }
@@ -60,7 +61,9 @@ export async function GET() {
 
     const comunicadosComContagem = await Promise.all(
       comunicados.map(async (c) => {
-        const { respostas, ...rest } = c;
+        const { respostas, ...comNomeReal } = c;
+        // Família vê quem publicou pelo cargo/nome institucional.
+        const rest = { ...comNomeReal, criadoPor: pessoaParaQuemVe(c.criadoPor, session.role) };
         if (session.role === "GUARDIAN") {
           // Irmãos na escola respondem um a um: "respondido" só quando todos têm resposta.
           const alunosAlvo =

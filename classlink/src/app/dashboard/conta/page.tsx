@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { AvisosWhatsAppEquipe } from "@/components/AvisosWhatsAppEquipe";
+import { NomeParaFamilias } from "@/components/NomeParaFamilias";
 
 export default function ContaPage() {
   const user = useCurrentUser();
@@ -111,6 +112,8 @@ export default function ContaPage() {
           </form>
         </div>
       )}
+
+      {(user.role === "ADMIN" || user.role === "STAFF") && <NomeParaFamilias />}
 
       {(user.role === "ADMIN" || user.role === "STAFF") && <AvisosWhatsAppEquipe />}
 

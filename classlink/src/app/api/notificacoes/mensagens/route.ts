@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ONDE_GESTAO, perfilDoUsuario } from "@/lib/permissoes-mensagens";
+import { SELECT_PESSOA, nomeParaQuemVe } from "@/lib/nome-institucional";
 
 /**
  * Mensagens não lidas do usuário logado — conversas com famílias (inclusive as que chegam
@@ -25,7 +26,7 @@ export async function GET() {
             prisma.message.findFirst({
               where: { ...naoLida, conversation: filtroConversa },
               orderBy: { createdAt: "desc" },
-              select: { id: true, body: true, channel: true, createdAt: true, conversationId: true, sender: { select: { name: true } } },
+              select: { id: true, body: true, channel: true, createdAt: true, conversationId: true, sender: { select: SELECT_PESSOA } },
             }),
           ]);
 
@@ -55,7 +56,7 @@ export async function GET() {
     const candidatas = [
       ultimaFamilia && {
         id: ultimaFamilia.id,
-        remetente: ultimaFamilia.sender.name,
+        remetente: nomeParaQuemVe(ultimaFamilia.sender, session.role),
         texto: ultimaFamilia.body.slice(0, 140),
         viaWhatsApp: ultimaFamilia.channel === "WHATSAPP",
         createdAt: ultimaFamilia.createdAt,
