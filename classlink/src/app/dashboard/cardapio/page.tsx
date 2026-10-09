@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch, apiJson } from "@/lib/api-client";
+import { ImportarCardapios } from "@/components/ImportarCardapios";
 
 const DIAS = ["seg", "ter", "qua", "qui", "sex"] as const;
 type Dia = (typeof DIAS)[number];
@@ -335,6 +336,7 @@ export default function CardapioPage() {
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [form, setForm] = useState<Formulario | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [importando, setImportando] = useState(false);
 
   const carregar = useCallback(() => {
     apiJson<Dados>("/api/cardapios")
@@ -357,6 +359,9 @@ export default function CardapioPage() {
   const semanas = useMemo(() => (dados ? Array.from({ length: 12 }, (_, i) => somarDias(dados.segundaAtual, 7 * i)) : []), [dados]);
   const daSemana = dados?.cardapios.filter((c) => c.semanaInicio === dados.segundaAtual && c.status === "PUBLICADO") ?? [];
   const agendados = (dados?.cardapios.filter((c) => c.status === "AGENDADO") ?? []).sort((a, b) => a.semanaInicio.localeCompare(b.semanaInicio));
+  const semanasAgendadas = Object.entries(
+    agendados.reduce<Record<string, Cardapio[]>>((acc, c) => ((acc[c.semanaInicio] ??= []).push(c), acc), {}),
+  ).sort(([a], [b]) => a.localeCompare(b));
   const anteriores = dados?.cardapios.filter((c) => c.status === "PUBLICADO" && c.semanaInicio < dados.segundaAtual) ?? [];
 
   function novo() {
@@ -424,10 +429,21 @@ export default function CardapioPage() {
               : "O que as crianças vão comer nesta semana."}
           </p>
         </div>
-        {dados?.podeEditar && !form && (
-          <button onClick={novo} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
-            Novo cardápio
-          </button>
+        {dados?.podeEditar && !form && !importando && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                setImportando(true);
+                setAviso(null);
+              }}
+              className="rounded-md border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
+            >
+              Importar cardápios
+            </button>
+            <button onClick={novo} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+              Novo cardápio
+            </button>
+          </div>
         )}
       </div>
 
@@ -438,6 +454,19 @@ export default function CardapioPage() {
       )}
       {erro && <p className="text-sm text-red-600">{erro}</p>}
       {!dados && !erro && <p className="text-sm text-slate-500">Carregando...</p>}
+
+      {importando && dados && (
+        <ImportarCardapios
+          turmas={turmas}
+          segundaAtual={dados.segundaAtual}
+          onImportado={(msg) => {
+            setImportando(false);
+            setAviso(msg);
+            carregar();
+          }}
+          onFechar={() => setImportando(false)}
+        />
+      )}
 
       {form && dados && (
         <Editor
@@ -493,34 +522,40 @@ export default function CardapioPage() {
           {agendados.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhum cardápio agendado. Use “Novo cardápio” ou “Repetir nas próximas semanas”.</p>
           ) : (
-            <ul className="space-y-2">
-              {agendados.map((c) => (
-                <li key={c.id} className="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p>
-                      <span className="font-semibold">Semana {rotuloSemana(c.semanaInicio)}</span> · {c.turma ? `Turma ${c.turma}` : "Toda a escola"}
-                      <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
-                        Sai em {diaMes(c.semanaInicio)}, às 6h
-                      </span>
-                    </p>
-                    <div className="flex flex-wrap gap-3 text-xs">
-                      <button onClick={() => editar(c)} className="text-indigo-600 hover:underline">
-                        Editar
-                      </button>
-                      <button onClick={() => repetir(c)} className="text-indigo-600 hover:underline">
-                        Repetir nas próximas semanas
-                      </button>
-                      <button onClick={() => publicarAgora(c)} className="text-indigo-600 hover:underline">
-                        Publicar agora
-                      </button>
-                      <button onClick={() => excluir(c)} className="text-red-600 hover:underline">
-                        Excluir
-                      </button>
-                    </div>
-                  </div>
-                </li>
+            <div className="space-y-2">
+              {semanasAgendadas.map(([semana, lista]) => (
+                <details key={semana} className="rounded-xl border border-slate-200 bg-white text-sm dark:border-slate-800 dark:bg-slate-900">
+                  <summary className="flex cursor-pointer flex-wrap items-center gap-2 p-3">
+                    <span className="font-semibold">Semana {rotuloSemana(semana)}</span>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">Sai em {diaMes(semana)}, às 6h</span>
+                    <span className="text-xs text-slate-500">
+                      {lista.length} cardápio(s): {lista.map((c) => c.turma ?? "Toda a escola").join(", ")}
+                    </span>
+                  </summary>
+                  <ul className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
+                    {lista.map((c) => (
+                      <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                        <span>{c.turma ? `Turma ${c.turma}` : "Toda a escola"}</span>
+                        <div className="flex flex-wrap gap-3 text-xs">
+                          <button onClick={() => editar(c)} className="text-indigo-600 hover:underline">
+                            Editar
+                          </button>
+                          <button onClick={() => repetir(c)} className="text-indigo-600 hover:underline">
+                            Repetir nas próximas semanas
+                          </button>
+                          <button onClick={() => publicarAgora(c)} className="text-indigo-600 hover:underline">
+                            Publicar agora
+                          </button>
+                          <button onClick={() => excluir(c)} className="text-red-600 hover:underline">
+                            Excluir
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               ))}
-            </ul>
+            </div>
           )}
         </section>
       )}
