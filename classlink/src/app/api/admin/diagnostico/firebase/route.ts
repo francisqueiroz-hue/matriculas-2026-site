@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { conferirMesmoProjeto, testarChaveNoGoogle, type ResultadoTesteFirebase } from "@/lib/firebase-config-publica";
 import { origemPublica } from "@/lib/push";
-import { testarContaDeServico } from "@/lib/firebase-admin";
+import { credenciaisDaConta, testarContaDeServico } from "@/lib/firebase-admin";
 
 /** Botão "Testar chave do Firebase" do diagnóstico: confere o projeto e faz o pedido real ao Google. */
 export async function POST(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
       NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-      FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+      FIREBASE_PROJECT_ID: credenciaisDaConta(process.env).projectId,
     };
     const conta = await testarContaDeServico();
     const itens = [
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         ok: conta.ok,
         detalhe: conta.ok
           ? undefined
-          : `${conta.detalhe} — No Firebase: Configurações do projeto → Contas de serviço → Gerar nova chave privada. Do MESMO arquivo JSON, cadastre client_email em FIREBASE_CLIENT_EMAIL e private_key em FIREBASE_PRIVATE_KEY (Type Secret) e faça Redeploy.`,
+          : `${conta.detalhe} — No Firebase: Configurações do projeto → Contas de serviço → Gerar nova chave privada. Abra o arquivo JSON baixado, copie TODO o conteúdo (de { até }) e cole em FIREBASE_PRIVATE_KEY na Vercel (Type Secret) — o e-mail e o projeto são lidos do próprio arquivo. Depois faça Redeploy.`,
       },
     ];
     const resultado: ResultadoTesteFirebase = { ok: itens.every((i) => i.ok), itens };
