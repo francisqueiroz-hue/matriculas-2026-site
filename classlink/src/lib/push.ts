@@ -77,7 +77,7 @@ export async function notifyUsers(userIds: string[], aviso: AvisoPush): Promise<
   response.responses.forEach((res, i) => {
     if (res.success) return;
     const codigo = res.error?.code ?? "desconhecido";
-    erros.push(codigo);
+    erros.push(res.error?.message ? `${codigo}: ${res.error.message}` : codigo);
     if (TOKEN_INVALIDO.has(codigo)) invalidos.push(tokens[i].id);
   });
   if (erros.length > invalidos.length) console.error("Falha no envio de push", erros);
