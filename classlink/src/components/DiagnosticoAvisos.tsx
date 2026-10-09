@@ -57,6 +57,8 @@ export function DiagnosticoAvisos() {
   const [erro, setErro] = useState<string | null>(null);
   const [cadastrando, setCadastrando] = useState(false);
   const [retorno, setRetorno] = useState<string | null>(null);
+  const [testeFirebase, setTesteFirebase] = useState<{ ok: boolean; itens: { titulo: string; ok: boolean; detalhe?: string }[] } | null>(null);
+  const [testandoFirebase, setTestandoFirebase] = useState(false);
 
   const carregar = useCallback(() => {
     apiJson<Diagnostico>("/api/admin/diagnostico")
@@ -68,6 +70,17 @@ export function DiagnosticoAvisos() {
   }, []);
 
   useEffect(carregar, [carregar]);
+
+  async function testarFirebase() {
+    setTestandoFirebase(true);
+    try {
+      setTesteFirebase(await apiJson("/api/admin/diagnostico/firebase", { method: "POST" }));
+    } catch (err) {
+      setTesteFirebase({ ok: false, itens: [{ titulo: "Teste do Firebase", ok: false, detalhe: err instanceof Error ? err.message : "Falha no teste" }] });
+    } finally {
+      setTestandoFirebase(false);
+    }
+  }
 
   async function cadastrarModelos() {
     setCadastrando(true);
@@ -133,6 +146,19 @@ export function DiagnosticoAvisos() {
               <Item key={v.nome} ok={false} titulo={v.nome} dica={`Na Vercel, esta variável ${v.problema}. Apague e digite/cole de novo só o valor, sem aspas, e faça um novo deploy.`} />
             ))}
             <li className="text-xs text-slate-500">Dispositivos registrados para push: {d.push.dispositivosRegistrados}</li>
+            <li>
+              <button
+                type="button"
+                onClick={testarFirebase}
+                disabled={testandoFirebase}
+                className="rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+              >
+                {testandoFirebase ? "Testando…" : "Testar chave do Firebase"}
+              </button>
+            </li>
+            {testeFirebase?.itens.map((i) => (
+              <Item key={i.titulo} ok={i.ok} titulo={i.titulo} dica={i.detalhe ?? ""} />
+            ))}
           </ul>
         </div>
         <div>
