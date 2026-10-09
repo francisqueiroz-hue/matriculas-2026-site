@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
-import { apiJson } from "@/lib/api-client";
+import { apiFetch, apiJson } from "@/lib/api-client";
 
 interface ClassOption {
   id: string;
@@ -29,6 +29,7 @@ function AlunosContent() {
   >({});
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [aviso, setAviso] = useState<string | null>(null);
+  const [semelhantes, setSemelhantes] = useState<Record<string, Semelhante[]>>({});
   // Link wa.me com a mensagem de acesso, para a escola enviar do próprio WhatsApp.
   const [billingForms, setBillingForms] = useState<Record<string, { mensalidadeValor: string; diaVencimento: string }>>({});
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
@@ -86,26 +87,44 @@ function AlunosContent() {
     return guardianForms[studentId] ?? { email: "", guardianName: "", phone: "", relation: "" };
   }
 
-  async function handleLinkGuardian(studentId: string, e: React.FormEvent) {
-    e.preventDefault();
+  async function handleLinkGuardian(
+    studentId: string,
+    e: React.FormEvent | null,
+    extra: { guardianId?: string; confirmarNovo?: boolean } = {},
+  ) {
+    e?.preventDefault();
     const form = guardianForm(studentId);
-    if (!form.email && !form.phone) {
+    if (!extra.guardianId && !form.email && !form.phone) {
       setFeedback((prev) => ({ ...prev, [studentId]: "Informe pelo menos um e-mail ou telefone do responsável." }));
       return;
     }
     try {
-      const data = await apiJson<{ temporaryPassword?: string; novoAcesso?: boolean; envio?: { enviado: boolean; mensagem: string } | null }>(
-        `/api/admin/students/${studentId}/guardians`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            guardianEmail: form.email || undefined,
-            guardianName: form.guardianName,
-            guardianPhone: form.phone || undefined,
-            relation: form.relation,
-          }),
-        },
-      );
+      const res = await apiFetch(`/api/admin/students/${studentId}/guardians`, {
+        method: "POST",
+        body: JSON.stringify({
+          guardianEmail: extra.guardianId ? undefined : form.email || undefined,
+          guardianName: form.guardianName,
+          guardianPhone: extra.guardianId ? undefined : form.phone || undefined,
+          relation: form.relation,
+          ...extra,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        codigo?: string;
+        semelhantes?: Semelhante[];
+        temporaryPassword?: string;
+        novoAcesso?: boolean;
+        envio?: { enviado: boolean; mensagem: string } | null;
+      };
+      // Responsável com nome parecido já cadastrado: pergunta se é a mesma pessoa.
+      if (res.status === 409 && data.codigo === "RESPONSAVEL_SEMELHANTE") {
+        setSemelhantes((prev) => ({ ...prev, [studentId]: data.semelhantes ?? [] }));
+        setFeedback((prev) => ({ ...prev, [studentId]: "" }));
+        return;
+      }
+      if (!res.ok) throw new Error(data.error ?? `Erro ${res.status}`);
+      setSemelhantes((prev) => ({ ...prev, [studentId]: [] }));
       setFeedback((prev) => ({
         ...prev,
         [studentId]: !data.novoAcesso
@@ -358,6 +377,45 @@ function AlunosContent() {
                   Vincular responsável
                 </button>
               </form>
+              {(semelhantes[s.id]?.length ?? 0) > 0 && (
+                <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950" role="alert">
+                  <p className="font-semibold">Já existe responsável com nome parecido. É a mesma pessoa?</p>
+                  <p className="text-xs">
+                    Se for, use o cadastro que já existe: a família continua com um único login para todos os filhos.
+                  </p>
+                  <ul className="mt-2 space-y-2">
+                    {semelhantes[s.id].map((r) => (
+                      <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white p-2">
+                        <span>
+                          <strong>{r.name}</strong>
+                          {r.phone && ` · ${formatarTelefoneBR(r.phone)}`}
+                          {r.email && ` · ${r.email}`}
+                          {r.alunos.length > 0 && <span className="block text-xs text-slate-500">Aluno(s): {r.alunos.join(", ")}</span>}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleLinkGuardian(s.id, null, { guardianId: r.id })}
+                          className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                        >
+                          Usar este cadastro
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => handleLinkGuardian(s.id, null, { confirmarNovo: true })}
+                      className="font-semibold text-amber-900 underline"
+                    >
+                      É outra pessoa — cadastrar novo responsável
+                    </button>
+                    <button type="button" onClick={() => setSemelhantes((prev) => ({ ...prev, [s.id]: [] }))} className="text-slate-600 underline">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
               <p className="mt-1 text-xs text-slate-400">
                 Informe pelo menos um dos dois — e-mail ou telefone. Sem e-mail, o login é feito pelo telefone; o
                 próprio responsável pode adicionar um e-mail depois, em Minha conta.
@@ -402,6 +460,21 @@ function AlunosContent() {
       </ul>
     </div>
   );
+}
+
+interface Semelhante {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  alunos: string[];
+}
+
+function formatarTelefoneBR(telefone: string) {
+  const d = telefone.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return telefone;
 }
 
 export default function AlunosPage() {

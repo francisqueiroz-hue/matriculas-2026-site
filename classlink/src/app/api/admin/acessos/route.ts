@@ -6,6 +6,7 @@ import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { NUMERO_WHATSAPP_ESCOLA, linkPedirAcesso } from "@/lib/acesso";
 import { modeloDisponivel } from "@/lib/whatsapp-modelos";
 import { FUNCAO_LABEL, funcaoDoUsuario } from "@/lib/equipe";
+import { idsComNomeRepetido } from "@/lib/nomes-semelhantes";
 
 /**
  * Responsáveis da escola e se já entraram no app. "Nunca entrou" = nenhuma sessão criada
@@ -45,6 +46,13 @@ export async function GET(request: NextRequest) {
       orderBy: { name: "asc" },
     });
 
+    // Possíveis cadastros duplicados: outro responsável (ou colega) com nome parecido.
+    const todos = await prisma.user.findMany({
+      where: { schoolId: session.schoolId, role: equipe ? { in: ["ADMIN", "STAFF"] } : "GUARDIAN", deletedAt: null, active: true },
+      select: { id: true, name: true },
+    });
+    const repetidos = idsComNomeRepetido(todos);
+
     return NextResponse.json({
       numeroEscola: NUMERO_WHATSAPP_ESCOLA,
       linkPedirAcesso: linkPedirAcesso(),
@@ -61,6 +69,7 @@ export async function GET(request: NextRequest) {
         alunos: r.studentLinks.map((l) => (l.student.class ? `${l.student.name} (${l.student.class.name})` : l.student.name)),
         funcao: equipe ? FUNCAO_LABEL[funcaoDoUsuario(r) ?? "PROFESSOR"] : null,
         turmas: r.classesTeaching.map((c) => c.class.name),
+        nomeRepetido: repetidos.has(r.id),
       })),
     });
   } catch (error) {
