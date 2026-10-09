@@ -59,6 +59,7 @@ export const pacoteCardapiosSchema = z.object({
       z.object({
         nome: z.string().trim().min(1).max(80),
         sugestao: z.array(z.string()).optional(),
+        naoSugerir: z.array(z.string()).optional(),
         conteudo: conteudoCardapioSchema,
       }),
     )

@@ -10,10 +10,12 @@ describe("pacote de cardápios out–dez/2026 (PDFs da nutricionista)", () => {
     return s.conteudo.itens[dia][s.conteudo.refeicoes.indexOf(refeicao)];
   };
 
-  it("12 semanas, de 12/10 a 28/12, todas começando na segunda", () => {
-    expect(p.semanas).toHaveLength(12);
+  it("10 semanas, de 12/10 a 14/12 (sem 21/12 e 28/12), todas começando na segunda", () => {
+    expect(p.semanas).toHaveLength(10);
     expect(p.semanas[0]).toBe("2026-10-12");
-    expect(p.semanas.at(-1)).toBe("2026-12-28");
+    expect(p.semanas.at(-1)).toBe("2026-12-14");
+    expect(p.semanas).not.toContain("2026-12-21");
+    expect(p.semanas).not.toContain("2026-12-28");
     expect(p.semanas.every(ehSegunda)).toBe(true);
   });
 
