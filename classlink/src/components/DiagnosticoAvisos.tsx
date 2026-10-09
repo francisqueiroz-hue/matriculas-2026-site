@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { apiJson } from "@/lib/api-client";
 
 interface Diagnostico {
-  push: { navegador: boolean; chaveVapid: boolean; servidor: boolean; servidorErro: string | null; dispositivosRegistrados: number };
+  push: {
+    navegador: boolean; chaveVapid: boolean; servidor: boolean; servidorErro: string | null;
+    dispositivosRegistrados: number;
+    variaveisComProblema?: { nome: string; problema: string }[];
+  };
   whatsapp: {
     api: boolean;
     webhookAssinatura: boolean;
@@ -125,6 +129,9 @@ export function DiagnosticoAvisos() {
                   : "Preencha FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL e FIREBASE_PRIVATE_KEY (README, passo 5)."
               }
             />
+            {d.push.variaveisComProblema?.map((v) => (
+              <Item key={v.nome} ok={false} titulo={v.nome} dica={`Na Vercel, esta variável ${v.problema}. Apague e digite/cole de novo só o valor, sem aspas, e faça um novo deploy.`} />
+            ))}
             <li className="text-xs text-slate-500">Dispositivos registrados para push: {d.push.dispositivosRegistrados}</li>
           </ul>
         </div>
