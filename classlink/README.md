@@ -251,6 +251,14 @@ oculta e não aceita novas mensagens. Resposta da família pelo WhatsApp ou e-ma
 conversa dela com a gestão (a mais recente, ou uma nova com a direção). "Coordenação" é a
 função Coordenação do cadastro da equipe.
 
+**Responder pelo WhatsApp:** quem ativou os avisos em Conta pode responder direto no
+WhatsApp — toque e segure o aviso e escolha *Responder*. A resposta entra na conversa do
+ClassLink (o id de cada aviso fica em `WhatsAppVinculoConversa`) e a pessoa recebe a
+confirmação "✓ Resposta enviada para ...". Sem *Responder*, vale o aviso dos últimos 30
+minutos. A família recebe a resposta pelo app (push) ou, se escreveu pelo WhatsApp e a
+conversa de 24h está aberta, no próprio WhatsApp. Só texto; as regras de quem conversa com
+quem continuam valendo. Código: `src/lib/resposta-whatsapp.ts`.
+
 **Excluir conversa:** a direção e a coordenação têm a lixeira ao lado de cada conversa em
 Mensagens. Ela apaga a conversa e todas as mensagens para as duas pessoas (sem volta) —
 para conversas de teste ou encerradas. Professores e famílias não excluem conversas.

@@ -187,6 +187,9 @@ model User {
   contratoArquivosEnviados ContratoArquivo[] @relation("ContratoArquivoEnviadoPor")
   contratoEventos          ContratoEvento[]  @relation("ContratoEventoUsuario")
 
+  // Avisos enviados pelo WhatsApp da escola e respostas recebidas por lá (responder pelo WhatsApp)
+  whatsappVinculos WhatsAppVinculoConversa[]
+
   @@index([schoolId])
 }
 
@@ -739,4 +742,31 @@ model ContratoConfig {
   updatedAt    DateTime @updatedAt
 
   @@unique([schoolId, anoLetivo])
+}
+
+/// Liga uma mensagem do WhatsApp da escola (wamid) a uma conversa do ClassLink, para que a
+/// direção/coordenação responda direto pelo WhatsApp: "AVISO" = aviso ou confirmação que a
+/// escola enviou à pessoa (a resposta a ele volta para essa conversa); "RESPOSTA" = resposta
+/// já recebida e processada (evita duplicar quando a Meta reenvia o webhook).
+model WhatsAppVinculoConversa {
+  id             String              @id @default(cuid())
+  externalId     String              @unique
+  papel          PapelVinculoWhatsApp
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  tipo           TipoConversaWhatsApp
+  conversationId String
+  createdAt      DateTime            @default(now())
+
+  @@index([userId, papel, createdAt])
+}
+
+enum PapelVinculoWhatsApp {
+  AVISO
+  RESPOSTA
+}
+
+enum TipoConversaWhatsApp {
+  FAMILIA
+  EQUIPE
 }
