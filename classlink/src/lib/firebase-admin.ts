@@ -1,3 +1,4 @@
+import { limparValorPublico } from "@/lib/firebase-config-publica";
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 
 let cachedApp: App | null | undefined;
@@ -45,8 +46,10 @@ export function normalizarChavePrivada(valor: string | undefined): string | unde
 export function getFirebaseAdminApp(): App | null {
   if (cachedApp !== undefined) return cachedApp;
 
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  // Espaço, aspas ou caractere invisível colados junto fazem o Google recusar a conta
+  // (app/invalid-credential), mesmo com a chave certa.
+  const projectId = limparValorPublico(process.env.FIREBASE_PROJECT_ID);
+  const clientEmail = limparValorPublico(process.env.FIREBASE_CLIENT_EMAIL);
   const privateKey = normalizarChavePrivada(process.env.FIREBASE_PRIVATE_KEY);
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
@@ -65,4 +68,20 @@ export function getFirebaseAdminApp(): App | null {
     cachedApp = null;
   }
   return cachedApp;
+}
+
+/**
+ * Confere com o Google se a conta de serviço é aceita (pede um token de acesso de verdade).
+ * O cert() só valida o formato; uma chave apagada no Google Cloud ou um e-mail que não é o
+ * da mesma chave só aparece aqui.
+ */
+export async function testarContaDeServico(): Promise<{ ok: boolean; detalhe?: string }> {
+  const app = getFirebaseAdminApp();
+  if (!app) return { ok: false, detalhe: erroConfiguracao ?? "Conta de serviço não configurada." };
+  try {
+    await app.options.credential?.getAccessToken();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, detalhe: err instanceof Error ? err.message : String(err) };
+  }
 }
