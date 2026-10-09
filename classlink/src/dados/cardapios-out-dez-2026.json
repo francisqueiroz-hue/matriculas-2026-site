@@ -1,6 +1,6 @@
 {
   "versao": 1,
-  "fonte": "Google Drive › Cardápios (13 PDFs, 05/10/2026 a 01/01/2027) — semana de 05/10 não incluída (já em andamento)",
+  "fonte": "Google Drive › Cardápios (PDFs da nutricionista) — semanas de 12/10 a 18/12/2026; fora: 05/10 (já em andamento), 21/12 e 28/12 (recesso)",
   "semanas": [
     "2026-10-12",
     "2026-10-19",
@@ -11,9 +11,7 @@
     "2026-11-23",
     "2026-11-30",
     "2026-12-07",
-    "2026-12-14",
-    "2026-12-21",
-    "2026-12-28"
+    "2026-12-14"
   ],
   "observacoes": "O cardápio poderá sofrer alterações devido à entrega de matéria-prima pelos fornecedores, sazonalidade e aceitação dos alunos. O feijão é enriquecido com folhosos verdes escuros e legumes durante o cozimento. Para os alunos que não aceitarem o lanche do dia serão oferecidas outras opções de frutas. A comida é temperada com alho e cebola, sem adição de sal. Nosso molho de tomate é feito com tomate, beterraba e cenoura. Sobremesa do almoço e do jantar: frutas frescas.",
   "segmentos": [
@@ -184,7 +182,8 @@
     {
       "nome": "Ensino Fundamental I",
       "sugestao": [
-        "ano",
+        "1 ano",
+        "5 ano",
         "fundamental"
       ],
       "conteudo": {
@@ -232,7 +231,12 @@
             "Isca de carne, mix de legumes, farofa, arroz branco e feijão preto"
           ]
         }
-      }
+      },
+      "naoSugerir": [
+        "2 ano",
+        "3 ano",
+        "4 ano"
+      ]
     }
   ]
 }

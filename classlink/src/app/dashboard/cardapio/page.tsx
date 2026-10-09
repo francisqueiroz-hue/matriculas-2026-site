@@ -409,6 +409,13 @@ export default function CardapioPage() {
       return "Cardápio publicado no Mural.";
     });
 
+  const excluirSemana = (semana: string, lista: Cardapio[]) =>
+    acao(async () => {
+      if (!confirm(`Excluir todos os ${lista.length} cardápio(s) agendados da semana ${rotuloSemana(semana)}?`)) return "Nada foi alterado.";
+      for (const c of lista) await apiJson(`/api/cardapios/${c.id}`, { method: "DELETE" });
+      return `Semana ${rotuloSemana(semana)} excluída (${lista.length} cardápio(s)).`;
+    });
+
   const excluir = (c: Cardapio) =>
     acao(async () => {
       if (!confirm(`Excluir o cardápio da semana ${rotuloSemana(c.semanaInicio)}${c.status === "PUBLICADO" ? " (a publicação do Mural também sai)" : ""}?`)) {
@@ -532,6 +539,11 @@ export default function CardapioPage() {
                       {lista.length} cardápio(s): {lista.map((c) => c.turma ?? "Toda a escola").join(", ")}
                     </span>
                   </summary>
+                  <div className="flex justify-end border-t border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <button onClick={() => excluirSemana(semana, lista)} className="text-xs font-semibold text-red-600 hover:underline">
+                      Excluir semana inteira
+                    </button>
+                  </div>
                   <ul className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
                     {lista.map((c) => (
                       <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">

@@ -10,6 +10,8 @@ const NOME_DIA = { seg: "Seg", ter: "Ter", qua: "Qua", qui: "Qui", sex: "Sex" } 
 interface Segmento {
   nome: string;
   sugestao?: string[];
+  /** Turmas que nunca são sugeridas para este cardápio (ex.: 2º, 3º e 4º ano). */
+  naoSugerir?: string[];
   conteudo: { refeicoes: string[]; itens: Record<(typeof DIAS)[number], string[]> };
 }
 interface Pacote {
@@ -26,7 +28,7 @@ interface Turma {
 
 /** Pacotes que já vêm no ClassLink (cardápios enviados pela escola). */
 const PACOTES: { id: string; titulo: string; pacote: Pacote }[] = [
-  { id: "out-dez-2026", titulo: "Cardápios de 12/10 a 01/01/2027 (nutricionista)", pacote: pacoteOutDez2026 as Pacote },
+  { id: "out-dez-2026", titulo: "Cardápios de 12/10 a 18/12/2026 (nutricionista)", pacote: pacoteOutDez2026 as Pacote },
 ];
 
 function somarDias(iso: string, dias: number) {
@@ -35,15 +37,28 @@ function somarDias(iso: string, dias: number) {
   return d.toISOString().slice(0, 10);
 }
 const diaMes = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
-const semNumero = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+/** Sem acentos, sem º/°, minúsculas: "2º Ano A" → "2 ano a". */
+const normalizar = (t: string) =>
+  t
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[º°ª]/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 
 /** Sugere o segmento de cada turma pelo nome (a gestão confere e ajusta antes de importar). */
-function sugerirTurmas(pacote: Pacote, turmas: Turma[]): Record<number, string[]> {
+export function sugerirTurmas(pacote: Pacote, turmas: Turma[]): Record<number, string[]> {
   const usadas = new Set<string>();
   const mapa: Record<number, string[]> = {};
   pacote.segmentos.forEach((seg, i) => {
     mapa[i] = turmas
-      .filter((t) => !usadas.has(t.id) && (seg.sugestao ?? []).some((s) => semNumero(` ${t.name} `).includes(semNumero(s))))
+      .filter((t) => {
+        // O padrão começa no início de uma palavra: "1 ano" casa com "1º Ano A", não com "11º Ano".
+        const nome = ` ${normalizar(t.name)} `;
+        const casa = (padrao: string) => nome.includes(` ${normalizar(padrao)}`);
+        if (usadas.has(t.id) || (seg.naoSugerir ?? []).some(casa)) return false;
+        return (seg.sugestao ?? []).some(casa);
+      })
       .map((t) => t.id);
     mapa[i].forEach((id) => usadas.add(id));
   });

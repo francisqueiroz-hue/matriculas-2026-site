@@ -281,10 +281,12 @@ Mural; excluir tira a publicação. Semanas passadas não são publicadas. Famí
 veem só os publicados das turmas que acompanham. Código: `src/lib/cardapios.ts`.
 
 **Importar cardápios** (mesma tela) agenda de uma vez vários cardápios por segmento: o
-ClassLink já traz o pacote da nutricionista de **12/10/2026 a 01/01/2027**
+ClassLink já traz o pacote da nutricionista de **12/10 a 18/12/2026** (sem as semanas de
+recesso, 21/12 e 28/12)
 (`src/dados/cardapios-out-dez-2026.json`, montado a partir dos 13 PDFs da pasta
 "Cardápios" do Drive — Berçário, Maternalzinho/Maternal 1, Educação Infantil e
-Fundamental I). A tela sugere as turmas de cada segmento pelo nome; a gestão confere e
+Fundamental I — este só para 1º e 5º ano; 2º, 3º e 4º ano não recebem cardápio). A tela
+sugere as turmas de cada segmento pelo nome; a gestão confere e
 confirma. Semanas passadas e combinações que já têm cardápio ficam de fora (nada é
 sobrescrito). Também aceita um pacote `.json` no mesmo formato para os próximos períodos.
 
