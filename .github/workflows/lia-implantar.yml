@@ -1,0 +1,108 @@
+# Implantação manual da Lia (agente-whatsapp/). Só roda quando alguém clica em "Run workflow".
+# Guia: agente-whatsapp/GUIA-IMPLANTACAO.md. Não foi executado ainda: o primeiro uso deve ser a ação "testar".
+name: Lia - testar e implantar (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: "O que fazer"
+        required: true
+        type: choice
+        options: [testar, implantar, definir-webhook, remover-webhook]
+      modelo_workers_ai:
+        description: "Só em 'implantar': modelo do Workers AI (confira no catálogo da Cloudflare)"
+        required: false
+        default: "@cf/meta/llama-3.1-8b-instruct"
+      phone_number_id:
+        description: "Só em definir/remover webhook: ID do número no painel da Meta"
+        required: false
+      url_do_worker:
+        description: "Só em definir-webhook: ex. https://lia.SEU-SUBDOMINIO.workers.dev/webhook"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lia-implantar
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: agente-whatsapp
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: agente-whatsapp/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+
+  implantar:
+    if: ${{ inputs.acao == 'implantar' }}
+    needs: testar
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      D1_ID: ${{ vars.CLOUDFLARE_D1_ID }}
+      MODELO: ${{ inputs.modelo_workers_ai }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: agente-whatsapp/package-lock.json
+      - run: npm ci
+      - name: Conferir configuração
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Falta o segredo CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Falta o segredo CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test -n "$D1_ID" || { echo "Falta a variável CLOUDFLARE_D1_ID"; exit 1; }
+          test -n "$MODELO" || { echo "Informe o modelo do Workers AI"; exit 1; }
+      - name: Preencher wrangler.toml (só nesta execução, não vai para o repositório)
+        run: |
+          sed -i "s|PREENCHER_APOS_wrangler_d1_create|$D1_ID|; s|PREENCHER_modelo_workers_ai|$MODELO|" wrangler.toml
+      - name: Criar/atualizar as tabelas do banco
+        run: npx wrangler d1 migrations apply lia --remote
+      - name: Carregar a base de conhecimento (não apaga o que foi aprovado no painel)
+        run: |
+          npm run --silent semear > semente.sql
+          npx wrangler d1 execute lia --remote --file semente.sql
+      - name: Publicar o Worker
+        run: npx wrangler deploy
+
+  webhook:
+    if: ${{ inputs.acao == 'definir-webhook' || inputs.acao == 'remover-webhook' }}
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: ${{ secrets.WHATSAPP_API_TOKEN }}
+      VERIFY: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+      NUMERO: ${{ inputs.phone_number_id }}
+      URL: ${{ inputs.url_do_worker }}
+      ACAO: ${{ inputs.acao }}
+    steps:
+      - name: Definir ou remover o webhook só deste número (o do ClassLink não é tocado)
+        run: |
+          test -n "$TOKEN" || { echo "Falta o segredo WHATSAPP_API_TOKEN"; exit 1; }
+          test -n "$NUMERO" || { echo "Informe o ID do número"; exit 1; }
+          if [ "$ACAO" = "definir-webhook" ]; then
+            test -n "$URL" || { echo "Informe a URL do webhook"; exit 1; }
+            test -n "$VERIFY" || { echo "Falta o segredo WHATSAPP_VERIFY_TOKEN"; exit 1; }
+            corpo=$(jq -n --arg u "$URL" --arg v "$VERIFY" '{webhook_configuration:{override_callback_uri:$u,verify_token:$v}}')
+          else
+            corpo='{"webhook_configuration":{"override_callback_uri":""}}'
+          fi
+          resposta=$(curl -sS -X POST "https://graph.facebook.com/${GRAPH_VERSAO:-v21.0}/$NUMERO" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "$corpo")
+          echo "$resposta"
+          echo "$resposta" | jq -e '.success == true' > /dev/null

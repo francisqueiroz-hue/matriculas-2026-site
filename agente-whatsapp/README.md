@@ -2,6 +2,8 @@
 
 Worker da Cloudflare (TypeScript + D1) que atende o **número público** (21) 96469-9441. Não mexe no ClassLink nem no número interno. Visão geral: `docs/superpowers/specs/2026-10-08-agente-whatsapp-lia-design.md`.
 
+> **Passo a passo para quem não programa (Cloudflare + Meta + GitHub): [`GUIA-IMPLANTACAO.md`](GUIA-IMPLANTACAO.md).** Publicação por botão em `.github/workflows/lia-implantar.yml` (ação manual).
+
 ## Antes de tudo
 Leia `CANAL.md`: há pontos sobre a coexistência, o selo "IA ativa" e custos que **ainda não foram confirmados na Meta**. Não aponte o número público para a Lia antes de resolvê-los e de testar com um número de teste.
 

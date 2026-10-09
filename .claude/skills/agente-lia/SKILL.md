@@ -23,6 +23,6 @@ Cloudflare Worker (TypeScript) + D1 que atende o número público (21) 96469-944
 - **Mudar a persona:** edite `conhecimento/persona.md` e copie para `src/persona.ts` (o teste compara os dois).
 - **Mudar o painel:** edite `painel/*` e rode `npm run gerar:painel` (o teste confere `src/painel-html.ts`).
 - **Testar:** `cd agente-whatsapp && npm test && npm run typecheck`.
-- **Implantar, webhook, coexistência, segredos:** `agente-whatsapp/README.md` e `agente-whatsapp/CANAL.md`.
+- **Implantar, webhook, coexistência, segredos:** `agente-whatsapp/GUIA-IMPLANTACAO.md` (passo a passo para o dono), `README.md` e `CANAL.md`. Funcionamento da escola: segunda a sexta, 7h–19h. `npm run semear` é idempotente (não apaga o que o dono aprovou).
 
 Detalhes de arquitetura e do fluxo de um turno: `references/arquitetura.md`. Tudo que não foi confirmado em fonte oficial da Meta está listado em `agente-whatsapp/CANAL.md`: leia antes de afirmar algo sobre coexistência, preços ou dispositivos vinculados.
