@@ -45,7 +45,9 @@ export class ErroPush extends Error {
     readonly etapa: string,
     causa: unknown,
   ) {
-    const detalhe = causa instanceof Error ? `${causa.name}: ${causa.message}` : String(causa);
+    // Primeira linha da pilha ajuda a saber qual função do navegador recusou (o Safari só diz "Type error").
+    const origem = causa instanceof Error ? causa.stack?.split("\n").find((l) => l.trim())?.trim().slice(0, 80) : undefined;
+    const detalhe = causa instanceof Error ? `${causa.name}: ${causa.message}${origem ? ` [${origem}]` : ""}` : String(causa);
     super(`${etapa} — ${detalhe}`);
     this.name = "ErroPush";
   }
@@ -61,6 +63,26 @@ async function etapa<T>(nome: string, acao: () => Promise<T>): Promise<T> {
 
 function comPrazo<T>(promessa: Promise<T>, ms: number, mensagem: string): Promise<T> {
   return Promise.race([promessa, new Promise<T>((_, rejeitar) => setTimeout(() => rejeitar(new Error(mensagem)), ms))]);
+}
+
+/** Converte a chave VAPID (base64url) e confere se é uma chave P-256 pública (65 bytes, começa com 0x04). */
+export function chaveVapid(base64url: string): Uint8Array<ArrayBuffer> {
+  const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+  const binario = atob(base64 + "=".repeat((4 - (base64.length % 4)) % 4));
+  const bytes = new Uint8Array(new ArrayBuffer(binario.length));
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  if (bytes.length !== 65 || bytes[0] !== 4) {
+    throw new Error(`chave inválida (${bytes.length} bytes). Confira NEXT_PUBLIC_FIREBASE_VAPID_KEY na Vercel: é a "chave pública" do par de chaves Web Push no Firebase`);
+  }
+  return bytes;
+}
+
+/** Garante a inscrição de push do aparelho (o Firebase reaproveita a existente). */
+async function garantirInscricao(registration: ServiceWorkerRegistration, chave: Uint8Array<ArrayBuffer>, refazer: boolean) {
+  const atual = await registration.pushManager.getSubscription();
+  if (atual && !refazer) return;
+  if (atual) await atual.unsubscribe().catch(() => false);
+  await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chave });
 }
 
 /**
@@ -94,7 +116,17 @@ export async function requestPushToken(pedirPermissao = false): Promise<string |
   if (permission !== "granted") return null;
 
   const registration = await etapa("Service worker", serviceWorkerAtivo);
-  return etapa("Registro do aparelho", () =>
-    comPrazo(getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration }), 30_000, "tempo esgotado"),
-  );
+  const chave = await etapa("Chave pública (VAPID)", async () => chaveVapid(VAPID_KEY));
+  await etapa("Inscrição no push do aparelho", () => garantirInscricao(registration, chave, false));
+
+  const obterToken = () =>
+    comPrazo(getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration }), 30_000, "tempo esgotado");
+  try {
+    return await obterToken();
+  } catch (primeiroErro) {
+    // Inscrição antiga/corrompida (comum depois de reinstalar o app no iPhone): refaz do zero e tenta uma vez mais.
+    console.warn("Registro do aparelho falhou; refazendo a inscrição", primeiroErro);
+    await etapa("Refazer inscrição no push", () => garantirInscricao(registration, chave, true));
+    return etapa("Registro no Firebase", obterToken);
+  }
 }
