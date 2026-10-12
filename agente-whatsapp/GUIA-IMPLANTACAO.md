@@ -26,6 +26,18 @@ Faça antes de tudo; as respostas me ajudam a decidir o caminho.
 - [ ] **0.2** No celular da escola, o ícone do WhatsApp tem um **"B"**? (WhatsApp **Business**). Anote a versão do aplicativo (Configurações → Ajuda → Informações do app).
 - [ ] **0.3** Decida quem será o **único e-mail** autorizado a abrir o painel (o seu).
 
+### Atalho opcional: auditoria pelo MCP oficial da Meta (somente leitura)
+
+Em 15/09/2026 a Meta lançou o **WhatsApp Business Tools MCP**, uma conexão que deixa um assistente de IA consultar e configurar contas, números, modelos de mensagem, webhooks e mensagens de teste ([TechCrunch](https://techcrunch.com/2026/09/15/meta-now-lets-ai-agents-handle-the-boring-parts-of-whatsapp-business-setup/)). Ele **não substitui** a Lia nem a Cloudflare; serve para **reduzir os palpites da Parte 0, da B1 e da C1**, lendo a sua conta de verdade. O lançamento é gradual: pode não estar disponível para você ainda.
+
+- [ ] Conecte-o no seu assistente de IA (Claude, ChatGPT ou outro) como servidor MCP remoto, **usando o endereço que consta na documentação oficial da Meta** (um endereço circulando em redes sociais não foi confirmado por mim). A autenticação é feita por você, no login da Meta: confira as permissões pedidas antes de autorizar.
+- [ ] Peça **só leitura**, com este texto:
+
+> Use apenas o WhatsApp Business Tools MCP oficial da Meta. Faça uma auditoria **somente de leitura**: não crie nem altere contas, números, modelos ou webhooks, e não envie mensagens. Para as duas contas "Espaço Kids e Instituto Fokus", me diga: (1) o ID de cada conta e de cada número, incluindo o Test Number; (2) o estado de cada número (conectado à API, ao aplicativo ou em coexistência); (3) a configuração de webhook de cada número e do aplicativo; (4) o que é o selo "IA ativa" e como desativá-lo; (5) a situação da verificação do negócio, da forma de pagamento e dos limites de envio; (6) os modelos de mensagem existentes. Depois liste, em ordem, o que falta para a Lia atender o número (21) 96469-9441 sem desligar o aplicativo.
+
+- [ ] **Não deixe a IA alterar nada** sem eu revisar o que ela propõe. Proibido tocar nos números (21) 96469-9441 e (21) 99286-5778 e no endereço de webhook **do aplicativo** (é o do ClassLink). A única alteração aceitável, depois de revisada, é o webhook **só do Test Number**.
+- [ ] Cole-me o relatório (sem tokens). Com ele, fecho a decisão de `CANAL.md`.
+
 ---
 
 ## Parte A — Cloudflare e GitHub (cerca de 45 min)
