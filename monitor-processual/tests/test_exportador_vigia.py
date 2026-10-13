@@ -209,3 +209,28 @@ def test_retrato_usa_o_prazo_recalculado_quando_o_banco_diverge(db):
     _prazo(db, "d1", n, "2026-03-06", 5, "uteis", "2026-03-13")  # errado de propósito
     p = ex.exportar(db, agora=AGORA)["processos"][0]
     assert p["documento"]["prazo"]["dataLimite"] == p["retrato"]["prazos_abertos"][0]["data_limite"] == "2026-03-16"
+
+
+def test_capital_configurada_muda_o_prazo_e_o_aviso(db):
+    n = _numero(14)
+    _acomp(db, n)
+    # qui 21/01/2027, 1 dia útil (TJSP): interior vence seg 25/01; capital (25/01 feriado) vence ter 26/01
+    _com(db, "k1", n, "2027-01-21", "x", "2027-01-21 10:00:00")
+    _prazo(db, "k1", n, "2027-01-21", 1, "uteis", "2027-01-25")
+    _sql(db, "update comunicacoes set sigla_tribunal='TJSP' where id='k1'")
+    interior = ex.exportar(db, agora=AGORA)["processos"][0]["documento"]["prazo"]
+    assert interior["dataLimite"] == "2027-01-25" and interior["capital"] is False
+    (db.parent / "configuracao_vigia.json").write_text(json.dumps({"capital": [n.replace("-", "").replace(".", "")]}), encoding="utf-8")
+    r = ex.exportar(db, agora=AGORA)
+    cap = r["processos"][0]["documento"]["prazo"]
+    assert cap["dataLimite"] == "2027-01-26" and cap["capital"] is True
+    assert r["processos"][0]["retrato"]["prazos_abertos"][0]["data_limite"] == "2027-01-26"
+    assert [a["tipo"] for a in r["auditoria"]] == ["prazo_divergente"]   # o banco ainda diz 25/01
+
+
+def test_configuracao_ausente_ou_corrompida_nao_quebra(db):
+    assert ex.ler_capital(db) == set()
+    (db.parent / "configuracao_vigia.json").write_text("{ não é json", encoding="utf-8")
+    assert ex.ler_capital(db) == set()
+    (db.parent / "configuracao_vigia.json").write_text(json.dumps({"capital": "texto", "x": 1}), encoding="utf-8")
+    assert ex.ler_capital(db) == set()

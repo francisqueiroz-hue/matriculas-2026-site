@@ -102,7 +102,7 @@ def test_instala_com_backup_e_corrige_o_run_daily(monitor):
     r = rodar(monitor, "--sim", "--sem-pytest")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "INSTALADO COM SUCESSO" in r.stdout
-    for f in ("calendar_prazos", "calendarios", "calendario_tjrj", "calendario_tjsp", "calendario_trt1", "calendario_nacional", "vigia_contrato", "vigia_analise", "exportador_vigia"):
+    for f in ("calendar_prazos", "calendarios", "calendario_tjrj", "calendario_tjsp", "calendario_trt1", "calendario_nacional", "vigia_contrato", "vigia_analise", "exportador_vigia", "importar_painel", "gatilho_diario"):
         assert h(monitor / "core" / f"{filename(f)}") == h(RAIZ / "core" / f"{filename(f)}")
     texto = (monitor / "run_daily.py").read_text(encoding="utf-8")
     assert texto.count('tribunal=comunicacao.get("sigla_tribunal"),') == 1

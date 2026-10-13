@@ -84,8 +84,24 @@ def _termos(textos) -> list[str]:
     return achados
 
 
-def exportar(db: str | os.PathLike, *, agora: datetime | None = None) -> dict:
+def ler_capital(db: str | os.PathLike) -> set[str]:
+    """
+    Números (CNJ, normalizados) de processos da Comarca/município da CAPITAL, lidos de
+    `configuracao_vigia.json` ao lado do banco: {"capital": ["0000000-00.0000.0.00.0000", ...]}.
+    Arquivo ausente ou inválido = nenhum (o cálculo vale para o interior, o lado seguro).
+    """
+    caminho = Path(db).resolve().parent / "configuracao_vigia.json"
+    try:
+        dados = json.loads(caminho.read_text(encoding="utf-8-sig"))
+        lista = dados.get("capital", []) if isinstance(dados, dict) else []
+        return {n for n in (vc.normalizar_numero(x) for x in lista) if n}
+    except (OSError, ValueError):
+        return set()
+
+
+def exportar(db: str | os.PathLike, *, agora: datetime | None = None, capital: set[str] | None = None) -> dict:
     agora = (agora or datetime.now()).replace(microsecond=0)
+    capital = ler_capital(db) if capital is None else capital
     corte = agora - timedelta(hours=HORAS_NOVIDADE)
     con = _abrir_somente_leitura(db)
     try:
@@ -145,7 +161,8 @@ def exportar(db: str | os.PathLike, *, agora: datetime | None = None) -> dict:
             tipo = p.get("tipo_contagem")
             if disp and p.get("dias") and tipo in ("uteis", "corridos"):
                 try:
-                    bloco = vc.montar_prazo(disp, int(p["dias"]), tipo, tribunal=sigla, agora=agora)
+                    bloco = vc.montar_prazo(disp, int(p["dias"]), tipo, tribunal=sigla,
+                                            capital=numero in capital, agora=agora)
                     if bloco["dataLimite"] != lim.isoformat():
                         auditoria.append({
                             "tipo": "prazo_divergente",

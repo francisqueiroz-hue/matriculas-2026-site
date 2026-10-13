@@ -30,7 +30,7 @@ $dst = "<pasta do monitor>"
 |---|---|
 | Confere | arquivos do pacote (SHA-256 em `VERSAO.json`) e se o destino é mesmo o monitor |
 | Backup | `_backup_calendarios_<data_hora>\` com cópia de tudo o que será trocado + `MANIFESTO.json` |
-| Instala | `core\`: `calendar_prazos`, `calendarios`, `calendario_tjrj`, `calendario_tjsp`, `calendario_trt1`, `calendario_nacional`, `vigia_contrato`, `vigia_analise`, `exportador_vigia`; `tests\`: `test_prazos`, `test_calendarios`, `test_vigia_contrato`, `test_vigia_analise`, `test_exportador_vigia` |
+| Instala | `core\`: `calendar_prazos`, `calendarios`, `calendario_tjrj`, `calendario_tjsp`, `calendario_trt1`, `calendario_nacional`, `vigia_contrato`, `vigia_analise`, `exportador_vigia`, `importar_painel`, `gatilho_diario`; `tests\`: `test_prazos`, `test_calendarios`, `test_vigia_contrato`, `test_vigia_analise`, `test_exportador_vigia`, `test_calendario_tjsp`, `test_importar_painel`, `test_gatilho_diario` |
 | Corrige | em `run_daily.py`, a chamada de `calcular_prazo` ganha `tribunal=comunicacao.get("sigla_tribunal"),` (preserva quebras de linha e BOM) |
 | Teste de fumaça | importa os módulos, confere datas conhecidas (TJRJ e TRT1), passa amostras pelo **seu** classificador e roda os testes do pacote (se o `pytest` estiver instalado) |
 | Se falhar | restaura os arquivos (conferido por SHA-256) e remove os que foram criados |
