@@ -53,7 +53,7 @@ r = calcular_prazo(
 Os valores de `tipo_contagem` do classificador (`"uteis"`, `"corridos"` ou nada) são compatíveis com a validação estrita do cálculo. Para processos da Comarca/município da Capital, acrescente `capital=True`.
 
 ## Checklist da fase 2
-1. Instalar os arquivos novos de `core/` na cópia **agendada** do monitor (com backup) e aplicar o ajuste acima.
+1. Instalar na cópia **agendada** do monitor com `instalacao/instalar_calendarios.py` (faz o backup, instala os arquivos, aplica o ajuste acima e roda o teste de fumaça; veja `instalacao/LEIAME.md`).
 2. Decidir o código-base (proposta: o monitor, que é a origem do Vigia) e migrar do Vigia só o que for exclusivo: exportação do retrato para a rotina e painel. A análise AJEAP local sai: a conta da API está sem crédito e a análise já é feita pela rotina em nuvem.
 3. `run_daily.py`: montar o documento de cada processo com `montar_documento` + `montar_prazo(tribunal=sigla_do_numero(...))` e gravar `data/retrato_vigia.json`.
 4. Rotina em nuvem: ler o JSON e gravar em `processos/<id>`; migrar os ids legados (mapa antigo → `cnj_`) numa única passada, **com a rotina pausada**.
