@@ -209,6 +209,13 @@ def exportar(db: str | os.PathLike, *, agora: datetime | None = None, capital: s
             "nomeLocal": ac.get("apelido") or None,
             "eventos": eventos,
         }
+        if datas_mov and ultima_exec:
+            # as movimentações do monitor vêm do DataJud/CNJ: o painel mostra a data da última coleta com sucesso
+            proc["datajud"] = {
+                "ultimoAndamento": max(datas_mov).isoformat(),
+                "ultimaVerificacao": str(ultima_exec["executado_em"]).replace(" ", "T")[:19],
+                "fonte": "Monitor processual (DataJud/CNJ)",
+            }
         if datas_mov:
             ult = next(m for m in mvs if _data(m.get("data_movimento")) == max(datas_mov))
             proc["ultimaMovData"] = max(datas_mov).isoformat()

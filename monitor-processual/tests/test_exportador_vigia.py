@@ -234,3 +234,28 @@ def test_configuracao_ausente_ou_corrompida_nao_quebra(db):
     assert ex.ler_capital(db) == set()
     (db.parent / "configuracao_vigia.json").write_text(json.dumps({"capital": "texto", "x": 1}), encoding="utf-8")
     assert ex.ler_capital(db) == set()
+
+
+def test_bloco_datajud_usa_a_ultima_coleta_com_sucesso(db):
+    n = _numero(15)
+    _acomp(db, n)
+    _sql(db, "insert into movimentacoes (numero_processo,data_movimento,codigo,descricao,criado_em) values (?,?,?,?,?)",
+         n, "2026-10-05T10:00:00", 2, "Conclusos", "2026-10-06 06:00:00")
+    _sql(db, "insert into execucoes (executado_em,sucesso) values (?,?)", "2026-10-13 08:01:02", 1)
+    _sql(db, "insert into execucoes (executado_em,sucesso) values (?,?)", "2026-10-14 07:00:00", 0)   # falha não conta
+    d = ex.exportar(db, agora=AGORA)["processos"][0]["documento"]
+    assert d["datajud"] == {"ultimoAndamento": "2026-10-05", "ultimaVerificacao": "2026-10-13T08:01:02",
+                            "fonte": "Monitor processual (DataJud/CNJ)"}
+    # o bloco satisfaz a auditoria de DataJud desatualizado (limite de 7 dias)
+    assert [p for p in vc.auditar([d], agora=AGORA) if p["tipo"].startswith("datajud")] == []
+
+
+def test_sem_movimentacao_ou_sem_coleta_nao_inventa_datajud(db):
+    a, b = _numero(16), _numero(17)
+    _acomp(db, a)
+    _acomp(db, b)
+    _sql(db, "insert into movimentacoes (numero_processo,data_movimento,codigo,descricao,criado_em) values (?,?,?,?,?)",
+         b, "2026-10-05T10:00:00", 2, "Conclusos", "2026-10-06 06:00:00")
+    docs = {p["documento"]["numero"]: p["documento"] for p in ex.exportar(db, agora=AGORA)["processos"]}
+    assert "datajud" not in docs[a]       # sem movimentação
+    assert "datajud" not in docs[b]       # movimentação, mas nenhuma coleta com sucesso registrada
