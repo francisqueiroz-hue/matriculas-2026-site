@@ -55,6 +55,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Iterable, NamedTuple
 
+NOME = "TJRJ"
 ATUALIZADO_EM = date(2026, 10, 5)  # data do informativo mais recente consultado
 ANOS_COM_ATOS = frozenset({2026})  # anos com pontos facultativos/atos cadastrados
 ANO_INICIAL_ART_83 = 2025          # Lei 10.633/2024 em vigor (publicada em 19/12/2024)
@@ -208,3 +209,8 @@ def eh_expediente_reduzido(d: date, capital: bool = False) -> bool:
 
 def anos_sem_atos(anos: Iterable[int]) -> list[int]:
     return [a for a in anos if a not in ANOS_COM_ATOS]
+
+
+def ressalvas(ano: int) -> dict[date, str]:
+    """Datas em que o prazo depende de condição desconhecida (TJRJ: nenhuma cadastrada)."""
+    return {}

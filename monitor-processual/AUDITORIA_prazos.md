@@ -2,6 +2,23 @@
 
 Data: 13/10/2026 · Arquivos: `core/calendario_tjrj.py` (novo), `core/calendar_prazos.py`, `tests/test_prazos.py`
 
+## Atualização de 13/10/2026 — perfis de calendário por tribunal
+Os processos monitorados não são só do TJRJ: no painel há processos do **TRT1** (maioria) e do **TJSP**. Um calendário único errava para os demais tribunais. Agora `calcular_prazo(..., tribunal="TRT1")` escolhe o perfil pela sigla do DJEN (`siglaTribunal`):
+
+| Perfil | Fonte | Observações |
+|---|---|---|
+| `TJRJ` (padrão, quando não se informa tribunal) | Lei est. 10.633/2024, art. 83, e informativos do TJRJ de 2026 | como descrito abaixo |
+| `TRT1` | Ato nº 109/2025 do TRT1 (texto lido em 13/10/2026) + Lei 5.010/1966 | Semana Santa de quarta a sexta (01 a 03/04), 11/08 e 08/12 são feriados, recesso de 20/12 a 06/01 como feriado, 30/10 Dia do Servidor |
+| `NACIONAL` (reserva) | Leis federais | para qualquer sigla sem perfil (ex.: TJSP, TRT2). **Sempre emite aviso**: o vencimento pode estar errado |
+
+Pontos do Ato 109/2025 que merecem atenção:
+- **Art. 2º:** em 20/04, 05/06, 10/08 e 07/12/2026 o trabalho é remoto, mas só os prazos dos *processos eletrônicos migrados que dependam de volumes físicos* ficam suspensos. Nos demais processos o prazo corre; por isso esses dias são tratados como **úteis, com aviso**.
+- **Inconsistência do próprio ato:** os considerandos citam o Dia do Servidor em 28/10, a tabela lista 30/10. O calendário segue a tabela (30/10 não útil; 28/10 útil) e **avisa** quando o prazo toca 28/10.
+- **Feriados locais** (art. 3º): use `capital=True` (só 20/01, São Sebastião) ou `feriados_extras`.
+- Recesso do art. 220 do CPC no processo do trabalho: a aplicação não foi verificada; os dias 07 a 20/01 só são suspensos com `aplicar_recesso=True`.
+
+Verificação dos perfis: 95 testes passam; calendário do TRT1 de 2026 idêntico ao da tabela do ato (escrita à mão); varredura independente do TRT1 (disp. de 01/01 a 30/11/2026); perfis isolados por thread e sem vazamento entre chamadas; 9 defeitos propositais detectados; e **0 diferenças** em 20.352 cenários do TJRJ contra a versão anterior (quem não informa o tribunal continua com o resultado de antes).
+
 ## Regra do DJe (conferida no Planalto)
 Lei 11.419/2006, art. 4º, § 3º: publicação = 1º dia útil seguinte à disponibilização; § 4º: prazo começa no 1º dia útil seguinte à publicação. Res. CNJ 455/2022: **não verificada** (texto não acessado).
 
@@ -68,6 +85,6 @@ Dias cujo status mudou em relação à versão anterior (seg–sex): 2025: 6 · 
 ## Instalação
 1. Faça backup de `core/calendar_prazos.py` e `tests/test_prazos.py`.
 2. Copie os três arquivos `.py` para as mesmas pastas (`core/calendario_tjrj.py` é novo).
-3. Se o seu código chama `calcular_prazo` para a Capital, passe `capital=True` (procure: `Select-String -Path . -Recurse -Include *.py -Pattern "calcular_prazo"`).
+3. Em cada chamada de `calcular_prazo`, passe `tribunal=<sigla do DJEN>` e, se for o caso, `capital=True` (procure: `Select-String -Path . -Recurse -Include *.py -Pattern "calcular_prazo"`). Sem `tribunal`, vale o TJRJ.
 4. Recomendado para o TJRJ: `APLICAR_RECESSO_ART_220=true` no `.env` (art. 83, § 1º, da Lei 10.633/2024 suspende os prazos de 20/12 a 20/01).
 5. Rode `python -m pytest tests -q`. (O modo `python tests/test_prazos.py` direto não é suportado.)

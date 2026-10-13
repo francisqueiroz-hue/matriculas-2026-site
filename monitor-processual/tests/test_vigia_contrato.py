@@ -96,7 +96,7 @@ def test_montar_prazo_usa_calendario_do_tjrj():
     assert (p["dataPublicacao"], p["dataInicio"], p["dataLimite"]) == ("2026-04-06", "2026-04-07", "2026-04-13")
     assert p["tipoContagem"] == "uteis" and p["capital"] is False and p["avisos"] == []
     assert p["calculadoEm"] == "2026-10-13T12:00:00"
-    assert p["calendario"].startswith("TJRJ (informativo de ")
+    assert p["calendario"].startswith("TJRJ (base de ")
 
 
 def test_montar_prazo_capital_muda_o_resultado_e_traz_aviso():
@@ -174,3 +174,27 @@ def test_auditar_datajud_limite_configuravel():
     d = dict(_doc(60), datajud={"ultimaVerificacao": "2026-10-06T12:00:00"})  # 7 dias
     assert v.auditar([d], agora=AGORA) == []
     assert [p["tipo"] for p in v.auditar([d], agora=AGORA, max_dias_datajud=3)] == ["datajud_desatualizado"]
+
+
+def test_sigla_do_numero():
+    assert v.sigla_do_numero(_numero(1, j="5", tr="01")) == "TRT1"
+    assert v.sigla_do_numero(_numero(1, j="8", tr="19")) == "TJRJ"
+    assert v.sigla_do_numero(_numero(1, j="8", tr="26")) == "TJSP"
+    assert v.sigla_do_numero(_numero(1, j="4", tr="02")) is None
+    assert v.sigla_do_numero("lixo") is None
+
+
+def test_montar_prazo_com_tribunal_usa_o_calendario_certo():
+    # seg 30/03/2026: TRT1 tem Quarta Santa (01/04) -> início seg 06/04 -> 3 úteis -> qua 08/04.
+    # No TJRJ a quarta é dia útil -> início qua 01/04 -> vence ter 07/04.
+    trt = v.montar_prazo(date(2026, 3, 30), 3, tribunal="TRT1", agora=AGORA)
+    tj = v.montar_prazo(date(2026, 3, 30), 3, tribunal="TJRJ", agora=AGORA)
+    assert (trt["dataInicio"], trt["dataLimite"]) == ("2026-04-06", "2026-04-08")
+    assert (tj["dataInicio"], tj["dataLimite"]) == ("2026-04-01", "2026-04-07")
+    assert trt["calendario"].startswith("TRT1 (base de ")
+
+
+def test_montar_prazo_de_tribunal_sem_perfil_marca_reserva_e_avisa():
+    p = v.montar_prazo(date(2026, 3, 6), 5, tribunal="TJSP", agora=AGORA)
+    assert "reserva" in p["calendario"]
+    assert any("NÃO cadastrado" in a for a in p["avisos"])

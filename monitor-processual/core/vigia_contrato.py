@@ -17,7 +17,7 @@ Decisões que este módulo trava:
   (Res. CNJ 65/2008: os 20 dígitos, lidos como inteiro, dão resto 1 na
   divisão por 97). Número inválido nunca vira documento.
 * PRAZO CALCULADO: o bloco `prazo` vem de `calendar_prazos.calcular_prazo`
-  (calendário do TJRJ, com os avisos), em vez do texto livre "prazo em
+  (calendário do tribunal do processo, com os avisos), em vez do texto livre "prazo em
   verificação".
 * AUDITORIA: `auditar` aponta duplicados, ids fora do padrão, campos
   ausentes, DataJud ausente/desatualizado e o campo reservado `version`
@@ -34,7 +34,7 @@ from datetime import date, datetime
 from typing import Iterable
 
 from . import calendar_prazos as _prazos
-from . import calendario_tjrj as _cal
+from . import calendarios as _perfis
 
 _RE_CNJ = re.compile(r"^(\d{7})-(\d{2})\.(\d{4})\.(\d)\.(\d{2})\.(\d{4})$")
 
@@ -103,20 +103,35 @@ def tribunal_curto(numero) -> str:
 
 
 # ------------------------------------------------------------------- prazo
+def sigla_do_numero(numero) -> str | None:
+    """Sigla do tribunal deduzida do número CNJ ('TRT1', 'TJRJ', 'TJSP') ou None."""
+    t = tribunal_curto(numero)
+    return None if t == "—" else t
+
+
 def montar_prazo(
     data_disponibilizacao: date,
     dias: int,
     tipo_contagem: str = "uteis",
     *,
+    tribunal: str | None = None,
     capital: bool = False,
     aplicar_recesso: bool = False,
     feriados_extras: set[date] | None = None,
     agora: datetime | None = None,
 ) -> dict:
-    """Bloco `prazo` do documento (datas em ISO), calculado pelo calendário do TJRJ."""
+    """
+    Bloco `prazo` do documento (datas em ISO). `tribunal` (sigla do DJEN ou
+    `sigla_do_numero`) escolhe o calendário; sem ele vale o padrão (TJRJ).
+    """
     r = _prazos.calcular_prazo(
-        data_disponibilizacao, dias, tipo_contagem, feriados_extras, aplicar_recesso, capital
+        data_disponibilizacao, dias, tipo_contagem, feriados_extras, aplicar_recesso, capital, tribunal
     )
+    nome, perfil, reserva = _perfis.resolver(tribunal)
+    ref = getattr(perfil, "ATUALIZADO_EM", None)
+    rotulo = nome if not reserva else f"{nome} (calendário nacional de reserva)"
+    if ref and not reserva:
+        rotulo += f" (base de {ref:%d/%m/%Y})"
     return {
         "dataDisponibilizacao": r["data_disponibilizacao"].isoformat(),
         "dataPublicacao": r["data_publicacao"].isoformat(),
@@ -127,7 +142,7 @@ def montar_prazo(
         "capital": bool(capital),
         "recessoAplicado": bool(aplicar_recesso),
         "avisos": list(r["avisos"]),
-        "calendario": f"TJRJ (informativo de {_cal.ATUALIZADO_EM:%d/%m/%Y})",
+        "calendario": rotulo,
         "calculadoEm": (agora or datetime.now()).replace(microsecond=0).isoformat(),
     }
 

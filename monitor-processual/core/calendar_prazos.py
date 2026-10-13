@@ -60,12 +60,28 @@ APLICAR_RECESSO_ART_220=true no .env — e confira caso a caso.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import unicodedata
 from datetime import date, datetime, timedelta
 
-from . import calendario_tjrj as _cal
+from . import calendarios as _perfis
 
-_DIAS_NAO_UTEIS_CACHE: dict[int, frozenset] = {}
+_DIAS_NAO_UTEIS_CACHE: dict[tuple, frozenset] = {}
+# Perfil de calendário em uso na chamada atual (isolado por contexto/thread).
+# Padrão: TJRJ, o comportamento anterior à existência de perfis.
+_PERFIL_ATUAL = contextvars.ContextVar(
+    "perfil_calendario", default=_perfis.PERFIS[_perfis.PERFIL_PADRAO]
+)
+
+
+@contextlib.contextmanager
+def _usando_perfil(perfil):
+    token = _PERFIL_ATUAL.set(perfil)
+    try:
+        yield
+    finally:
+        _PERFIL_ATUAL.reset(token)
 
 
 def _como_data(d):
@@ -97,12 +113,15 @@ def _normalizar_tipo_contagem(tipo) -> str:
 
 def _dias_sem_expediente(ano: int) -> frozenset:
     """
-    Dias não úteis do TJRJ em `ano` (feriados legais + atos estaduais).
-    Ver core/calendario_tjrj.py — não depende da biblioteca `holidays`.
+    Dias não úteis de `ano` no perfil de calendário em uso (TJRJ, TRT1 ou
+    NACIONAL de reserva). Ver core/calendarios.py — não depende da biblioteca
+    `holidays`.
     """
-    if ano not in _DIAS_NAO_UTEIS_CACHE:
-        _DIAS_NAO_UTEIS_CACHE[ano] = frozenset(_cal.dias_nao_uteis(ano))
-    return _DIAS_NAO_UTEIS_CACHE[ano]
+    perfil = _PERFIL_ATUAL.get()
+    chave = (perfil.NOME, ano)
+    if chave not in _DIAS_NAO_UTEIS_CACHE:
+        _DIAS_NAO_UTEIS_CACHE[chave] = frozenset(perfil.dias_nao_uteis(ano))
+    return _DIAS_NAO_UTEIS_CACHE[chave]
 
 
 # compatibilidade com código que importava o nome antigo
@@ -118,7 +137,11 @@ def eh_dia_util(
     d: date,
     feriados_extras: set[date] | None = None,
     aplicar_recesso: bool = False,
+    tribunal: str | None = None,
 ) -> bool:
+    if tribunal is not None:
+        with _usando_perfil(_perfis.resolver(tribunal)[1]):
+            return eh_dia_util(d, feriados_extras, aplicar_recesso)
     d = _como_data(d)
     if d.weekday() >= 5:  # sábado=5, domingo=6
         return False
@@ -233,37 +256,53 @@ def calcular_prazo(
     feriados_extras: set[date] | None = None,
     aplicar_recesso: bool = False,
     capital: bool = False,
+    tribunal: str | None = None,
 ) -> dict:
     """
     Pipeline completo: disponibilização -> publicação -> 1º dia -> vencimento.
 
-    `capital=True` acrescenta o que vale só na Comarca da Capital (feriado de
-    São Sebastião e atos da Capital). O padrão é False: errar para "interior"
-    produz data mais CEDO (seguro); errar para "capital" produziria data mais
-    tarde. Atos de uma comarca específica vão em `feriados_extras`.
+    `tribunal` é a sigla do DJEN ("TJRJ", "TRT1"...) e escolhe o calendário.
+    Sem sigla usa o TJRJ (comportamento anterior). Sigla sem perfil cadastrado
+    usa o calendário NACIONAL de reserva e AVISA.
+
+    `capital=True` acrescenta o que vale só no município/Comarca da Capital
+    (feriado de São Sebastião e, no TJRJ, os atos da Capital). O padrão é
+    False: errar para "interior" produz data mais CEDO (seguro); errar para
+    "capital" produziria data mais tarde. Atos de uma comarca específica vão
+    em `feriados_extras`.
 
     Devolve também `avisos`: textos que o painel mostra junto do prazo:
+      * tribunal sem perfil cadastrado (calendário nacional de reserva);
       * cruzamento do recesso do art. 220;
       * ano sem pontos facultativos/atos cadastrados (só feriados legais);
-      * publicação/início que passou por dia de expediente reduzido.
+      * publicação/início que passou por dia de expediente reduzido;
+      * datas do período com ressalva do ato (ex.: TRT1, art. 2º do Ato 109/2025).
     """
     tipo_contagem = _normalizar_tipo_contagem(tipo_contagem)
     data_disponibilizacao = _como_data(data_disponibilizacao)
+    nome_perfil, perfil, reserva = _perfis.resolver(tribunal)
     extras = set(feriados_extras or ())
     if capital:
         ano0 = data_disponibilizacao.year
-        extras |= _cal.extras_capital(range(ano0, ano0 + 6))
+        extras |= perfil.extras_capital(range(ano0, ano0 + 6))
     extras = extras or None
 
-    pub = data_publicacao(data_disponibilizacao, extras)
-    inicio = data_inicio_prazo(pub, extras)
-
-    if tipo_contagem == "corridos":
-        vencimento = somar_dias_corridos(inicio, dias, extras, aplicar_recesso)
-    else:
-        vencimento = somar_dias_uteis(inicio, dias, extras, aplicar_recesso)
+    with _usando_perfil(perfil):
+        pub = data_publicacao(data_disponibilizacao, extras)
+        inicio = data_inicio_prazo(pub, extras)
+        if tipo_contagem == "corridos":
+            vencimento = somar_dias_corridos(inicio, dias, extras, aplicar_recesso)
+        else:
+            vencimento = somar_dias_uteis(inicio, dias, extras, aplicar_recesso)
 
     avisos = []
+    if reserva:
+        avisos.append(
+            f"Calendário do tribunal '{nome_perfil}' NÃO cadastrado: foi usado o "
+            "calendário nacional de reserva (feriados legais, Carnaval, Sexta-feira "
+            "Santa e Corpus Christi). Pontos facultativos e feriados locais do tribunal "
+            "não foram considerados: o vencimento pode estar errado. Confira antes de protocolar."
+        )
     if _cruza_recesso(inicio, vencimento) and not aplicar_recesso:
         avisos.append(
             "Este prazo atravessa a faixa de 20/12 a 20/01. Se a suspensão do "
@@ -271,26 +310,35 @@ def calcular_prazo(
             "TARDE do que o calculado aqui. Confira antes de protocolar."
         )
 
-    sem_atos = _cal.anos_sem_atos(range(data_disponibilizacao.year, vencimento.year + 1))
-    if sem_atos:
+    anos = range(data_disponibilizacao.year, vencimento.year + 1)
+    sem_atos = perfil.anos_sem_atos(anos)
+    if sem_atos and not reserva:
         avisos.append(
-            "Calendário do TJRJ sem pontos facultativos/atos cadastrados para "
+            f"Calendário do {nome_perfil} sem pontos facultativos/atos cadastrados para "
             + ", ".join(str(a) for a in sem_atos)
-            + ": só os feriados legais foram considerados. Confira o informativo "
-            "de suspensão de prazos do TJRJ antes de protocolar."
+            + ": só os feriados legais foram considerados. Confira o calendário "
+            f"oficial do {nome_perfil} antes de protocolar."
         )
 
     cursor = data_disponibilizacao + timedelta(days=1)
     while cursor <= inicio:
-        if _cal.eh_expediente_reduzido(cursor, capital):
+        if perfil.eh_expediente_reduzido(cursor, capital):
             avisos.append(
                 f"{cursor:%d/%m/%Y} teve expediente reduzido com prazos suspensos "
                 "e foi tratado como dia NÃO útil para publicação e início do prazo. "
                 "Se o seu caso o tratar como dia útil para a publicação, a data "
-                "mudaria: confira o ato do TJRJ."
+                f"mudaria: confira o ato do {nome_perfil}."
             )
             break
         cursor += timedelta(days=1)
+
+    inicio_janela = data_disponibilizacao + timedelta(days=1)
+    vistas: set[date] = set()
+    for ano in anos:
+        for d, texto in sorted(perfil.ressalvas(ano).items()):
+            if inicio_janela <= d <= vencimento and d not in vistas:
+                vistas.add(d)
+                avisos.append(f"{d:%d/%m/%Y}: {texto}")
 
     return {
         "data_disponibilizacao": data_disponibilizacao,
@@ -300,6 +348,8 @@ def calcular_prazo(
         "tipo_contagem": tipo_contagem,
         "data_limite": vencimento,
         "avisos": avisos,
+        "calendario": nome_perfil,
+        "calendario_reserva": reserva,
     }
 
 
@@ -321,12 +371,16 @@ def dias_uteis_ate(
     data_limite: date,
     referencia: date | None = None,
     feriados_extras: set[date] | None = None,
+    tribunal: str | None = None,
 ) -> int:
     """
     Dias úteis restantes (o próprio dia de hoje conta, se for útil). É o
     número que realmente importa para decidir se dá tempo de peticionar.
-    Negativo quando já venceu.
+    Negativo quando já venceu. `tribunal` escolhe o calendário (padrão: TJRJ).
     """
+    if tribunal is not None:
+        with _usando_perfil(_perfis.resolver(tribunal)[1]):
+            return dias_uteis_ate(data_limite, referencia, feriados_extras)
     referencia = _como_data(referencia or date.today())
     data_limite = _como_data(data_limite)
     if data_limite < referencia:
