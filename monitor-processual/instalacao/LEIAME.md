@@ -30,7 +30,7 @@ $dst = "<pasta do monitor>"
 |---|---|
 | Confere | arquivos do pacote (SHA-256 em `VERSAO.json`) e se o destino é mesmo o monitor |
 | Backup | `_backup_calendarios_<data_hora>\` com cópia de tudo o que será trocado + `MANIFESTO.json` |
-| Instala | `core\`: `calendar_prazos`, `calendarios`, `calendario_tjrj`, `calendario_trt1`, `calendario_nacional`, `vigia_contrato`, `vigia_analise`, `exportador_vigia`; `tests\`: `test_prazos`, `test_calendarios`, `test_vigia_contrato`, `test_vigia_analise`, `test_exportador_vigia` |
+| Instala | `core\`: `calendar_prazos`, `calendarios`, `calendario_tjrj`, `calendario_tjsp`, `calendario_trt1`, `calendario_nacional`, `vigia_contrato`, `vigia_analise`, `exportador_vigia`; `tests\`: `test_prazos`, `test_calendarios`, `test_vigia_contrato`, `test_vigia_analise`, `test_exportador_vigia` |
 | Corrige | em `run_daily.py`, a chamada de `calcular_prazo` ganha `tribunal=comunicacao.get("sigla_tribunal"),` (preserva quebras de linha e BOM) |
 | Teste de fumaça | importa os módulos, confere datas conhecidas (TJRJ e TRT1), passa amostras pelo **seu** classificador e roda os testes do pacote (se o `pytest` estiver instalado) |
 | Se falhar | restaura os arquivos (conferido por SHA-256) e remove os que foram criados |
@@ -46,7 +46,7 @@ Ele **não** executa o `run_daily.py`, **não** acessa a rede e **não** grava n
 1. Reinicie a tarefa **Painel** (ou o computador) para o painel carregar os módulos novos.
 2. Na próxima execução diária, confira o fim do `data\log.txt` e os prazos novos: o campo de observações traz os avisos (tribunal sem perfil, dia com ressalva, ano sem ato cadastrado).
 3. Processos da Comarca/município da **Capital**: o instalador não liga isso. Se for o caso, acrescente `capital=True` na mesma chamada.
-4. Tribunais sem perfil (ex.: TJSP) usam o calendário nacional de reserva e **sempre** avisam: confira o vencimento no calendário do tribunal.
+4. Tribunais sem perfil (ex.: TRT2, TRF2) usam o calendário nacional de reserva e **sempre** avisam: confira o vencimento no calendário do tribunal.
 
 ## Requisitos
 Python 3.9 ou superior. `pytest` é opcional (sem ele, os testes do pacote não rodam, mas a fumaça sim). A biblioteca `holidays` deixou de ser usada pelo cálculo.

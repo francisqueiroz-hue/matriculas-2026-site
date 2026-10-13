@@ -195,6 +195,6 @@ def test_montar_prazo_com_tribunal_usa_o_calendario_certo():
 
 
 def test_montar_prazo_de_tribunal_sem_perfil_marca_reserva_e_avisa():
-    p = v.montar_prazo(date(2026, 3, 6), 5, tribunal="TJSP", agora=AGORA)
+    p = v.montar_prazo(date(2026, 3, 6), 5, tribunal="TRF2", agora=AGORA)
     assert "reserva" in p["calendario"]
     assert any("NÃO cadastrado" in a for a in p["avisos"])

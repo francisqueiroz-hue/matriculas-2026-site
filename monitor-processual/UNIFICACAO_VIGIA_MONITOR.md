@@ -64,7 +64,7 @@ Os valores de `tipo_contagem` do classificador (`"uteis"`, `"corridos"` ou nada)
 ## Riscos
 - Migrar ids com a rotina ativa recria duplicatas.
 - `capital=False` é o padrão (erra para o lado seguro); processos da Comarca/município da Capital precisam de `capital=True`.
-- Tribunal sem perfil (ex.: TJSP) usa o calendário nacional de reserva e **sempre** avisa: nunca confie no vencimento sem conferir.
+- Tribunal sem perfil (ex.: TRT2, TRF2) usa o calendário nacional de reserva e **sempre** avisa: nunca confie no vencimento sem conferir.
 - O TRT1 tem uma inconsistência no próprio ato (Dia do Servidor em 28/10 ou 30/10): por decisão do usuário vale 28/10; o cálculo avisa quando toca 28/10 ou 30/10.
 - Informativos do TJRJ não substituem o DJERJ; calendário de 2027 ainda sem atos.
 

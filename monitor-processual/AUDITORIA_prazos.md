@@ -9,7 +9,8 @@ Os processos monitorados não são só do TJRJ: no painel há processos do **TRT
 |---|---|---|
 | `TJRJ` (padrão, quando não se informa tribunal) | Lei est. 10.633/2024, art. 83, e informativos do TJRJ de 2026 | como descrito abaixo |
 | `TRT1` | Ato nº 109/2025 do TRT1 (texto lido em 13/10/2026) + Lei 5.010/1966 | Semana Santa de quarta a sexta (01 a 03/04), 11/08 e 08/12 são feriados, recesso de 20/12 a 06/01 como feriado, 28/10 Dia do Servidor |
-| `NACIONAL` (reserva) | Leis federais | para qualquer sigla sem perfil (ex.: TJSP, TRT2). **Sempre emite aviso**: o vencimento pode estar errado |
+| `TJSP` | Provimento CSM nº 2.813/2025 + nº 2.845/2026 (lidos em 13/10/2026) | Endoenças e Paixão, Data Magna (09/07), suspensões de 20/04, 05/06, 10/07 e 07/12, Dia do Servidor em **30/10** (28/10 tem expediente), recesso 20/12 a 06/01; capital: 25/01 |
+| `NACIONAL` (reserva) | Leis federais | para qualquer sigla sem perfil (ex.: TRT2, TRF2). **Sempre emite aviso**: o vencimento pode estar errado |
 
 Pontos do Ato 109/2025 que merecem atenção:
 - **Art. 2º:** em 20/04, 05/06, 10/08 e 07/12/2026 o trabalho é remoto, mas só os prazos dos *processos eletrônicos migrados que dependam de volumes físicos* ficam suspensos. Nos demais processos o prazo corre; por isso esses dias são tratados como **úteis, com aviso**.

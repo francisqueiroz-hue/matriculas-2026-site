@@ -45,13 +45,13 @@ import sys
 from pathlib import Path
 
 ARQUIVOS_CORE = [
-    "calendar_prazos.py", "calendarios.py", "calendario_tjrj.py",
+    "calendar_prazos.py", "calendarios.py", "calendario_tjrj.py", "calendario_tjsp.py",
     "calendario_trt1.py", "calendario_nacional.py", "vigia_contrato.py",
     "vigia_analise.py", "exportador_vigia.py",
 ]
 ARQUIVOS_TESTES = [
     "test_prazos.py", "test_calendarios.py", "test_vigia_contrato.py",
-    "test_vigia_analise.py", "test_exportador_vigia.py",
+    "test_vigia_analise.py", "test_exportador_vigia.py", "test_calendario_tjsp.py",
 ]
 PREFIXO_BACKUP = "_backup_calendarios_"
 IGNORAR_NA_VARREDURA = {"venv", ".venv", "env", "__pycache__", ".git", "node_modules", "site-packages", "core", "tests"}
@@ -76,7 +76,8 @@ try:
     chk("TRT1: seg 30/03/2026, 3 úteis -> 08/04/2026", lim(date(2026, 3, 30), 3, tribunal="TRT1") == date(2026, 4, 8), lim(date(2026, 3, 30), 3, tribunal="TRT1"))
     chk("TJRJ: mesma entrada -> 07/04/2026", lim(date(2026, 3, 30), 3, tribunal="TJRJ") == date(2026, 4, 7))
     chk("01/04/2026: TRT1 não útil, TJRJ útil", (not eh_dia_util(date(2026, 4, 1), tribunal="TRT1")) and eh_dia_util(date(2026, 4, 1), tribunal="TJRJ"))
-    r = calcular_prazo(date(2026, 3, 6), 5, tribunal="TJSP")
+    chk("TJSP: qua 08/07/2026, 3 úteis -> 16/07/2026 (Data Magna e 10/07 sem expediente)", lim(date(2026, 7, 8), 3, tribunal="TJSP") == date(2026, 7, 16), lim(date(2026, 7, 8), 3, tribunal="TJSP"))
+    r = calcular_prazo(date(2026, 3, 6), 5, tribunal="TRF2")
     chk("tribunal sem perfil usa a reserva e avisa", r["calendario_reserva"] and any("NÃO cadastrado" in a for a in r["avisos"]))
     try:
         calcular_prazo(date(2026, 3, 6), 5, "calendario"); chk("tipo_contagem inválido é recusado", False)

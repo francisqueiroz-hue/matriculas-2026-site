@@ -126,18 +126,18 @@ def test_normalizar_sigla_e_resolver():
     assert calendarios.resolver(None)[0] == "TJRJ" and calendarios.resolver(None)[2] is False
     assert calendarios.resolver("TRT1")[0] == "TRT1" and calendarios.resolver("TRT1")[2] is False
     assert calendarios.resolver("TRT2") == ("TRT2", nac, True)
-    assert calendarios.resolver("TJSP") == ("TJSP", nac, True)
+    assert calendarios.resolver("TRF2") == ("TRF2", nac, True)
 
 
 def test_tribunal_sem_perfil_usa_nacional_e_avisa():
-    r = calcular_prazo(date(2026, 4, 2), 5, tribunal="TJSP")
-    assert r["calendario"] == "TJSP" and r["calendario_reserva"] is True
+    r = calcular_prazo(date(2026, 4, 2), 5, tribunal="TRF2")
+    assert r["calendario"] == "TRF2" and r["calendario_reserva"] is True
     assert "NÃO cadastrado" in r["avisos"][0]
     # nacional: Quinta Santa é útil; Sexta Santa não. qui 02/04 -> pub seg 06/04 -> início ter 07/04
     assert (r["data_publicacao"], r["data_inicio_prazo"]) == (date(2026, 4, 6), date(2026, 4, 7))
-    assert eh_dia_util(date(2026, 4, 2), tribunal="TJSP") and not eh_dia_util(date(2026, 4, 3), tribunal="TJSP")
-    assert eh_dia_util(date(2026, 4, 23), tribunal="TJSP")        # São Jorge não é nacional
-    assert not eh_dia_util(date(2026, 11, 20), tribunal="TJSP")   # Consciência Negra é nacional desde 2024
+    assert eh_dia_util(date(2026, 4, 2), tribunal="TRF2") and not eh_dia_util(date(2026, 4, 3), tribunal="TRF2")
+    assert eh_dia_util(date(2026, 4, 23), tribunal="TRF2")        # São Jorge não é nacional
+    assert not eh_dia_util(date(2026, 11, 20), tribunal="TRF2")   # Consciência Negra é nacional desde 2024
 
 
 def test_sem_tribunal_equivale_ao_tjrj():

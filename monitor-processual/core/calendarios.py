@@ -16,10 +16,11 @@ from __future__ import annotations
 
 import re
 
-from . import calendario_nacional, calendario_tjrj, calendario_trt1
+from . import calendario_nacional, calendario_tjrj, calendario_tjsp, calendario_trt1
 
 PERFIS = {
     "TJRJ": calendario_tjrj,
+    "TJSP": calendario_tjsp,
     "TRT1": calendario_trt1,
 }
 PERFIL_PADRAO = "TJRJ"
