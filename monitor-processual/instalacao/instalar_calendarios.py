@@ -47,8 +47,12 @@ from pathlib import Path
 ARQUIVOS_CORE = [
     "calendar_prazos.py", "calendarios.py", "calendario_tjrj.py",
     "calendario_trt1.py", "calendario_nacional.py", "vigia_contrato.py",
+    "vigia_analise.py", "exportador_vigia.py",
 ]
-ARQUIVOS_TESTES = ["test_prazos.py", "test_calendarios.py", "test_vigia_contrato.py"]
+ARQUIVOS_TESTES = [
+    "test_prazos.py", "test_calendarios.py", "test_vigia_contrato.py",
+    "test_vigia_analise.py", "test_exportador_vigia.py",
+]
 PREFIXO_BACKUP = "_backup_calendarios_"
 IGNORAR_NA_VARREDURA = {"venv", ".venv", "env", "__pycache__", ".git", "node_modules", "site-packages", "core", "tests"}
 

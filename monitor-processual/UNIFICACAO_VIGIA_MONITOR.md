@@ -74,3 +74,6 @@ Os valores de `tipo_contagem` do classificador (`"uteis"`, `"corridos"` ou nada)
 - **Rotina em nuvem** "Vigia — AJEAP e minutas" (08:23, horário de Brasília): prompt-fonte em `claude/rotina_ajeap_vigia_prompt.txt`. Em **modo conferência até 15/10/2026** (não grava); grava a partir de 16/10/2026, com `if_version` e higiene reversível (`processos_arquivo`).
 - **Sem conectores:** na ausência do Claude Docs, o texto da minuta vai no campo `texto` do painel (limite 30.000 caracteres).
 - **Pendente:** exportador do monitor (`prazos_abertos`, `novidade`, `intimacoes`) — depende do schema do `monitor.db`; atualização do prompt do Radar (ids `cnj_`) e do artefato (renderizar `prazo`/`minutas`).
+
+## Exportador do monitor (fase 3b)
+`core/exportador_vigia.py` lê `data/monitor.db` (somente leitura) e grava `data/retrato_vigia.json` com, por processo: `documento` (contrato do painel + bloco `prazo` recalculado pelo calendário do tribunal), `retrato` (`novidade` nas últimas 26 h, `termos_sensiveis`, `prazos_abertos`, `ultimo_andamento_data`) e `comunicacoes` (texto truncado). Divergência entre o prazo gravado no banco e o recalculado vai para `auditoria` (vale o recalculado). Uso: `python -m core.exportador_vigia --db data/monitor.db --saida data/retrato_vigia.json`. O arquivo tem dados de clientes: fica em `data/`, nunca no git.
