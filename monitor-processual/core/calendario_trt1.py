@@ -22,8 +22,8 @@ Região, no ano de 2026".
 
 Tabela do Art. 1º (2026): 01/01; 02 a 06/01 recesso; 16 a 18/02 Carnaval; 01 a
 03/04 Semana Santa; 21/04 Tiradentes; 23/04 São Jorge; 01/05; 04/06 Corpus
-Christi; 11/08 Instituição dos Cursos Jurídicos; 07/09; 12/10; 30/10 Dia do
-Servidor Público; 02/11 Finados; 20/11 Consciência Negra; 08/12 Dia da Justiça;
+Christi; 11/08 Instituição dos Cursos Jurídicos; 07/09; 12/10; 28/10 Dia do
+Servidor Público (confirmado pelo usuário; a tabela traz 30/10); 02/11 Finados; 20/11 Consciência Negra; 08/12 Dia da Justiça;
 20 a 31/12 recesso. Bases: Leis 662/1949, 5.010/1966 (art. 62), 5.198/2008
 (estadual), 6.802/1980, 8.112/1990, 9.093/1995 e 14.759/2023.
 
@@ -31,9 +31,9 @@ Servidor Público; 02/11 Finados; 20/11 Consciência Negra; 08/12 Dia da Justiç
 INCONSISTÊNCIA DO PRÓPRIO ATO — Dia do Servidor Público
 =============================================================================
 Os "considerandos" falam do feriado de 28/10/2026 (quarta-feira); a TABELA do
-art. 1º lista 30/10 (sexta-feira). Este módulo segue a TABELA (30/10 é não
-útil; 28/10 é útil) e emite aviso sempre que o prazo toca 28/10. Se o TRT1
-publicar retificação, ajuste `_AJUSTES`.
+art. 1º lista 30/10 (sexta-feira). Decisão do usuário (13/10/2026): vale 28/10.
+Este módulo trata 28/10 como NÃO útil e 30/10 como útil, e emite aviso sempre que
+o prazo toca 28/10 ou 30/10 (conferir no calendário do TRT1 / retificação).
 
 =============================================================================
 O QUE ESTE MÓDULO NÃO COBRE
@@ -73,7 +73,7 @@ _FIXOS = (
 
 # Ajustes do Ato do ano: o que a tabela traz e as regras gerais não derivam.
 _AJUSTES: dict[int, dict[date, str]] = {
-    2026: {date(2026, 10, 30): "Dia do Servidor Público (tabela do Ato 109/2025; Lei 8.112/1990)"},
+    2026: {date(2026, 10, 28): "Dia do Servidor Público (considerandos do Ato 109/2025; Lei 8.112/1990)"},
 }
 
 _CAPITAL_FIXOS = ((1, 20, "São Sebastião (município do Rio de Janeiro)"),)
@@ -135,7 +135,7 @@ _TXT_ART_2 = (
 )
 _TXT_SERVIDOR = (
     "O Ato 109/2025 cita 28/10 (Dia do Servidor) nos considerandos, mas lista 30/10 na "
-    "tabela. Este calendário trata 30/10 como não útil e 28/10 como útil: confirme no "
+    "tabela. Este calendário trata 28/10 como não útil e 30/10 como útil: confirme no "
     "calendário do TRT1."
 )
 
@@ -146,6 +146,7 @@ def ressalvas(ano: int) -> dict[date, str]:
         return {}
     r = {date(2026, m, d): _TXT_ART_2 for m, d in ((4, 20), (6, 5), (8, 10), (12, 7))}
     r[date(2026, 10, 28)] = _TXT_SERVIDOR
+    r[date(2026, 10, 30)] = _TXT_SERVIDOR
     return r
 
 

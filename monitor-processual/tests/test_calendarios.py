@@ -24,7 +24,7 @@ _TRT1_2026 = {
     date(2026, 4, 21), date(2026, 4, 23),                                     # Tiradentes; São Jorge
     date(2026, 5, 1), date(2026, 6, 4),                                       # Trabalho; Corpus Christi
     date(2026, 8, 11),                                                        # Instituição dos Cursos Jurídicos
-    date(2026, 9, 7), date(2026, 10, 12), date(2026, 10, 30),                 # Independência; Aparecida; Servidor
+    date(2026, 9, 7), date(2026, 10, 12), date(2026, 10, 28),                 # Independência; Aparecida; Servidor
     date(2026, 11, 2), date(2026, 11, 20),                                    # Finados; Consciência Negra
     date(2026, 12, 8),                                                        # Dia da Justiça
     *(date(2026, 12, d) for d in (21, 22, 23, 24, 25, 28, 29, 30, 31)),       # recesso 20 a 31/12
@@ -58,14 +58,14 @@ def test_trt1_recesso_vai_ate_06_01_e_dia_07_e_util():
     assert eh_dia_util(date(2027, 1, 20), tribunal="TRT1")  # sem aplicar_recesso
 
 
-def test_trt1_dia_do_servidor_segue_a_tabela_e_avisa_sobre_28_10():
-    assert eh_dia_util(date(2026, 10, 28), tribunal="TRT1")
-    assert not eh_dia_util(date(2026, 10, 30), tribunal="TRT1")
-    # ter 27/10, 5 úteis: pub qua 28/10, início qui 29/10; 30/10 e 02/11 não úteis
-    # -> 29/10 (1), 03/11 (2), 04/11 (3), 05/11 (4), 06/11 (5)
+def test_trt1_dia_do_servidor_e_28_10_por_decisao_do_usuario_e_avisa():
+    assert not eh_dia_util(date(2026, 10, 28), tribunal="TRT1")
+    assert eh_dia_util(date(2026, 10, 30), tribunal="TRT1")
+    # ter 27/10, 5 úteis: pub qui 29/10 (28/10 não útil), início sex 30/10;
+    # 30/10 (1), 03/11 (2; 02/11 Finados), 04/11 (3), 05/11 (4), 06/11 (5)
     r = calcular_prazo(date(2026, 10, 27), 5, tribunal="TRT1")
     assert (r["data_publicacao"], r["data_inicio_prazo"], r["data_limite"]) == (
-        date(2026, 10, 28), date(2026, 10, 29), date(2026, 11, 6))
+        date(2026, 10, 29), date(2026, 10, 30), date(2026, 11, 6))
     assert any("28/10/2026" in a and "30/10" in a for a in r["avisos"])
 
 
@@ -95,7 +95,7 @@ def test_dias_em_que_trt1_e_tjrj_divergem():
     so_tjrj = [date(2026, 2, 13), date(2026, 2, 27), date(2026, 4, 24), date(2026, 6, 5), date(2026, 6, 29)]
     for d in so_tjrj:  # atos do TJRJ que o TRT1 não tem
         assert not eh_dia_util(d, tribunal="TJRJ") and eh_dia_util(d, tribunal="TRT1"), d
-    so_trt1 = [date(2026, 4, 1), date(2026, 10, 30), date(2026, 12, 21), date(2026, 1, 2)]
+    so_trt1 = [date(2026, 4, 1), date(2026, 10, 28), date(2026, 12, 21), date(2026, 1, 2)]
     for d in so_trt1:  # feriados do TRT1 que o TJRJ (sem aplicar recesso) trata como úteis
         assert eh_dia_util(d, tribunal="TJRJ") and not eh_dia_util(d, tribunal="TRT1"), d
     ambos = [date(2026, 4, 2), date(2026, 4, 3), date(2026, 4, 23), date(2026, 8, 11), date(2026, 12, 8), date(2026, 2, 18)]
