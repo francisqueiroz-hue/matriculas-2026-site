@@ -6,8 +6,9 @@ navegador: na primeira abertura do dia ela dispara, nesta ordem:
 
  1. importar   – traz do painel (arquivo do Drive) os processos que faltam na lista do monitor;
  2. coleta     – roda `run_daily.py` (DataJud, DJEN, e-mails), exceto se já rodou com sucesso hoje;
- 3. exportar   – gera `data/retrato_vigia.json` a partir do banco do monitor;
- 4. publicar   – copia o retrato para a pasta privada do Drive (a rotina Radar lê de lá).
+ 3. fonte      – registra quando o próprio DataJud atualizou cada processo (`core.datajud_fonte`);
+ 4. exportar   – gera `data/retrato_vigia.json` a partir do banco do monitor;
+ 5. publicar   – copia o retrato para a pasta privada do Drive (a rotina Radar lê de lá).
 
 Segurança (o servidor executa programas no computador, então é restrito):
 * escuta só em 127.0.0.1; recusa pedidos cujo Host não seja local (anti DNS rebinding);
@@ -176,6 +177,13 @@ def montar_etapas(base: Path, *, drive: Path | None, lista: Path | None, python:
             raise RuntimeError(f"run_daily.py terminou com código {proc.returncode}")
         return "coleta concluída"
 
+    def fonte_datajud() -> str:
+        proc = subprocess.run([python, "-m", "core.datajud_fonte", "--db", str(db)], cwd=str(base),
+                              capture_output=True, text=True, timeout=1800)
+        if proc.returncode != 0:
+            raise RuntimeError(f"datajud_fonte terminou com código {proc.returncode} (confira DATAJUD_API_KEY no .env)")
+        return "data da fonte registrada"
+
     def exportar() -> str:
         r = exportador_vigia.exportar(db)
         exportador_vigia.gravar(r, retrato)
@@ -193,6 +201,7 @@ def montar_etapas(base: Path, *, drive: Path | None, lista: Path | None, python:
     return [
         Etapa("importar", "Trazer processos novos do painel", importar, False, pular_importar),
         Etapa("coleta", "Consultar DataJud, DJEN e e-mails", coleta, False, coleta_ja_feita),
+        Etapa("fonte", "Registrar a atualização da fonte DataJud", fonte_datajud, False),
         Etapa("exportar", "Gerar o retrato do dia", exportar, True),
         Etapa("publicar", "Enviar o retrato ao Drive", publicar, True, pular_publicar),
     ]

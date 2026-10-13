@@ -259,3 +259,34 @@ def test_sem_movimentacao_ou_sem_coleta_nao_inventa_datajud(db):
     docs = {p["documento"]["numero"]: p["documento"] for p in ex.exportar(db, agora=AGORA)["processos"]}
     assert "datajud" not in docs[a]       # sem movimentação
     assert "datajud" not in docs[b]       # movimentação, mas nenhuma coleta com sucesso registrada
+
+
+def test_fonte_atrasada_vira_situacao_e_auditoria(db):
+    n = _numero(18)
+    _acomp(db, n)
+    _sql(db, "insert into movimentacoes (numero_processo,data_movimento,codigo,descricao,criado_em) values (?,?,?,?,?)",
+         n, "2026-08-12T12:04:56", 2, "Conclusos", "2026-10-06 06:00:00")
+    _sql(db, "insert into execucoes (executado_em,sucesso) values (?,?)", "2026-10-13 08:00:00", 1)
+    fonte = {n: {"atualizadoEm": "2026-09-13T23:02:50", "ultimoMovimento": "2026-08-12T12:04:56", "verificadoEm": "2026-10-13T08:30:00"}}
+    r = ex.exportar(db, agora=AGORA, fonte=fonte)
+    dj = r["processos"][0]["documento"]["datajud"]
+    assert dj["atualizadoEm"] == "2026-09-13T23:02:50" and dj["ultimaVerificacao"] == "2026-10-13T08:00:00"
+    assert "13/09/2026" in dj["situacao"] and "Confira nos autos" in dj["situacao"]
+    assert [a["tipo"] for a in r["auditoria"]] == ["datajud_fonte_atrasada"]
+    # o contrato do painel também acusa
+    assert [p["tipo"] for p in vc.auditar([r["processos"][0]["documento"]], agora=AGORA)
+            if p["tipo"].startswith("datajud")] == ["datajud_fonte_atrasada"]
+
+
+def test_fonte_recente_nao_alerta_e_arquivo_ausente_nao_quebra(db):
+    n = _numero(19)
+    _acomp(db, n)
+    fonte = {n: {"atualizadoEm": "2026-10-12T10:00:00", "ultimoMovimento": None, "verificadoEm": "2026-10-13T08:30:00"}}
+    r = ex.exportar(db, agora=AGORA, fonte=fonte)
+    dj = r["processos"][0]["documento"]["datajud"]
+    assert dj["atualizadoEm"] == "2026-10-12T10:00:00" and "situacao" not in dj and r["auditoria"] == []
+    assert ex.ler_fonte(db) == {}                                  # sem datajud_fonte.json ao lado do banco
+    (db.parent / "datajud_fonte.json").write_text("{ lixo", encoding="utf-8")
+    assert ex.ler_fonte(db) == {}
+    (db.parent / "datajud_fonte.json").write_text(json.dumps({"processos": {n: {"atualizadoEm": "2026-10-12T10:00:00"}}}), encoding="utf-8")
+    assert ex.ler_fonte(db)[n]["atualizadoEm"] == "2026-10-12T10:00:00"

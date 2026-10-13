@@ -208,6 +208,8 @@ def test_etapas_reais_exportar_e_publicar(tmp_path):
     con.commit(); con.close()
     drive = tmp_path / "drive"; drive.mkdir()
     etapas = {e.nome: e for e in g.montar_etapas(base, drive=drive, lista=None)}
+    assert [e.nome for e in g.montar_etapas(base, drive=drive, lista=None)] == ["importar", "coleta", "fonte", "exportar", "publicar"]
+    assert etapas["fonte"].critica is False
     assert etapas["importar"].pular_se() is not None                      # sem lista configurada
     assert etapas["coleta"].pular_se() is None                            # nenhuma execução hoje
     assert "0 processo(s)" in etapas["exportar"].executar()

@@ -264,4 +264,11 @@ def auditar(docs: Iterable[dict], *, agora: datetime | None = None, max_dias_dat
                 idade = (agora - ver).days
                 if idade > max_dias_datajud:
                     add(d, "datajud_desatualizado", f"última verificação há {idade} dias")
+            # frescor da FONTE (quando o próprio DataJud atualizou), distinto da data da nossa coleta
+            try:
+                fonte = datetime.fromisoformat(str(dj.get("atualizadoEm"))[:19]) if dj.get("atualizadoEm") else None
+            except ValueError:
+                fonte = None
+            if fonte is not None and (agora - fonte).days > max_dias_datajud:
+                add(d, "datajud_fonte_atrasada", f"DataJud sem atualizar há {(agora - fonte).days} dias")
     return problemas

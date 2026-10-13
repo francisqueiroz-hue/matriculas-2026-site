@@ -99,9 +99,23 @@ def ler_capital(db: str | os.PathLike) -> set[str]:
         return set()
 
 
-def exportar(db: str | os.PathLike, *, agora: datetime | None = None, capital: set[str] | None = None) -> dict:
+LIMITE_FONTE_DIAS = 7
+
+
+def ler_fonte(db: str | os.PathLike) -> dict:
+    """`datajud_fonte.json` ao lado do banco (gerado por core.datajud_fonte); ausente = sem informação."""
+    try:
+        d = json.loads((Path(db).resolve().parent / "datajud_fonte.json").read_text(encoding="utf-8-sig"))
+        return d.get("processos", {}) if isinstance(d, dict) and isinstance(d.get("processos"), dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def exportar(db: str | os.PathLike, *, agora: datetime | None = None, capital: set[str] | None = None,
+             fonte: dict | None = None) -> dict:
     agora = (agora or datetime.now()).replace(microsecond=0)
     capital = ler_capital(db) if capital is None else capital
+    fonte = ler_fonte(db) if fonte is None else fonte
     corte = agora - timedelta(hours=HORAS_NOVIDADE)
     con = _abrir_somente_leitura(db)
     try:
@@ -216,6 +230,16 @@ def exportar(db: str | os.PathLike, *, agora: datetime | None = None, capital: s
                 "ultimaVerificacao": str(ultima_exec["executado_em"]).replace(" ", "T")[:19],
                 "fonte": "Monitor processual (DataJud/CNJ)",
             }
+        f = fonte.get(numero)
+        if f and f.get("atualizadoEm"):
+            dj = proc.setdefault("datajud", {"fonte": "Monitor processual (DataJud/CNJ)"})
+            dj["atualizadoEm"] = f["atualizadoEm"]
+            quando = _momento(f["atualizadoEm"])
+            if quando and (agora - quando).days > LIMITE_FONTE_DIAS:
+                dias = (agora - quando).days
+                dj["situacao"] = (f"Fonte DataJud sem atualização desde {quando:%d/%m/%Y} ({dias} dias): "
+                                  "pode haver andamentos não refletidos. Confira nos autos.")
+                auditoria.append({"tipo": "datajud_fonte_atrasada", "detalhe": f"{numero}: {dias} dias sem atualização na fonte"})
         if datas_mov:
             ult = next(m for m in mvs if _data(m.get("data_movimento")) == max(datas_mov))
             proc["ultimaMovData"] = max(datas_mov).isoformat()

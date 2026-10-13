@@ -1,7 +1,7 @@
 # Configura a automação diária do Vigia no Windows.
 #
 #  1) Tarefa "MonitorProcessual - Atualizacao": passa a ter, nesta ordem,
-#       importar do painel -> run_daily.py -> exportador -> cópia para o Drive.
+#       importar do painel -> run_daily.py -> fonte DataJud -> exportador -> cópia para o Drive.
 #     (idempotente: não duplica ações; faz backup do XML da tarefa antes de mexer)
 #  2) Tarefa "VigiaGatilhoLocal": ao entrar no Windows, inicia a página local
 #     http://127.0.0.1:8765/ , que atualiza o dia na primeira abertura do navegador.
@@ -49,6 +49,7 @@ $t = Get-ScheduledTask -TaskName $Tarefa
 $acoes = @($t.Actions)
 $temImport = $acoes | Where-Object { $_.Arguments -like "*core.importar_painel*" }
 $temExport = $acoes | Where-Object { $_.Arguments -like "*core.exportador_vigia*" }
+$temFonte  = $acoes | Where-Object { $_.Arguments -like "*core.datajud_fonte*" }
 $temCopia  = $acoes | Where-Object { $_.Arguments -like "*$NomePasta*" }
 $novas = @()
 if (-not $temImport) {
@@ -63,6 +64,16 @@ if (-not $temCopia) {
     $origem = Join-Path $Monitor "data\retrato_vigia.json"
     $argCop = "-NoProfile -Command Copy-Item -LiteralPath '$origem' -Destination '$pasta\retrato_vigia.json' -Force"
     $final += New-ScheduledTaskAction -Execute "powershell.exe" -Argument $argCop -WorkingDirectory $Monitor
+}
+if (-not $temFonte) {
+    # registra a atualização da fonte DataJud logo ANTES do exportador
+    $acaoFonte = New-ScheduledTaskAction -Execute $py -Argument "-m core.datajud_fonte --db data\monitor.db" -WorkingDirectory $Monitor
+    $ordenado = @()
+    foreach ($a in $final) {
+        if ($a.Arguments -like "*core.exportador_vigia*") { $ordenado += $acaoFonte }
+        $ordenado += $a
+    }
+    $final = $ordenado
 }
 if ($final.Count -ne $acoes.Count) {
     Set-ScheduledTask -TaskName $Tarefa -Action $final | Out-Null
