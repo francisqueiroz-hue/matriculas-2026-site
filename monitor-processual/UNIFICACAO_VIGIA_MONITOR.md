@@ -77,3 +77,11 @@ Os valores de `tipo_contagem` do classificador (`"uteis"`, `"corridos"` ou nada)
 
 ## Exportador do monitor (fase 3b)
 `core/exportador_vigia.py` lê `data/monitor.db` (somente leitura) e grava `data/retrato_vigia.json` com, por processo: `documento` (contrato do painel + bloco `prazo` recalculado pelo calendário do tribunal), `retrato` (`novidade` nas últimas 26 h, `termos_sensiveis`, `prazos_abertos`, `ultimo_andamento_data`) e `comunicacoes` (texto truncado). Divergência entre o prazo gravado no banco e o recalculado vai para `auditoria` (vale o recalculado). Uso: `python -m core.exportador_vigia --db data/monitor.db --saida data/retrato_vigia.json`. O arquivo tem dados de clientes: fica em `data/`, nunca no git.
+
+## Fase 4 (13/10/2026): automação ponta a ponta
+- **TJSP** com perfil próprio (Provimentos CSM 2.813/2025 e 2.845/2026); outras siglas ainda usam a reserva nacional com aviso.
+- **`capital`**: `data\configuracao_vigia.json` com `{"capital": ["<CNJ>", ...]}`; o exportador recalcula o prazo com o feriado da capital e registra divergência quando o banco difere.
+- **Ids do painel**: os 14 documentos migraram para `cnj_<20 dígitos>` (originais arquivados em `processos_arquivo`).
+- **Painel → monitor**: o Radar grava `numeros_painel.json` no Drive (passo 8d); `core/importar_painel.py` acrescenta ao `processos.json` os números que faltam (limite de 10 por execução, backup, só inclusão).
+- **Monitor → painel**: `run_daily` → exportador → cópia do `retrato_vigia.json` para o Drive → Radar (passo 8c, modo conferência até 15/10).
+- **Gatilho ao abrir o navegador**: `core/gatilho_diario.py` serve `http://127.0.0.1:8765/` (só local), que roda a atualização do dia uma vez. Instalação: `instalacao/configurar_automacao.ps1`.
