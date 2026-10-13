@@ -67,3 +67,10 @@ Os valores de `tipo_contagem` do classificador (`"uteis"`, `"corridos"` ou nada)
 - Tribunal sem perfil (ex.: TJSP) usa o calendário nacional de reserva e **sempre** avisa: nunca confie no vencimento sem conferir.
 - O TRT1 tem uma inconsistência no próprio ato (Dia do Servidor em 28/10 ou 30/10): o cálculo avisa quando toca 28/10.
 - Informativos do TJRJ não substituem o DJERJ; calendário de 2027 ainda sem atos.
+
+## Fase 3 — camada Claude (AJEAP em execução + minutas)
+- **Lógica determinística:** `core/vigia_analise.py` (31 testes) decide *quando* reanalisar (prazo em risco, sem AJEAP, novidade, termo sensível, movimento posterior, análise antiga com prazo aberto), limita a fila a 5 por execução (menor prazo primeiro), valida o bloco `ajeap` e registra minutas.
+- **Skill `claude/skills/vigia-ajeap/`:** protocolo AJEAP (8 etapas, 3 cenários, verificação de jurisprudência) + modelo de minuta. Minutas são sempre **RASCUNHO** com cabeçalho "NÃO PROTOCOLAR"; Claude nunca protocola nem envia.
+- **Rotina em nuvem** "Vigia — AJEAP e minutas" (08:23, horário de Brasília): prompt-fonte em `claude/rotina_ajeap_vigia_prompt.txt`. Em **modo conferência até 15/10/2026** (não grava); grava a partir de 16/10/2026, com `if_version` e higiene reversível (`processos_arquivo`).
+- **Sem conectores:** na ausência do Claude Docs, o texto da minuta vai no campo `texto` do painel (limite 30.000 caracteres).
+- **Pendente:** exportador do monitor (`prazos_abertos`, `novidade`, `intimacoes`) — depende do schema do `monitor.db`; atualização do prompt do Radar (ids `cnj_`) e do artefato (renderizar `prazo`/`minutas`).
