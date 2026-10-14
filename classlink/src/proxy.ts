@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ACCESS_COOKIE, verifyAccessToken } from "@/lib/auth";
+import { caminhoParaRenovar } from "@/lib/renovacao-sessao";
 
 export async function proxy(request: NextRequest) {
   const token = request.cookies.get(ACCESS_COOKIE)?.value;
@@ -10,9 +11,9 @@ export async function proxy(request: NextRequest) {
   const isLoginRoute = pathname === "/login";
 
   if (isDashboardRoute && !session) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    // O token de acesso dura 15 min; quem tem sessão (refresh token válido) é renovado em
+    // /api/auth/renovar e volta para esta página. Sem refresh válido, ali mesmo vai ao login.
+    return NextResponse.redirect(new URL(caminhoParaRenovar(pathname, request.nextUrl.search), request.url));
   }
 
   if (isLoginRoute && session) {
