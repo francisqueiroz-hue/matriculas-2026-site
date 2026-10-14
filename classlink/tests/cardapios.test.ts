@@ -57,3 +57,23 @@ describe("conteúdo do cardápio", () => {
     expect(tituloCardapio("2026-10-12", "Maternal")).toContain("— Maternal");
   });
 });
+
+describe("dia sem cardápio (feriado)", () => {
+  it("aparece no Mural com a nota no lugar das refeições", () => {
+    const conteudo = {
+      refeicoes: ["Almoço"],
+      itens: { seg: ["Arroz"], ter: ["Arroz"], qua: ["Arroz"], qui: [""], sex: ["Arroz"] },
+      semCardapio: { qui: "Feriado" },
+    };
+    const t = textoCardapio("2026-10-12", conteudo);
+    expect(t).toContain("Quinta (15/10)\nFeriado — sem cardápio neste dia");
+    expect(t).toContain("Quarta (14/10)");
+    expect(conteudoCardapioSchema.safeParse(conteudo).success).toBe(true);
+  });
+
+  it("nota vazia não gera bloco e dia desconhecido é recusado", () => {
+    const base = { refeicoes: ["Almoço"], itens: { seg: ["A"], ter: [""], qua: [""], qui: [""], sex: [""] } };
+    expect(textoCardapio("2026-10-12", { ...base, semCardapio: { ter: "  " } })).not.toContain("Terça");
+    expect(conteudoCardapioSchema.safeParse({ ...base, semCardapio: { dom: "x" } }).success).toBe(false);
+  });
+});
