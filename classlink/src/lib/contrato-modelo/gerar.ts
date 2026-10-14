@@ -1,4 +1,5 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
+import { ErroDeUsuario } from "@/lib/erros";
 import { CLAUSULAS_2027 } from "./texto-2027";
 import { LOGO_ESPACO_KIDS_PNG, LOGO_INSTITUTO_FOKUS_PNG } from "./logos";
 import {
@@ -298,7 +299,7 @@ function linhasPessoa(p: Pessoa, emBranco: boolean): [string, string][] {
 
 function preencher(texto: string, valores: Record<string, string>): string {
   return texto.replace(/\{\{(\w+)\}\}/g, (_, chave: string) => {
-    if (!(chave in valores)) throw new Error(`Campo do contrato sem valor: ${chave}`);
+    if (!(chave in valores)) throw new ErroDeUsuario(`Campo do contrato sem valor: ${chave}`);
     return ou(valores[chave], 14);
   });
 }
@@ -317,7 +318,7 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
   };
   const cfg = c.config;
   const periodo = c.periodo ? cfg.periodos.find((p) => p.chave === c.periodo) : undefined;
-  if (c.periodo && !periodo) throw new Error("Período do contrato não encontrado na configuração");
+  if (c.periodo && !periodo) throw new ErroDeUsuario("Período do contrato não encontrado na configuração");
   const temValores = c.parcelaBruta > 0;
   const v = calcularValores({ parcelaBruta: c.parcelaBruta, parcelaLiquida: c.parcelaLiquida, quantidade: cfg.parcelas.quantidade });
   const pedagogico = fam.pedagogicoMesmo || !fam.pedagogico ? fam.financeiro : fam.pedagogico;

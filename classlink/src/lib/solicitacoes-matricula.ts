@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { SolicitacaoMatriculaStatus, SolicitacaoMatriculaTipo } from "@prisma/client";
 import { normalizePhoneBR } from "@/lib/whatsapp";
+import { ErroDeUsuario } from "@/lib/erros";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
 
 /**
@@ -67,7 +68,7 @@ export const STATUS_LABEL: Record<SolicitacaoMatriculaStatus, string> = {
 /** Telefone salvo só com dígitos e DDI 55 — ex.: (21) 98765-4321 → 5521987654321. */
 export function normalizarTelefone(telefone: string): string {
   const normalizado = normalizePhoneBR(telefone);
-  if (!normalizado) throw new Error("Telefone inválido");
+  if (!normalizado) throw new ErroDeUsuario("Telefone inválido");
   return normalizado;
 }
 
