@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { normalizePhoneBR } from "@/lib/whatsapp";
+import { telefoneEmUso } from "@/lib/usuarios";
 import { avisosWhatsAppDisponiveis } from "@/lib/avisos-equipe";
 
 const atualizarSchema = z.object({
@@ -35,6 +36,9 @@ export async function PATCH(request: NextRequest) {
     if (body.telefone !== undefined && body.telefone !== "") {
       const normalizado = normalizePhoneBR(body.telefone);
       if (!normalizado) return NextResponse.json({ error: "Celular inválido. Use o DDD, ex.: (21) 98765-4321." }, { status: 400 });
+      if (await telefoneEmUso(normalizado, session.sub)) {
+        return NextResponse.json({ error: "Celular já cadastrado para outro usuário" }, { status: 409 });
+      }
       phone = normalizado;
     }
     if (body.avisosWhatsApp && !(phone && normalizePhoneBR(phone))) {

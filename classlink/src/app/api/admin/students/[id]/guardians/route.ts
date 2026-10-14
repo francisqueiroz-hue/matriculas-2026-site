@@ -6,6 +6,7 @@ import { handleApiError } from "@/lib/http";
 import { linkGuardianSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
 import { normalizePhoneBR, samePhoneBR } from "@/lib/whatsapp";
+import { telefoneEmUso } from "@/lib/usuarios";
 import { descreverEnvio, enviarAcessoPeloApp } from "@/lib/envio-acesso";
 import { responsaveisSemelhantes } from "@/lib/nomes-semelhantes";
 
@@ -22,7 +23,13 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
     const email = body.guardianEmail?.toLowerCase();
     // Nem toda família tem e-mail — quando não informado, o cadastro é feito só com
     // telefone (login também funciona por telefone, ver /api/auth/login).
-    const phone = body.guardianPhone ? normalizePhoneBR(body.guardianPhone) ?? body.guardianPhone : undefined;
+    // Telefone sempre padronizado (55 + DDD + número): o login por telefone compara exatamente.
+    // Um número inválido é recusado em vez de gravado como veio digitado.
+    let phone: string | undefined;
+    if (body.guardianPhone) {
+      phone = normalizePhoneBR(body.guardianPhone) ?? undefined;
+      if (!phone) return NextResponse.json({ error: "Celular inválido. Use o DDD, ex.: (21) 98765-4321." }, { status: 400 });
+    }
 
     let guardian = body.guardianId
       ? await prisma.user.findFirst({ where: { id: body.guardianId, schoolId: session.schoolId, role: "GUARDIAN", deletedAt: null } })
@@ -53,6 +60,18 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
           { status: 409 },
         );
       }
+    }
+
+    // O login por telefone procura um único usuário: o mesmo celular não pode estar em duas
+    // contas (de qualquer escola ou perfil). Vale também quando o responsável é criado com e-mail.
+    if (!guardian && phone && (await telefoneEmUso(phone))) {
+      return NextResponse.json(
+        {
+          error: "Este celular já está cadastrado para outro usuário. Se for a mesma pessoa, vincule o responsável que já existe.",
+          codigo: "CELULAR_EM_USO",
+        },
+        { status: 409 },
+      );
     }
 
     if (!guardian) {

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { samePhoneBR } from "@/lib/whatsapp";
+import { telefoneEmLista } from "@/lib/whatsapp";
 
 /**
  * Telefone já usado por outro usuário (ativo ou inativo, não excluído)? O login por
@@ -11,5 +11,5 @@ export async function telefoneEmUso(telefone: string, exceto?: string): Promise<
     where: { phone: { not: null }, deletedAt: null, ...(exceto ? { id: { not: exceto } } : {}) },
     select: { phone: true },
   });
-  return outros.some((o) => o.phone && samePhoneBR(o.phone, telefone));
+  return telefoneEmLista(telefone, outros.map((o) => o.phone));
 }
