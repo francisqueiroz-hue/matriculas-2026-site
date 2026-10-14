@@ -18,6 +18,11 @@ const baseLinks: NavLink[] = [
     icon: "M5 8a3 3 0 013-3h3l3-3v6l-3-3H8 M13 8h3l3 3v6l-3-3h-3",
   },
   {
+    href: "/dashboard/enquetes",
+    label: "Enquetes",
+    icon: "M9 11l3 3 8-8 M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9",
+  },
+  {
     href: "/dashboard/mensagens",
     label: "Mensagens",
     icon: "M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 20l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z",

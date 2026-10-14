@@ -116,6 +116,32 @@ export const createComunicadoSchema = z.object({
   prazoResposta: z.string().datetime().optional(),
 });
 
+export const createEnqueteSchema = z.object({
+  titulo: z.string().trim().min(1).max(200),
+  descricao: z.string().trim().max(3000).optional(),
+  audience: z.enum(["SCHOOL", "CLASS", "STUDENT"]),
+  classId: z.string().optional(),
+  alunoId: z.string().optional(),
+  // Anônima por padrão; "identificada" só quando a escola escolhe (ex.: reunião individual).
+  anonima: z.boolean().default(true),
+  prazo: z.string().datetime().optional(),
+  perguntas: z
+    .array(
+      z.object({
+        tipo: z.string().min(1).max(40),
+        texto: z.string().trim().min(1).max(500),
+        obrigatoria: z.boolean().default(true),
+        opcoes: z.unknown().optional(),
+      }),
+    )
+    .min(1, "Inclua ao menos uma pergunta")
+    .max(30, "No máximo 30 perguntas por enquete"),
+});
+
+export const responderEnqueteSchema = z.object({
+  respostas: z.record(z.string(), z.unknown()),
+});
+
 export const responderComunicadoSchema = z.object({
   alunoId: z.string().min(1),
   resposta: z.enum(["AUTORIZADO", "NAO_AUTORIZADO", "CONFIRMADO", "NAO_COMPARECERA", "LIDO"]),
