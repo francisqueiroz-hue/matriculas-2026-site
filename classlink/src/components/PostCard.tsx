@@ -166,6 +166,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
       )}
 
       {post.mediaUrl && post.mediaType === "image" && (
+        // URL assinada e temporária do Firebase Storage: o otimizador do Next não a reaproveita.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={post.mediaUrl} alt={`Foto do aviso: ${current.title}`} className="mt-3 max-h-96 w-full rounded-lg object-cover" />
       )}

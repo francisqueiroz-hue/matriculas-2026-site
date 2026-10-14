@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { apiJson } from "@/lib/api-client";
 import { destinoPosLogin } from "@/lib/destino-pos-login";
 import { linkPedirAcesso } from "@/lib/whatsapp-escola";
+import { LogoEspacoKids, LogoInstitutoFokus } from "@/components/Logos";
 
 function LoginForm() {
   const router = useRouter();
@@ -34,9 +35,9 @@ function LoginForm() {
     <div className="flex min-h-screen flex-1 items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-4 flex items-center justify-center gap-4">
-          <img src="/logos/logo-espaco-kids.png" alt="Espaço Kids" className="h-16 w-auto object-contain" />
+          <LogoEspacoKids className="h-16" />
           <span className="h-12 w-px bg-slate-200 dark:bg-slate-800" />
-          <img src="/logos/logo-instituto-fokus.png" alt="Instituto Fokus" className="h-16 w-auto object-contain" />
+          <LogoInstitutoFokus className="h-16" />
         </div>
         <p className="mb-6 text-center text-sm text-slate-500">Comunicação entre escola e família</p>
 

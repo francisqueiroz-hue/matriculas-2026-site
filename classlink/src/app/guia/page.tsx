@@ -1,4 +1,5 @@
 import { linkPedirAcesso } from "@/lib/whatsapp-escola";
+import { LogoEspacoKids, LogoInstitutoFokus } from "@/components/Logos";
 
 const AREAS = [
   {
@@ -59,9 +60,9 @@ export default function GuiaPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
       <div className="mb-8 flex items-center gap-4">
-        <img src="/logos/logo-espaco-kids.png" alt="Espaço Kids" className="h-14 w-auto object-contain" />
+        <LogoEspacoKids className="h-14" />
         <span className="h-10 w-px bg-slate-200" />
-        <img src="/logos/logo-instituto-fokus.png" alt="Instituto Fokus" className="h-14 w-auto object-contain" />
+        <LogoInstitutoFokus className="h-14" />
       </div>
 
       <div className="mb-10 text-center">
