@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { apiJson } from "@/lib/api-client";
 import { NUMERO_WHATSAPP_ESCOLA_FORMATADO, linkPedirAcesso } from "@/lib/whatsapp-escola";
+import { LogoEspacoKids, LogoInstitutoFokus } from "@/components/Logos";
 
 export default function EsqueciSenhaPage() {
   const [identifier, setIdentifier] = useState("");
@@ -25,9 +26,9 @@ export default function EsqueciSenhaPage() {
     <div className="flex min-h-screen flex-1 items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-4 flex items-center justify-center gap-4">
-          <img src="/logos/logo-espaco-kids.png" alt="Espaço Kids" className="h-16 w-auto object-contain" />
+          <LogoEspacoKids className="h-16" />
           <span className="h-12 w-px bg-slate-200" />
-          <img src="/logos/logo-instituto-fokus.png" alt="Instituto Fokus" className="h-16 w-auto object-contain" />
+          <LogoInstitutoFokus className="h-16" />
         </div>
 
         <h1 className="mb-1 text-center text-lg font-bold">Esqueci minha senha</h1>

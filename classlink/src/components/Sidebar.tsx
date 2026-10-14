@@ -7,6 +7,7 @@ import { NavIcon } from "@/components/NavIcon";
 import { apiFetch } from "@/lib/api-client";
 import { getNavLinks, useComunicadosPendentes } from "@/lib/nav-links";
 import { useMensagensNaoLidas } from "@/components/AvisosMensagens";
+import { LogoEspacoKids, LogoInstitutoFokus } from "@/components/Logos";
 
 export function Sidebar() {
   const user = useCurrentUser();
@@ -26,8 +27,8 @@ export function Sidebar() {
   return (
     <aside className="hidden sm:sticky sm:top-0 sm:flex sm:h-screen sm:w-60 sm:shrink-0 sm:flex-col sm:border-r sm:border-slate-200 sm:bg-white">
       <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-4">
-        <img src="/logos/logo-espaco-kids.png" alt="Espaço Kids" className="h-8 w-auto object-contain" />
-        <img src="/logos/logo-instituto-fokus.png" alt="Instituto Fokus" className="h-8 w-auto object-contain" />
+        <LogoEspacoKids className="h-8" />
+        <LogoInstitutoFokus className="h-8" />
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">

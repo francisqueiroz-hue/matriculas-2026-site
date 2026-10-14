@@ -8,6 +8,7 @@ import { NavIcon } from "@/components/NavIcon";
 import { apiFetch } from "@/lib/api-client";
 import { getNavLinks, useComunicadosPendentes } from "@/lib/nav-links";
 import { useMensagensNaoLidas } from "@/components/AvisosMensagens";
+import { LogoEspacoKids, LogoInstitutoFokus } from "@/components/Logos";
 
 export function Navbar() {
   const user = useCurrentUser();
@@ -30,8 +31,8 @@ export function Navbar() {
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur sm:hidden">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <img src="/logos/logo-espaco-kids.png" alt="Espaço Kids" className="h-8 w-auto object-contain" />
-          <img src="/logos/logo-instituto-fokus.png" alt="Instituto Fokus" className="h-8 w-auto object-contain" />
+          <LogoEspacoKids className="h-8" />
+          <LogoInstitutoFokus className="h-8" />
         </Link>
         <button
           type="button"

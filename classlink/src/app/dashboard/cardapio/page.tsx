@@ -82,6 +82,7 @@ function VerCardapio({ c }: { c: Cardapio }) {
       </div>
       {c.observacoes && <p className="text-sm text-slate-600 dark:text-slate-300">Observações: {c.observacoes}</p>}
       {c.imagemUrl && (
+        // URL assinada e temporária do Firebase Storage: o otimizador do Next não a reaproveita.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={c.imagemUrl} alt={`Cardápio da semana ${rotuloSemana(c.semanaInicio)}`} className="max-h-96 rounded-lg border border-slate-200" />
       )}
