@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         _count: { select: { reads: true } },
         reads: { where: { userId: session.sub }, select: { id: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 20,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
     });
