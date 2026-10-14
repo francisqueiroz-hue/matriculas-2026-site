@@ -42,9 +42,11 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium">E-mail ou telefone</label>
+            <label htmlFor="login-identificador" className="mb-1 block text-sm font-medium">E-mail ou telefone</label>
             <input
+              id="login-identificador"
               type="text"
+              autoComplete="username"
               required
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
@@ -53,9 +55,11 @@ function LoginForm() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Senha</label>
+            <label htmlFor="login-senha" className="mb-1 block text-sm font-medium">Senha</label>
             <input
+              id="login-senha"
               type="password"
+              autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -64,7 +68,11 @@ function LoginForm() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-red-600">
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"
