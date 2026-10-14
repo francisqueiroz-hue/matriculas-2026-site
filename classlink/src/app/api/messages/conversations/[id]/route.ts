@@ -10,6 +10,7 @@ import { sendMessageSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { isEmailConfigured, sendEmailMessage } from "@/lib/email";
+import { MENSAGEM_JANELA_FECHADA, janelaWhatsApp } from "@/lib/canal-envio";
 import { SELECT_PESSOA, nomeParaQuemVe, pessoaParaQuemVe } from "@/lib/nome-institucional";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
@@ -24,7 +25,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
         where: { id },
         include: {
           staff: { select: SELECT_PESSOA },
-          guardian: { select: { id: true, name: true, phone: true, email: true } },
+          guardian: { select: { id: true, name: true, phone: true, email: true, whatsappUltimaMensagemEm: true } },
         },
       }),
       prisma.message.findMany({
@@ -41,8 +42,16 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
 
     // Família: a equipe aparece pelo cargo/nome institucional; e-mail e telefone da família
     // só fazem sentido para a equipe.
+    // Só a equipe precisa saber se o WhatsApp ainda entrega texto livre (janela de 24h); a família não vê isso.
+    const { whatsappUltimaMensagemEm, ...guardianPublico } = conversation.guardian;
+    const souEquipe = session.sub === conversation.staffId;
     return NextResponse.json({
-      conversation: { ...conversation, staff: pessoaParaQuemVe(conversation.staff, session.role) },
+      conversation: {
+        ...conversation,
+        guardian: guardianPublico,
+        staff: pessoaParaQuemVe(conversation.staff, session.role),
+        ...(souEquipe && { janelaWhatsApp: janelaWhatsApp(whatsappUltimaMensagemEm) }),
+      },
       messages: messages.map((m) => ({ ...m, sender: pessoaParaQuemVe(m.sender, session.role) })),
     });
   } catch (error) {
@@ -66,9 +75,17 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     let externalId: string | undefined;
     if (canalEfetivo === "WHATSAPP") {
       if (!isWhatsAppConfigured()) return NextResponse.json({ error: "Integração com WhatsApp não configurada" }, { status: 400 });
-      const guardian = await prisma.user.findUniqueOrThrow({ where: { id: conversation.guardianId }, select: { phone: true } });
+      const guardian = await prisma.user.findUniqueOrThrow({
+        where: { id: conversation.guardianId },
+        select: { phone: true, whatsappUltimaMensagemEm: true },
+      });
       const phone = guardian.phone ? normalizePhoneBR(guardian.phone) : null;
       if (!phone) return NextResponse.json({ error: "Responsável não tem telefone cadastrado" }, { status: 400 });
+      // Fora da janela de 24h a Meta aceita o envio e depois descarta: a mensagem ficaria como
+      // "enviada pelo WhatsApp" sem a família nunca receber. Melhor recusar e explicar.
+      if (!janelaWhatsApp(guardian.whatsappUltimaMensagemEm).aberta) {
+        throw new ErroDeUsuario(MENSAGEM_JANELA_FECHADA, 409);
+      }
       const sent = await sendWhatsAppTextMessage(phone, body).catch((err: unknown) => {
         console.error("conversa: falha ao enviar WhatsApp", err);
         throw new ErroDeUsuario("Não foi possível enviar pelo WhatsApp. Confira o número do responsável e a integração.", 502);
