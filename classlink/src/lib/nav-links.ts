@@ -77,6 +77,11 @@ const adminLinks: NavLink[] = [
     label: "Matrículas",
     icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2 M9 5a2 2 0 002 2h2a2 2 0 002-2 M9 5a2 2 0 012-2h2a2 2 0 012 2 M9 14l2 2 4-4",
   },
+  {
+    href: "/dashboard/admin/rematricula",
+    label: "Rematrícula",
+    icon: "M4 12a8 8 0 0114-5.3 M18 3v4h-4 M20 12a8 8 0 01-14 5.3 M6 21v-4h4",
+  },
   { href: "/dashboard/admin/contratos", label: "Contratos", icon: "M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z M14 3v5h5 M9 13h6 M9 17h4" },
   {
     href: "/dashboard/admin/financeiro",
