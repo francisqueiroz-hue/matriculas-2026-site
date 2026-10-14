@@ -21,7 +21,24 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/posts/[id]/
       orderBy: { readAt: "asc" },
     });
 
-    return NextResponse.json({ reads });
+    // Quem deveria ter visto e ainda não abriu: responsáveis ativos da turma (ou da escola toda).
+    const destinatarios = await prisma.user.findMany({
+      where: {
+        schoolId: session.schoolId,
+        role: "GUARDIAN",
+        active: true,
+        deletedAt: null,
+        studentLinks: {
+          some: { student: { deletedAt: null, ...(post.audience === "CLASS" && post.classId ? { classId: post.classId } : {}) } },
+        },
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+    const leram = new Set(reads.map((r) => r.user.id));
+    const pendentes = destinatarios.filter((d) => !leram.has(d.id));
+
+    return NextResponse.json({ reads, pendentes });
   } catch (error) {
     return handleApiError(error);
   }
