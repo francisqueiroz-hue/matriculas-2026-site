@@ -109,6 +109,7 @@ model School {
   cardapios             Cardapio[]
   events                Event[]
   comunicados           Comunicado[]
+  enquetes              Enquete[]
   boletos               Boleto[]
   disciplinas           Disciplina[]
   teamConversations     TeamConversation[]
@@ -185,6 +186,9 @@ model User {
   comunicadosCriados  Comunicado[]         @relation("ComunicadoAuthor")
   respostasComunicado RespostaComunicado[] @relation("RespostaResponsavel")
   comunicadoLeituras  ComunicadoLeitura[]
+  enquetesCriadas     Enquete[]            @relation("EnqueteAuthor")
+  enqueteParticipacoes EnqueteParticipacao[]
+  enqueteEnvios       EnqueteEnvio[]
   notasLancadas       Nota[]               @relation("NotaLancadaPor")
 
   // Responsável: rematrículas confirmadas pelo aviso do painel
@@ -249,6 +253,7 @@ model Class {
   cardapios   Cardapio[]
   events      Event[]
   comunicados Comunicado[]
+  enquetes    Enquete[]
 
   @@index([schoolId])
 }
@@ -288,6 +293,7 @@ model Student {
   boletos                Boleto[]
   notas                  Nota[]
   comunicadosIndividuais Comunicado[]
+  enquetesIndividuais    Enquete[]
   contratos              Contrato[]
 
   @@index([schoolId])
@@ -842,4 +848,100 @@ model Cardapio {
 enum StatusCardapio {
   AGENDADO
   PUBLICADO
+}
+
+// ─── Enquetes (pesquisas de satisfação e outras consultas às famílias) ───
+
+// Pesquisa dirigida à escola toda, a uma turma ou a um aluno (aos responsáveis dele), no mesmo
+// modelo de público dos comunicados.
+model Enquete {
+  id          String       @id @default(cuid())
+  titulo      String
+  descricao   String?
+  audience    PostAudience
+  // Anônima por padrão: o sistema registra QUE a família respondeu, mas não liga a pessoa às respostas.
+  anonima     Boolean      @default(true)
+  prazo       DateTime?
+  encerradaEm DateTime?
+
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId String?
+
+  aluno   Student? @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  alunoId String?
+
+  criadoPor   User   @relation("EnqueteAuthor", fields: [criadoPorId], references: [id], onDelete: Cascade)
+  criadoPorId String
+
+  dataCriacao DateTime @default(now())
+
+  perguntas     EnquetePergunta[]
+  participacoes EnqueteParticipacao[]
+  envios        EnqueteEnvio[]
+
+  @@index([schoolId])
+  @@index([classId])
+  @@index([alunoId])
+}
+
+// "tipo" é texto (e não enum do banco) de propósito: novos tipos de pergunta entram só no código
+// (src/lib/enquetes.ts), sem migração. "opcoes" guarda a configuração do tipo (ex.: lista de escolhas).
+model EnquetePergunta {
+  id         String  @id @default(cuid())
+  enquete    Enquete @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  enqueteId  String
+  ordem      Int
+  tipo       String
+  texto      String
+  obrigatoria Boolean @default(true)
+  opcoes     Json?
+
+  itens EnqueteItem[]
+
+  @@index([enqueteId])
+}
+
+// Controle de quem já respondeu (uma por responsável). NÃO aponta para o envio: é isso que
+// preserva o anonimato.
+model EnqueteParticipacao {
+  id          String   @id @default(cuid())
+  enquete     Enquete  @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  enqueteId   String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  respondidoEm DateTime @default(now())
+
+  @@unique([enqueteId, userId])
+  @@index([enqueteId])
+}
+
+// Um conjunto de respostas. Em enquete anônima, userId e respondidoEm ficam nulos e o id é
+// aleatório (uuid), sem horário embutido, para não permitir cruzar com a participação.
+model EnqueteEnvio {
+  id           String    @id @default(uuid())
+  enquete      Enquete   @relation(fields: [enqueteId], references: [id], onDelete: Cascade)
+  enqueteId    String
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId       String?
+  respondidoEm DateTime?
+
+  itens EnqueteItem[]
+
+  @@index([enqueteId])
+}
+
+model EnqueteItem {
+  id         String          @id @default(cuid())
+  envio      EnqueteEnvio    @relation(fields: [envioId], references: [id], onDelete: Cascade)
+  envioId    String
+  pergunta   EnquetePergunta @relation(fields: [perguntaId], references: [id], onDelete: Cascade)
+  perguntaId String
+  numero     Int?
+  texto      String?
+
+  @@index([envioId])
+  @@index([perguntaId])
 }
