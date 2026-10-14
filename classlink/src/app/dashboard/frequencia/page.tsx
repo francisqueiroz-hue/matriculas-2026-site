@@ -77,8 +77,9 @@ function HistoricoFrequencia({ studentId }: { studentId: string }) {
   return (
     <div className="space-y-3">
       <div>
-        <label className="mb-1 block text-xs font-medium">Mês</label>
+        <label htmlFor="freq-mes" className="mb-1 block text-xs font-medium">Mês</label>
         <input
+          id="freq-mes"
           type="month"
           value={mes}
           onChange={(e) => {
@@ -195,8 +196,9 @@ function MarcacaoFrequencia() {
 
       <div className="flex flex-wrap gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium">Turma</label>
+          <label htmlFor="freq-lancar-turma" className="mb-1 block text-xs font-medium">Turma</label>
           <select
+            id="freq-lancar-turma"
             value={classId}
             onChange={(e) => {
               setClassId(e.target.value);
@@ -217,8 +219,9 @@ function MarcacaoFrequencia() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium">Data</label>
+          <label htmlFor="freq-data" className="mb-1 block text-xs font-medium">Data</label>
           <input
+            id="freq-data"
             type="date"
             value={date}
             max={hojeISO()}
@@ -261,6 +264,7 @@ function MarcacaoFrequencia() {
                     <td className="px-3 py-2">{s.name}</td>
                     <td className="px-3 py-2">
                       <select
+                        aria-label={`Situação de ${s.name}`}
                         value={marks[s.id] ?? "PRESENT"}
                         onChange={(e) => setMarks((prev) => ({ ...prev, [s.id]: e.target.value as AttendanceStatus }))}
                         className="rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -277,7 +281,7 @@ function MarcacaoFrequencia() {
               </tbody>
             </table>
           </div>
-          <button
+          <button type="button"
             onClick={handleSalvar}
             disabled={salvando}
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
@@ -317,8 +321,9 @@ function ConsultaFrequencia() {
       <h2 className="text-lg font-semibold">Consultar histórico de um aluno</h2>
       <div className="flex flex-wrap gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium">Turma</label>
+          <label htmlFor="freq-resumo-turma" className="mb-1 block text-xs font-medium">Turma</label>
           <select
+            id="freq-resumo-turma"
             value={classId}
             onChange={(e) => {
               setClassId(e.target.value);
@@ -336,8 +341,9 @@ function ConsultaFrequencia() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium">Aluno</label>
+          <label htmlFor="freq-resumo-aluno" className="mb-1 block text-xs font-medium">Aluno</label>
           <select
+            id="freq-resumo-aluno"
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             disabled={!classId}
@@ -379,8 +385,9 @@ function FrequenciaResponsavel() {
     <div className="space-y-4">
       {students.length > 1 && (
         <div>
-          <label className="mb-1 block text-xs font-medium">Aluno</label>
+          <label htmlFor="freq-aluno-responsavel" className="mb-1 block text-xs font-medium">Aluno</label>
           <select
+            id="freq-aluno-responsavel"
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             className="rounded-md border border-slate-300 px-2 py-2 text-sm"

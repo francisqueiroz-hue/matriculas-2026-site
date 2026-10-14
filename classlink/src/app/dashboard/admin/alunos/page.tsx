@@ -236,8 +236,9 @@ function AlunosContent() {
 
       <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div>
-          <label className="mb-1 block text-xs font-medium">Nome do aluno</label>
+          <label htmlFor="aluno-novo-nome" className="mb-1 block text-xs font-medium">Nome do aluno</label>
           <input
+            id="aluno-novo-nome"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -245,8 +246,9 @@ function AlunosContent() {
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium">Turma</label>
+          <label htmlFor="aluno-nova-turma" className="mb-1 block text-xs font-medium">Turma</label>
           <select
+            id="aluno-nova-turma"
             required
             value={classId}
             onChange={(e) => setClassId(e.target.value)}
@@ -281,7 +283,7 @@ function AlunosContent() {
                 <span className="font-medium">
                   {s.name} <span className="text-xs text-slate-500">({s.class.name})</span>
                 </span>
-                <button onClick={() => handleDelete(s.id, s.name)} className="text-xs text-red-600 hover:underline">
+                <button type="button" onClick={() => handleDelete(s.id, s.name)} className="text-xs text-red-600 hover:underline">
                   Excluir
                 </button>
               </div>
@@ -325,16 +327,16 @@ function AlunosContent() {
                         {g.guardian.email && g.guardian.phone ? ` · ${g.guardian.phone}` : ""})
                       </span>
                       <span className="flex items-center gap-3">
-                        <button onClick={() => startEditGuardian(g.guardian)} className="text-xs text-indigo-600 hover:underline">
+                        <button type="button" onClick={() => startEditGuardian(g.guardian)} className="text-xs text-indigo-600 hover:underline">
                           Editar
                         </button>
-                        <button
+                        <button type="button"
                           onClick={() => handleResetGuardianPassword(s.id, g.guardian.id)}
                           className="text-xs text-indigo-600 hover:underline"
                         >
                           Redefinir senha
                         </button>
-                        <button
+                        <button type="button"
                           onClick={() => handleUnlinkGuardian(s.id, g.guardian.id, g.guardian.name)}
                           className="text-xs text-red-600 hover:underline"
                         >
@@ -349,6 +351,7 @@ function AlunosContent() {
               <form onSubmit={(e) => handleLinkGuardian(s.id, e)} className="mt-3 flex flex-wrap gap-2">
                 <input
                   required
+                  aria-label="Nome do responsável"
                   placeholder="Nome do responsável"
                   value={form.guardianName}
                   onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, guardianName: e.target.value } }))}
@@ -356,18 +359,21 @@ function AlunosContent() {
                 />
                 <input
                   type="email"
+                  aria-label="E-mail do responsável"
                   placeholder="E-mail do responsável (opcional)"
                   value={form.email}
                   onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, email: e.target.value } }))}
                   className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
                 />
                 <input
+                  aria-label="Telefone do responsável"
                   placeholder="Telefone (obrigatório se não tiver e-mail)"
                   value={form.phone}
                   onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, phone: e.target.value } }))}
                   className="w-56 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
                 />
                 <input
+                  aria-label="Parentesco"
                   placeholder="Parentesco (opcional)"
                   value={form.relation}
                   onChange={(e) => setGuardianForms((prev) => ({ ...prev, [s.id]: { ...form, relation: e.target.value } }))}

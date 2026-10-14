@@ -225,16 +225,17 @@ function UsuariosContent() {
 
       <form onSubmit={handleCreate} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap gap-3">
-          <input required placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} className={campo} />
+          <input required aria-label="Nome" placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} className={campo} />
           <input
             type="tel"
             inputMode="tel"
+            aria-label="Celular com DDD"
             placeholder="Celular com DDD"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className={`${campo} min-w-64`}
           />
-          <input type="email" placeholder="E-mail (opcional)" value={email} onChange={(e) => setEmail(e.target.value)} className={campo} />
+          <input type="email" aria-label="E-mail" placeholder="E-mail (opcional)" value={email} onChange={(e) => setEmail(e.target.value)} className={campo} />
           <label className="sr-only" htmlFor="funcao-nova">
             Função
           </label>
@@ -339,13 +340,13 @@ function UsuariosContent() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => startEdit(u)} className="text-xs text-indigo-600 hover:underline">
+                  <button type="button" onClick={() => startEdit(u)} className="text-xs text-indigo-600 hover:underline">
                     Editar
                   </button>
-                  <button onClick={() => handleResetPassword(u.id)} className="text-xs text-indigo-600 hover:underline">
+                  <button type="button" onClick={() => handleResetPassword(u.id)} className="text-xs text-indigo-600 hover:underline">
                     Redefinir senha
                   </button>
-                  <button onClick={() => handleExcluir(u)} className="text-xs text-red-600 hover:underline">
+                  <button type="button" onClick={() => handleExcluir(u)} className="text-xs text-red-600 hover:underline">
                     Excluir
                   </button>
                 </div>
