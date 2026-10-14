@@ -80,7 +80,7 @@ export default function AdminMetricsPage() {
                 <h2 className="font-semibold">Comunicados</h2>
                 <div className="flex gap-1 rounded-md border border-slate-200 p-0.5 dark:border-slate-800">
                   {PERIODOS.map((p) => (
-                    <button
+                    <button type="button"
                       key={p}
                       onClick={() => setPeriodo(p)}
                       className={`rounded px-2.5 py-1 text-xs font-medium ${

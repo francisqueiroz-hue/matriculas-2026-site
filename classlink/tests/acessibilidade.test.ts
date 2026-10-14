@@ -12,6 +12,12 @@ const ARQUIVOS_CORRIGIDOS = [
   "src/app/dashboard/notas/page.tsx",
   "src/app/dashboard/mensagens/page.tsx",
   "src/app/dashboard/mensagens/[id]/page.tsx",
+  "src/app/dashboard/financeiro/page.tsx",
+  "src/app/dashboard/frequencia/page.tsx",
+  "src/app/dashboard/admin/page.tsx",
+  "src/app/dashboard/admin/alunos/page.tsx",
+  "src/app/dashboard/admin/turmas/page.tsx",
+  "src/app/dashboard/admin/usuarios/page.tsx",
 ];
 
 describe("acessibilidade dos formulários", () => {

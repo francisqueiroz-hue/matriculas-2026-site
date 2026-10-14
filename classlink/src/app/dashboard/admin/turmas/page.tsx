@@ -46,8 +46,9 @@ function TurmasContent() {
 
       <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div>
-          <label className="mb-1 block text-xs font-medium">Nome</label>
+          <label htmlFor="turma-nome" className="mb-1 block text-xs font-medium">Nome</label>
           <input
+            id="turma-nome"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -56,8 +57,9 @@ function TurmasContent() {
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium">Ano letivo</label>
+          <label htmlFor="turma-ano" className="mb-1 block text-xs font-medium">Ano letivo</label>
           <input
+            id="turma-ano"
             required
             type="number"
             value={year}
@@ -80,7 +82,7 @@ function TurmasContent() {
             <span>
               {c.name} <span className="text-xs text-slate-500">({c.year}) · {c._count.students} aluno(s)</span>
             </span>
-            <button onClick={() => handleDelete(c.id)} className="text-xs text-red-600 hover:underline">
+            <button type="button" onClick={() => handleDelete(c.id)} className="text-xs text-red-600 hover:underline">
               Remover
             </button>
           </li>

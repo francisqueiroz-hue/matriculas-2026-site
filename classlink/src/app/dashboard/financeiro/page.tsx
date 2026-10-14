@@ -92,13 +92,13 @@ export default function FinanceiroPage() {
       {billingInfo && !dadosCompletos && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
           Para receber boletos é preciso cadastrar CPF e endereço.{" "}
-          <button onClick={() => setShowForm(true)} className="font-semibold underline">
+          <button type="button" onClick={() => setShowForm(true)} className="font-semibold underline">
             Cadastrar agora
           </button>
         </div>
       )}
       {dadosCompletos && !showForm && (
-        <button onClick={() => setShowForm(true)} className="text-xs text-slate-500 underline">
+        <button type="button" onClick={() => setShowForm(true)} className="text-xs text-slate-500 underline">
           Editar dados de cobrança
         </button>
       )}
@@ -106,19 +106,19 @@ export default function FinanceiroPage() {
       {showForm && (
         <form onSubmit={salvarDados} className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <p className="text-sm font-semibold text-slate-500">Dados de cobrança</p>
-          <input required placeholder="CPF" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+          <input required aria-label="CPF" placeholder="CPF" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
           <div className="grid grid-cols-2 gap-2">
-            <input required placeholder="CEP" value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
-            <input required placeholder="UF" maxLength={2} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+            <input required aria-label="CEP" placeholder="CEP" value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+            <input required aria-label="UF" placeholder="UF" maxLength={2} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
           </div>
-          <input required placeholder="Logradouro" value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+          <input required aria-label="Logradouro" placeholder="Logradouro" value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
           <div className="grid grid-cols-2 gap-2">
-            <input required placeholder="Número" value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
-            <input placeholder="Complemento" value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+            <input required aria-label="Número" placeholder="Número" value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+            <input aria-label="Complemento" placeholder="Complemento" value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <input required placeholder="Bairro" value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
-            <input required placeholder="Cidade" value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+            <input required aria-label="Bairro" placeholder="Bairro" value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+            <input required aria-label="Cidade" placeholder="Cidade" value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-2">
