@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { mensagemAcesso } from "@/lib/acesso";
+import { TEXTO_BOAS_VINDAS_WHATSAPP } from "@/lib/boas-vindas";
 
 /**
  * Responde, no próprio WhatsApp, a uma família que pediu o acesso ("ACESSO"/"SENHA").
@@ -14,6 +15,8 @@ export async function responderPedidoDeAcesso(
   responsavel: { id: string; name: string; phone: string | null },
   telefone: string,
   urlGuia: string,
+  /** Frase de boas-vindas ao app para famílias; a equipe não recebe ("escola do seu filho"). */
+  comBoasVindas = true,
 ): Promise<void> {
   const usuario = await prisma.user.findUnique({
     where: { id: responsavel.id },
@@ -31,7 +34,8 @@ export async function responderPedidoDeAcesso(
   await sendWhatsAppTextMessage(
     telefone,
     // Login pelo telefone cadastrado (o do webhook pode vir sem o nono dígito).
-    mensagemAcesso({ nome: responsavel.name, url: urlGuia, login: responsavel.phone ?? telefone, senha }),
+    mensagemAcesso({ nome: responsavel.name, url: urlGuia, login: responsavel.phone ?? telefone, senha }) +
+      (comBoasVindas ? `\n\n${TEXTO_BOAS_VINDAS_WHATSAPP}` : ""),
   );
 
   await prisma.$transaction([

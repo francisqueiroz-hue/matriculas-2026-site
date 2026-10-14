@@ -3,8 +3,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const prismaMock = vi.hoisted(() => ({
   loginTentativa: { findUnique: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn() },
   user: { findUnique: vi.fn(), findFirst: vi.fn() },
-  refreshToken: { create: vi.fn() },
+  refreshToken: { create: vi.fn(), count: vi.fn() },
+  message: { findUnique: vi.fn(), create: vi.fn() },
+  conversation: { findUnique: vi.fn() },
 }));
+const conversaMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/permissoes-mensagens", () => ({ conversaDaFamiliaComGestao: conversaMock }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/auth", () => ({
   verifyPassword: vi.fn(),
@@ -35,6 +39,7 @@ beforeEach(() => {
   prismaMock.loginTentativa.upsert.mockResolvedValue({});
   prismaMock.loginTentativa.deleteMany.mockResolvedValue({ count: 1 });
   prismaMock.refreshToken.create.mockResolvedValue({});
+  prismaMock.refreshToken.count.mockResolvedValue(1);
   prismaMock.user.findUnique.mockResolvedValue(usuario);
 });
 
@@ -94,5 +99,28 @@ describe("POST /api/auth/login com limite de tentativas", () => {
     vi.mocked(verifyPassword).mockResolvedValue(true);
     await POST(req());
     expect(prismaMock.loginTentativa.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("boas-vindas no primeiro login do responsável", () => {
+  it("login correto de quem nunca entrou grava a mensagem de boas-vindas", async () => {
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    prismaMock.refreshToken.count.mockResolvedValue(0);
+    prismaMock.message.findUnique.mockResolvedValue(null);
+    prismaMock.conversation.findUnique.mockResolvedValue({ staffId: "adm1" });
+    conversaMock.mockResolvedValue("c1");
+    prismaMock.message.create.mockResolvedValue({});
+
+    const res = await POST(req());
+    expect(res.status).toBe(200);
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("quem já tinha sessão entra sem receber boas-vindas", async () => {
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    prismaMock.refreshToken.count.mockResolvedValue(2);
+    const res = await POST(req());
+    expect(res.status).toBe(200);
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
   });
 });
