@@ -7,6 +7,7 @@ import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
 import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "@/lib/whatsapp";
 import { ehPedidoDeAcesso } from "@/lib/acesso";
+import { mensagemIgnoravel } from "@/lib/whatsapp-ignorar";
 import { responderNumeroNaoCadastrado, responderPedidoDeAcesso } from "@/lib/pedido-acesso";
 
 /** Handshake de verificação exigido pela Meta ao cadastrar a URL do webhook no Meta Developer Console. */
@@ -107,6 +108,9 @@ export async function POST(request: NextRequest) {
     }
 
     for (const msg of mensagens) {
+      // Reação (👍 etc.) não é mensagem: não vira conversa nem aviso.
+      if (mensagemIgnoravel(msg.type)) continue;
+
       const jaProcessada = await prisma.message.findUnique({ where: { externalId: msg.id } });
       if (jaProcessada) continue;
 
