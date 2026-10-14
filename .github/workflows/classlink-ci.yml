@@ -1,0 +1,49 @@
+name: ClassLink - verificações
+
+# Roda a cada PR (e a cada push em main) que mexe no app: typecheck, lint e testes.
+# Não usa banco nem segredos: o Prisma só precisa de uma URL de mentira para gerar o cliente.
+on:
+  pull_request:
+    paths:
+      - "classlink/**"
+      - ".github/workflows/classlink-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "classlink/**"
+      - ".github/workflows/classlink-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: classlink-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: classlink
+    env:
+      # Só para o `prisma generate` do postinstall; nenhuma conexão é aberta.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: classlink/package-lock.json
+      - name: Instalar dependências (gera o cliente Prisma)
+        run: npm ci
+      - name: Gerar tipos de rotas do Next
+        run: npx next typegen
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Testes
+        run: npm test
