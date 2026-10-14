@@ -30,7 +30,24 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
       { status: boleto.status, codigoSolicitacao: boleto.codigoSolicitacao },
       body.acao === "PAGO" ? dataDePagamento(body.dataPagamento, agoraNoFusoDaEscola()) : new Date(),
     );
-    const atualizado = await prisma.boleto.update({ where: { id }, data: { status: data.status, pagoEm: data.pagoEm, erroDetalhe: null } });
+    // Atualização e registro de auditoria na mesma transação: não há baixa sem rastro.
+    const atualizado = await prisma.$transaction(async (tx) => {
+      const novo = await tx.boleto.update({ where: { id }, data: { status: data.status, pagoEm: data.pagoEm, erroDetalhe: null } });
+      await tx.boletoBaixaLog.create({
+        data: {
+          boletoId: id,
+          schoolId: session.schoolId,
+          acao: body.acao,
+          statusAnterior: boleto.status,
+          statusNovo: data.status,
+          dataPagamento: data.pagoEm,
+          valor: boleto.valor,
+          porUserId: session.sub,
+          porNome: session.name,
+        },
+      });
+      return novo;
+    });
     return NextResponse.json({ id: atualizado.id, status: atualizado.status, pagoEm: atualizado.pagoEm });
   } catch (error) {
     return handleApiError(error);

@@ -44,6 +44,8 @@ interface Pago {
   valor: number;
   pagoEm: string | null;
   desfazivel: boolean;
+  baixaPor: string | null;
+  baixaEm: string | null;
 }
 
 function hojeISO() {
@@ -286,6 +288,7 @@ function FinanceiroContent() {
                     <p className="text-xs text-slate-500">
                       {p.responsavel ?? "Sem responsável"} · R$ {p.valor.toFixed(2)}
                       {p.pagoEm && ` · pago em ${new Date(p.pagoEm).toLocaleDateString("pt-BR")}`}
+                      {p.baixaPor && ` · baixa por ${p.baixaPor}${p.baixaEm ? ` em ${new Date(p.baixaEm).toLocaleDateString("pt-BR")}` : ""}`}
                     </p>
                   </div>
                   {p.desfazivel ? (

@@ -514,9 +514,31 @@ model Boleto {
   updatedAt DateTime  @updatedAt
   pagoEm    DateTime?
 
+  baixas BoletoBaixaLog[]
+
   @@unique([studentId, mesReferencia])
   @@index([schoolId])
   @@index([status])
+}
+
+/// Trilha de auditoria da baixa manual: quem marcou/desfez o pagamento, quando e com qual data.
+/// O nome fica copiado aqui para o registro sobreviver à exclusão do usuário.
+model BoletoBaixaLog {
+  id             String       @id @default(cuid())
+  boleto         Boleto       @relation(fields: [boletoId], references: [id], onDelete: Cascade)
+  boletoId       String
+  schoolId       String
+  acao           String // "PAGO" | "DESFAZER"
+  statusAnterior BoletoStatus
+  statusNovo     BoletoStatus
+  dataPagamento  DateTime? // data informada na baixa (nula ao desfazer)
+  valor          Decimal      @db.Decimal(10, 2) // valor do boleto no momento da ação
+  porUserId      String
+  porNome        String
+  criadoEm       DateTime     @default(now())
+
+  @@index([boletoId])
+  @@index([schoolId, criadoEm])
 }
 
 // Disciplina lecionada na escola (ex.: "Matemática", "Português"). Escopo por escola,
