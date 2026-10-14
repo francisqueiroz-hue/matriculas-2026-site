@@ -12,7 +12,8 @@ import { mensagemAcesso, parametrosModeloAcesso, PALAVRA_PEDIDO_ACESSO } from "@
 import { modeloDisponivel } from "@/lib/whatsapp-modelos";
 
 /** Margem de segurança sobre as 24h da Meta, para não enviar texto livre no limite. */
-export const JANELA_CONVERSA_MS = 23 * 60 * 60 * 1000;
+export { JANELA_CONVERSA_MS } from "@/lib/canal-envio";
+import { JANELA_CONVERSA_MS } from "@/lib/canal-envio";
 
 export function conversaAberta(ultimaMensagemEm: Date | null | undefined, agora = Date.now()): boolean {
   return Boolean(ultimaMensagemEm && agora - ultimaMensagemEm.getTime() < JANELA_CONVERSA_MS);

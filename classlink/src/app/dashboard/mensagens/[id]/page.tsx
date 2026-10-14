@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
-import { reciboDeLeitura } from "@/lib/recibo-leitura";
+import { ROTULO_ENVIO, explicacaoDoCanal, reciboPorCanal, type JanelaWhatsApp } from "@/lib/canal-envio";
 
 type Canal = "APP" | "WHATSAPP" | "EMAIL";
 
@@ -24,6 +24,7 @@ interface GuardianConversationResponse {
     id: string;
     staff: { id: string; name: string };
     guardian: { id: string; name: string; phone: string | null; email: string | null };
+    janelaWhatsApp?: { aberta: boolean; ate: string | null };
   };
   messages: { id: string; body: string; channel: Canal; createdAt: string; readAt: string | null; sender: { id: string; name: string; role: string } }[];
 }
@@ -42,6 +43,7 @@ interface ConversationState {
   counterpart: { id: string; name: string };
   guardianPhone: string | null;
   guardianEmail: string | null;
+  janelaWhatsApp: JanelaWhatsApp;
   /** Só relevante para conversas com responsável: se o usuário atual é o membro da equipe (habilita canal e requisição). */
   souStaffNaConversa: boolean;
   messages: DisplayMessage[];
@@ -90,6 +92,7 @@ function ConversationPageInner() {
           counterpart,
           guardianPhone: null,
           guardianEmail: null,
+          janelaWhatsApp: { aberta: false, ate: null },
           souStaffNaConversa: false,
           messages: res.messages.map((m) => ({ ...m, channel: null })),
         });
@@ -101,6 +104,10 @@ function ConversationPageInner() {
           counterpart: souStaffNaConversa ? res.conversation.guardian : res.conversation.staff,
           guardianPhone: res.conversation.guardian.phone,
           guardianEmail: res.conversation.guardian.email,
+          janelaWhatsApp: {
+            aberta: res.conversation.janelaWhatsApp?.aberta ?? false,
+            ate: res.conversation.janelaWhatsApp?.ate ? new Date(res.conversation.janelaWhatsApp.ate) : null,
+          },
           souStaffNaConversa,
           messages: res.messages,
         });
@@ -128,6 +135,11 @@ function ConversationPageInner() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [data?.messages.length]);
 
+  /** O WhatsApp só vale com a janela de 24h aberta; se ela fechou, volta para o ClassLink. */
+  function canalValido(): Canal {
+    return canalEnvio === "WHATSAPP" && !data?.janelaWhatsApp.aberta ? "APP" : canalEnvio;
+  }
+
   async function enviarMensagem(body: string, channel: Canal = "APP") {
     setSending(true);
     setSendError(null);
@@ -152,7 +164,7 @@ function ConversationPageInner() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
-    if (await enviarMensagem(text, canalEnvio)) setText("");
+    if (await enviarMensagem(text, canalValido())) setText("");
   }
 
   function toggleItem(item: string) {
@@ -164,7 +176,7 @@ function ConversationPageInner() {
     const itens = [...itensSelecionados, ...(itemOutro.trim() ? [itemOutro.trim()] : [])];
     if (itens.length === 0) return;
     const corpo = `📋 Requisição de itens pessoais:\n${itens.map((i) => `- ${i}`).join("\n")}\n\nPor favor, providencie o quanto antes. Obrigado!`;
-    if (await enviarMensagem(corpo, canalEnvio)) {
+    if (await enviarMensagem(corpo, canalValido())) {
       setItensSelecionados([]);
       setItemOutro("");
       setShowRequisicao(false);
@@ -176,6 +188,7 @@ function ConversationPageInner() {
   const podeUsarFuncoesDeResponsavel = !isEquipe && data.souStaffNaConversa;
   const guardianTemTelefone = Boolean(data.guardianPhone);
   const guardianTemEmail = Boolean(data.guardianEmail);
+  const canalAtual = podeUsarFuncoesDeResponsavel ? canalValido() : "APP";
 
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col">
@@ -252,7 +265,7 @@ function ConversationPageInner() {
                   {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                   {m.channel && m.channel !== "APP" && <span>· via {CANAL_LABEL[m.channel]}</span>}
                 </p>
-                {mine && <ReciboMensagem readAt={m.readAt} />}
+                {mine && <ReciboMensagem canal={m.channel} readAt={m.readAt} />}
               </div>
             </div>
           );
@@ -277,12 +290,13 @@ function ConversationPageInner() {
             onChange={(e) => setCanalEnvio(e.target.value as Canal)}
             className="rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
           >
-            <option value="APP">Enviar por: ClassLink</option>
-            <option value="WHATSAPP" disabled={!guardianTemTelefone}>
-              Enviar por: WhatsApp{!guardianTemTelefone ? " (sem telefone)" : ""}
+            <option value="APP">Canal: ClassLink</option>
+            <option value="WHATSAPP" disabled={!guardianTemTelefone || !data.janelaWhatsApp.aberta}>
+              Canal: WhatsApp
+              {!guardianTemTelefone ? " (sem telefone)" : !data.janelaWhatsApp.aberta ? " (indisponível agora)" : ""}
             </option>
             <option value="EMAIL" disabled={!guardianTemEmail}>
-              Enviar por: E-mail{!guardianTemEmail ? " (sem e-mail)" : ""}
+              Canal: E-mail{!guardianTemEmail ? " (sem e-mail)" : ""}
             </option>
           </select>
         )}
@@ -291,16 +305,21 @@ function ConversationPageInner() {
           disabled={sending}
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
         >
-          Enviar
+          {ROTULO_ENVIO[canalAtual]}
         </button>
       </form>
+      {podeUsarFuncoesDeResponsavel && (
+        <p aria-live="polite" className="mt-1 text-xs text-slate-500">
+          {explicacaoDoCanal(canalAtual, data.janelaWhatsApp)}
+        </p>
+      )}
     </div>
   );
 }
 
-/** "✓ Enviada" ou "✓✓ Lida em 14/10/2026 às 14:05": comprovante de que a outra pessoa abriu a mensagem. */
-function ReciboMensagem({ readAt }: { readAt?: string | null }) {
-  const recibo = reciboDeLeitura(readAt);
+/** "✓ Enviada" ou "✓✓ Lida no ClassLink em 14/10/2026 às 14:05": só o ClassLink comprova que a pessoa abriu. */
+function ReciboMensagem({ canal, readAt }: { canal: Canal | null; readAt?: string | null }) {
+  const recibo = reciboPorCanal(canal, readAt);
   return (
     <p className={`mt-0.5 text-[10px] ${recibo.lida ? "font-semibold text-emerald-200" : "text-indigo-200"}`}>
       <span aria-hidden="true">{recibo.marca}</span> {recibo.texto}
