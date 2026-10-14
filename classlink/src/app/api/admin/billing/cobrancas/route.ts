@@ -60,6 +60,7 @@ export async function GET() {
         student: {
           select: { name: true, guardians: { orderBy: { createdAt: "asc" }, take: 1, select: { guardian: { select: { name: true } } } } },
         },
+        baixas: { where: { acao: "PAGO" }, orderBy: { criadoEm: "desc" }, take: 1, select: { porNome: true, criadoEm: true } },
       },
     });
     const pagos = pagosBd.map((b) => ({
@@ -71,6 +72,8 @@ export async function GET() {
       pagoEm: b.pagoEm ? b.pagoEm.toISOString() : null,
       // Pagamento confirmado pelo banco (boleto emitido) não se desfaz aqui.
       desfazivel: !b.codigoSolicitacao,
+      baixaPor: b.baixas[0]?.porNome ?? null,
+      baixaEm: b.baixas[0]?.criadoEm.toISOString() ?? null,
     }));
 
     return NextResponse.json({ itens, pagos });
