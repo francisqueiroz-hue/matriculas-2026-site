@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
+import { filtroDeVisibilidade, turmasVisiveisNoMural } from "@/lib/visibilidade-posts";
 
 /** Confirma a leitura do aviso pelo usuário atual (idempotente). */
 export async function POST(_request: NextRequest, ctx: RouteContext<"/api/posts/[id]/read">) {
@@ -10,7 +11,9 @@ export async function POST(_request: NextRequest, ctx: RouteContext<"/api/posts/
     const session = await requireSession();
     const { id: postId } = await ctx.params;
 
-    const post = await prisma.post.findFirst({ where: { id: postId, schoolId: session.schoolId } });
+    // Só avisos que a pessoa pode ver: confirmar leitura de aviso de outra turma é 404.
+    const turmas = await turmasVisiveisNoMural(session);
+    const post = await prisma.post.findFirst({ where: { id: postId, schoolId: session.schoolId, ...filtroDeVisibilidade(turmas) } });
     if (!post) return NextResponse.json({ error: "Aviso não encontrado" }, { status: 404 });
 
     try {

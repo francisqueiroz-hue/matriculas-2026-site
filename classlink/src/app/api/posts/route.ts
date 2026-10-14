@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { createPostSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { getSignedMediaUrl } from "@/lib/firebase-storage";
+import { filtroDeVisibilidade, turmasVisiveisNoMural } from "@/lib/visibilidade-posts";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 
 /** Troca o caminho interno do arquivo por uma URL assinada de leitura (temporária). */
@@ -23,29 +24,13 @@ export async function GET(request: NextRequest) {
     const cursor = request.nextUrl.searchParams.get("cursor") ?? undefined;
     const classIdFilter = request.nextUrl.searchParams.get("classId") ?? undefined;
 
-    let visibleClassIds: string[] | null = null;
-    if (session.role === "GUARDIAN") {
-      const links = await prisma.guardianStudent.findMany({
-        where: { guardianId: session.sub, student: { deletedAt: null } },
-        select: { student: { select: { classId: true } } },
-      });
-      visibleClassIds = [...new Set(links.map((l) => l.student.classId))];
-    } else if (session.role === "STAFF") {
-      const teaching = await prisma.classTeacher.findMany({
-        where: { teacherId: session.sub },
-        select: { classId: true },
-      });
-      visibleClassIds = [...new Set(teaching.map((t) => t.classId))];
-    } // ADMIN vê tudo da escola
+    const visibleClassIds = await turmasVisiveisNoMural(session);
 
     const posts = await prisma.post.findMany({
       where: {
         schoolId: session.schoolId,
         ...(classIdFilter ? { classId: classIdFilter } : {}),
-        OR:
-          visibleClassIds === null
-            ? undefined
-            : [{ audience: "SCHOOL" }, { audience: "CLASS", classId: { in: visibleClassIds } }],
+        ...filtroDeVisibilidade(visibleClassIds),
       },
       include: {
         author: { select: SELECT_PESSOA },
