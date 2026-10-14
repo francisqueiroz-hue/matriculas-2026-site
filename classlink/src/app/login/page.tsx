@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiJson } from "@/lib/api-client";
+import { destinoPosLogin } from "@/lib/destino-pos-login";
 import { linkPedirAcesso } from "@/lib/whatsapp-escola";
 
 function LoginForm() {
@@ -20,7 +21,7 @@ function LoginForm() {
     setLoading(true);
     try {
       await apiJson("/api/auth/login", { method: "POST", body: JSON.stringify({ identifier, password }) });
-      router.push(searchParams.get("next") ?? "/dashboard");
+      router.push(destinoPosLogin(searchParams.get("next")));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao entrar");
