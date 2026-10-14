@@ -123,7 +123,9 @@ model User {
   passwordHash String
   name         String
   role         Role
-  phone        String?
+  // Único (Fase 2 do telefone): o login por telefone procura um só usuário. O cadastro grava
+  // sempre no padrão 55 + DDD + número; exclusão (LGPD) zera o campo, então não trava recadastro.
+  phone        String?   @unique
   avatarUrl    String?
   active       Boolean   @default(true)
   deletedAt    DateTime? // exclusão lógica (LGPD) antes de expurgo definitivo
