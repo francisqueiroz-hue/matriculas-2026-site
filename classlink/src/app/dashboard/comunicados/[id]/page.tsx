@@ -206,7 +206,7 @@ export default function ComunicadoDetailPage() {
                   <span className="text-sm">
                     {p.guardian.name} <span className="text-slate-500">— {p.aluno.name}</span>
                   </span>
-                  <button
+                  <button type="button"
                     disabled={enviando === p.guardian.id}
                     onClick={() => reenviar(p.guardian.id)}
                     className="rounded-md border border-indigo-600 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950"

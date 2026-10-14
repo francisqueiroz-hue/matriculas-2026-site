@@ -1,31 +1,22 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { auditarArquivo } from "./helpers/auditar-a11y";
 
-// Arquivos já corrigidos: não podem voltar a ter campo sem rótulo nem botão sem `type`.
-// Cada lote de correção de acessibilidade acrescenta os seus arquivos aqui.
-const ARQUIVOS_CORRIGIDOS = [
-  "src/app/login/page.tsx",
-  "src/app/esqueci-senha/page.tsx",
-  "src/app/dashboard/conta/page.tsx",
-  "src/app/dashboard/agenda/page.tsx",
-  "src/app/dashboard/boletim/page.tsx",
-  "src/app/dashboard/notas/page.tsx",
-  "src/app/dashboard/mensagens/page.tsx",
-  "src/app/dashboard/mensagens/[id]/page.tsx",
-  "src/app/dashboard/financeiro/page.tsx",
-  "src/app/dashboard/frequencia/page.tsx",
-  "src/app/dashboard/admin/page.tsx",
-  "src/app/dashboard/admin/alunos/page.tsx",
-  "src/app/dashboard/admin/turmas/page.tsx",
-  "src/app/dashboard/admin/usuarios/page.tsx",
-];
-
-describe("acessibilidade dos formulários", () => {
-  for (const arquivo of ARQUIVOS_CORRIGIDOS) {
-    it(`${arquivo}: campos com rótulo e botões com type`, () => {
-      expect(auditarArquivo(arquivo)).toEqual([]);
-    });
+function* arquivosTsx(dir: string): Generator<string> {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) yield* arquivosTsx(p);
+    else if (p.endsWith(".tsx")) yield p;
   }
+}
+
+describe("acessibilidade dos formulários (app inteiro)", () => {
+  it("todo campo tem rótulo e todo botão tem type", () => {
+    const achados = [...arquivosTsx("src")].flatMap(auditarArquivo);
+    const resumo = achados.map((a) => `${a.arquivo}:${a.linha} ${a.problema}`);
+    expect(resumo).toEqual([]);
+  });
 
   it("o auditor detecta os problemas (não é um teste vazio)", () => {
     const achados = auditarArquivo("tests/helpers/exemplo-ruim.tsx");

@@ -64,7 +64,7 @@ export function Sidebar() {
         <Link href="/dashboard/conta" className="block truncate text-sm text-slate-500 hover:underline">
           {user.name}
         </Link>
-        <button
+        <button type="button"
           onClick={handleLogout}
           className="mt-2 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
         >
