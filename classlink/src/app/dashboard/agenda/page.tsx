@@ -122,6 +122,7 @@ export default function AgendaPage() {
         <h1 className="text-xl font-bold">Agenda escolar</h1>
         {canCreate && (
           <button
+            type="button"
             onClick={() => setShowForm((v) => !v)}
             className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700"
           >
@@ -137,12 +138,14 @@ export default function AgendaPage() {
         >
           <input
             required
+            aria-label="Título do evento"
             placeholder="Título"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
           />
           <textarea
+            aria-label="Descrição do evento"
             placeholder="Descrição (opcional)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -151,12 +154,14 @@ export default function AgendaPage() {
           <div className="flex flex-wrap gap-3">
             <input
               required
+              aria-label="Data e hora de início"
               type="datetime-local"
               value={startsAt}
               onChange={(e) => setStartsAt(e.target.value)}
               className="rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
             />
             <select
+              aria-label="Turma do evento"
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
               className="rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"

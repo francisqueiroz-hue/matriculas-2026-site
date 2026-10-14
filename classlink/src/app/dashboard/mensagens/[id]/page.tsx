@@ -174,6 +174,7 @@ function ConversationPageInner() {
         </h1>
         {podeUsarFuncoesDeResponsavel && (
           <button
+            type="button"
             onClick={() => setShowRequisicao((v) => !v)}
             className="flex items-center gap-1 rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950"
           >
@@ -199,6 +200,7 @@ function ConversationPageInner() {
             ))}
           </div>
           <input
+            aria-label="Outro item"
             value={itemOutro}
             onChange={(e) => setItemOutro(e.target.value)}
             placeholder="Outro item (opcional)"
@@ -249,6 +251,7 @@ function ConversationPageInner() {
 
       <form onSubmit={handleSend} className="mt-3 flex flex-wrap gap-2">
         <input
+          aria-label="Mensagem"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Escreva uma mensagem..."
@@ -256,6 +259,7 @@ function ConversationPageInner() {
         />
         {podeUsarFuncoesDeResponsavel && (
           <select
+            aria-label="Enviar por"
             value={canalEnvio}
             onChange={(e) => setCanalEnvio(e.target.value as Canal)}
             className="rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"

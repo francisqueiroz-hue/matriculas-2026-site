@@ -168,7 +168,7 @@ export default function MensagensPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Mensagens</h1>
-        <button onClick={openNew} className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">
+        <button type="button" onClick={openNew} className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">
           Nova conversa
         </button>
       </div>
@@ -186,6 +186,7 @@ export default function MensagensPage() {
                 {contatosEquipe.map((c) => (
                   <li key={`equipe-${c.id}`}>
                     <button
+                      type="button"
                       disabled={starting}
                       onClick={() => startConversation(c.id, "equipe")}
                       className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -207,6 +208,7 @@ export default function MensagensPage() {
                 {contatosResponsaveis.map((c) => (
                   <li key={`resp-${c.id}`}>
                     <button
+                      type="button"
                       disabled={starting}
                       onClick={() => startConversation(c.id, "responsavel")}
                       className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"

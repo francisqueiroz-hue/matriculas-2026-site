@@ -125,8 +125,9 @@ function NotasContent() {
 
       <div className="flex flex-wrap gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium">Turma</label>
+          <label htmlFor="notas-turma" className="mb-1 block text-xs font-medium">Turma</label>
           <select
+            id="notas-turma"
             value={classId}
             onChange={(e) => {
               setClassId(e.target.value);
@@ -145,8 +146,9 @@ function NotasContent() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium">Aluno</label>
+          <label htmlFor="notas-aluno" className="mb-1 block text-xs font-medium">Aluno</label>
           <select
+            id="notas-aluno"
             value={studentId}
             onChange={(e) => {
               setStudentId(e.target.value);
@@ -167,8 +169,9 @@ function NotasContent() {
 
       <form onSubmit={handleAddDisciplina} className="flex items-end gap-2">
         <div>
-          <label className="mb-1 block text-xs font-medium">Nova disciplina</label>
+          <label htmlFor="notas-nova-disciplina" className="mb-1 block text-xs font-medium">Nova disciplina</label>
           <input
+            id="notas-nova-disciplina"
             value={novaDisciplina}
             onChange={(e) => setNovaDisciplina(e.target.value)}
             placeholder="Ex: Matemática"
@@ -234,6 +237,7 @@ function NotasContent() {
                             <input
                               key={`${studentId}-${linha.disciplinaId}-${t}-${campo}-${v[campo] ?? ""}`}
                               type="text"
+                              aria-label={`${linha.nome}, ${TRIMESTRE_LABEL[t]}, ${CAMPO_LABEL[campo]}`}
                               inputMode="decimal"
                               defaultValue={v[campo] ?? ""}
                               onBlur={(e) => handleSalvarCelula(linha.disciplinaId, t, campo, e.target.value)}

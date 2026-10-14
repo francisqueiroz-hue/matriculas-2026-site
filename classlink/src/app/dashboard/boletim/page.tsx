@@ -63,8 +63,9 @@ export default function BoletimPage() {
 
       {students.length > 1 && (
         <div>
-          <label className="mb-1 block text-xs font-medium">Aluno</label>
+          <label htmlFor="boletim-aluno" className="mb-1 block text-xs font-medium">Aluno</label>
           <select
+            id="boletim-aluno"
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             className="rounded-md border border-slate-300 px-2 py-2 text-sm"
