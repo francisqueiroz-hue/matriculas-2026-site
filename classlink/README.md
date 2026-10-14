@@ -344,7 +344,9 @@ registro de autoria. Os dados de contato são apagados (LGPD, minimização).
   atendimento, Visita agendada, Matriculado, Desistiu), anotações internas, botão de
   WhatsApp para a família, exportação CSV e exclusão (pedido LGPD). Só o perfil ADMIN acessa.
 - O endpoint público `POST /api/matriculas/solicitacoes` aceita chamadas de outros
-  domínios (CORS aberto, sem cookies), exige o consentimento, tem campo-armadilha contra
+  domínios (CORS aberto por padrão, sem cookies; para restringir, defina
+  `MATRICULAS_ALLOWED_ORIGINS` com os sites que hospedam o formulário, separados por vírgula —
+  inclua o GitHub Pages, se usado), exige o consentimento, tem campo-armadilha contra
   robôs e limita a 5 envios a cada 10 minutos por IP. Se houver mais de uma escola no
   banco, defina `MATRICULAS_SCHOOL_ID`.
 - Para garantir que todas as famílias foram avisadas, crie também um **Comunicado** do tipo

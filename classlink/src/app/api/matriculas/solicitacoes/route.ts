@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
+import { cabecalhosCors } from "@/lib/cors-matriculas";
 import {
   ANO_LETIVO_MATRICULAS,
-  CORS_HEADERS,
   JANELA_LIMITE_MS,
   LIMITE_ENVIOS_POR_IP,
   getClientIp,
@@ -21,16 +21,18 @@ async function escolaDasMatriculas(): Promise<string | null> {
   return escolas.length === 1 ? escolas[0].id : null;
 }
 
-function json(body: unknown, status = 200) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
+function json(body: unknown, status = 200, origem: string | null = null) {
+  return NextResponse.json(body, { status, headers: cabecalhosCors(origem) });
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+export function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, { status: 204, headers: cabecalhosCors(request.headers.get("origin")) });
 }
 
 /** Endpoint público (sem login) usado pelos formulários de pré-matrícula e rematrícula. */
 export async function POST(request: NextRequest) {
+  const origem = request.headers.get("origin");
+  const responder = (corpo: unknown, status = 200) => json(corpo, status, origem);
   try {
     const body = solicitacaoPublicaSchema.parse(await request.json());
 
@@ -40,14 +42,14 @@ export async function POST(request: NextRequest) {
         where: { ipOrigem, createdAt: { gte: new Date(Date.now() - JANELA_LIMITE_MS) } },
       });
       if (recentes >= LIMITE_ENVIOS_POR_IP) {
-        return json({ error: "Muitos envios em pouco tempo. Tente novamente em alguns minutos." }, 429);
+        return responder({ error: "Muitos envios em pouco tempo. Tente novamente em alguns minutos." }, 429);
       }
     }
 
     const schoolId = await escolaDasMatriculas();
     if (!schoolId) {
       console.error("Defina MATRICULAS_SCHOOL_ID: há mais de uma escola (ou nenhuma) cadastrada.");
-      return json({ error: "Cadastro de matrículas indisponível no momento." }, 503);
+      return responder({ error: "Cadastro de matrículas indisponível no momento." }, 503);
     }
 
     const solicitacao = await prisma.solicitacaoMatricula.create({
@@ -69,12 +71,12 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
-    return json({ ok: true, id: solicitacao.id }, 201);
+    return responder({ ok: true, id: solicitacao.id }, 201);
   } catch (error) {
     if (error instanceof ZodError || error instanceof SyntaxError) {
-      return json({ error: "Dados inválidos" }, 400);
+      return responder({ error: "Dados inválidos" }, 400);
     }
     console.error(error);
-    return json({ error: "Erro ao registrar a solicitação" }, 500);
+    return responder({ error: "Erro ao registrar a solicitação" }, 500);
   }
 }

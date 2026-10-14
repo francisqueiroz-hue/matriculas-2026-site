@@ -45,13 +45,6 @@ export const ANO_LETIVO_MATRICULAS = CAMPANHA_REMATRICULA.ano;
 export const LIMITE_ENVIOS_POR_IP = 5;
 export const JANELA_LIMITE_MS = 10 * 60 * 1000;
 
-export const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
-
 export const TIPO_LABEL: Record<SolicitacaoMatriculaTipo, string> = {
   PRE_MATRICULA: "Pré-matrícula",
   REMATRICULA: "Rematrícula",
