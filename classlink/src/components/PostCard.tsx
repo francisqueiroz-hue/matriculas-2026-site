@@ -120,10 +120,10 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
         </div>
         {canModerate && !editing && (
           <span className="flex shrink-0 items-center gap-3">
-            <button onClick={startEdit} className="text-xs text-indigo-600 hover:underline">
+            <button type="button" onClick={startEdit} className="text-xs text-indigo-600 hover:underline">
               Editar
             </button>
-            <button onClick={handleDelete} className="text-xs text-red-600 hover:underline">
+            <button type="button" onClick={handleDelete} className="text-xs text-red-600 hover:underline">
               Remover
             </button>
           </span>
@@ -134,12 +134,14 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
         <form onSubmit={handleSaveEdit} className="space-y-2">
           <input
             required
+            aria-label="Título do aviso"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
           />
           <textarea
             required
+            aria-label="Mensagem do aviso"
             rows={4}
             value={editBody}
             onChange={(e) => setEditBody(e.target.value)}
@@ -188,7 +190,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
         ) : null}
 
         {canSeeReaders && (
-          <button onClick={toggleReaders} className="text-slate-500 hover:underline">
+          <button type="button" onClick={toggleReaders} className="text-slate-500 hover:underline">
             {post._count.reads} confirmação(ões) · ver quem leu
           </button>
         )}

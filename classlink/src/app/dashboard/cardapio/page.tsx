@@ -304,6 +304,7 @@ function Editor({
         ) : (
           <input
             type="file"
+            aria-label="Foto do cardápio impresso"
             accept="image/jpeg,image/png,image/webp"
             disabled={enviandoFoto}
             onChange={(e) => e.target.files?.[0] && enviarFoto(e.target.files[0])}
@@ -438,7 +439,7 @@ export default function CardapioPage() {
         </div>
         {dados?.podeEditar && !form && !importando && (
           <div className="flex flex-wrap gap-2">
-            <button
+            <button type="button"
               onClick={() => {
                 setImportando(true);
                 setAviso(null);
@@ -447,7 +448,7 @@ export default function CardapioPage() {
             >
               Importar cardápios
             </button>
-            <button onClick={novo} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+            <button type="button" onClick={novo} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
               Novo cardápio
             </button>
           </div>
@@ -504,13 +505,13 @@ export default function CardapioPage() {
                   <p className="text-sm font-semibold">{c.turma ? `Turma ${c.turma}` : "Toda a escola"}</p>
                   {dados.podeEditar && (
                     <div className="flex gap-3 text-xs">
-                      <button onClick={() => editar(c)} className="text-indigo-600 hover:underline">
+                      <button type="button" onClick={() => editar(c)} className="text-indigo-600 hover:underline">
                         Editar
                       </button>
-                      <button onClick={() => repetir(c)} className="text-indigo-600 hover:underline">
+                      <button type="button" onClick={() => repetir(c)} className="text-indigo-600 hover:underline">
                         Repetir nas próximas semanas
                       </button>
-                      <button onClick={() => excluir(c)} className="text-red-600 hover:underline">
+                      <button type="button" onClick={() => excluir(c)} className="text-red-600 hover:underline">
                         Excluir
                       </button>
                     </div>
@@ -540,7 +541,7 @@ export default function CardapioPage() {
                     </span>
                   </summary>
                   <div className="flex justify-end border-t border-slate-100 px-3 py-2 dark:border-slate-800">
-                    <button onClick={() => excluirSemana(semana, lista)} className="text-xs font-semibold text-red-600 hover:underline">
+                    <button type="button" onClick={() => excluirSemana(semana, lista)} className="text-xs font-semibold text-red-600 hover:underline">
                       Excluir semana inteira
                     </button>
                   </div>
@@ -549,16 +550,16 @@ export default function CardapioPage() {
                       <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                         <span>{c.turma ? `Turma ${c.turma}` : "Toda a escola"}</span>
                         <div className="flex flex-wrap gap-3 text-xs">
-                          <button onClick={() => editar(c)} className="text-indigo-600 hover:underline">
+                          <button type="button" onClick={() => editar(c)} className="text-indigo-600 hover:underline">
                             Editar
                           </button>
-                          <button onClick={() => repetir(c)} className="text-indigo-600 hover:underline">
+                          <button type="button" onClick={() => repetir(c)} className="text-indigo-600 hover:underline">
                             Repetir nas próximas semanas
                           </button>
-                          <button onClick={() => publicarAgora(c)} className="text-indigo-600 hover:underline">
+                          <button type="button" onClick={() => publicarAgora(c)} className="text-indigo-600 hover:underline">
                             Publicar agora
                           </button>
-                          <button onClick={() => excluir(c)} className="text-red-600 hover:underline">
+                          <button type="button" onClick={() => excluir(c)} className="text-red-600 hover:underline">
                             Excluir
                           </button>
                         </div>

@@ -85,6 +85,7 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
       <h2 className="text-sm font-semibold text-slate-500">Novo comunicado</h2>
 
       <select
+        aria-label="Tipo de comunicado"
         value={tipo}
         onChange={(e) => setTipo(e.target.value)}
         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
@@ -98,6 +99,7 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
 
       <input
         required
+        aria-label="Título do comunicado"
         placeholder="Título"
         value={titulo}
         onChange={(e) => setTitulo(e.target.value)}
@@ -105,6 +107,7 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
       />
       <textarea
         required
+        aria-label="Descrição do comunicado"
         placeholder="Descrição"
         value={descricao}
         onChange={(e) => setDescricao(e.target.value)}
@@ -114,6 +117,7 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
 
       <div className="flex flex-wrap items-center gap-3">
         <select
+          aria-label="Quem recebe"
           value={audience}
           onChange={(e) => {
             const value = e.target.value as "SCHOOL" | "CLASS" | "STUDENT";
@@ -131,6 +135,7 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
         {(audience === "CLASS" || audience === "STUDENT") && (
           <select
             required
+            aria-label="Turma"
             value={classId}
             onChange={(e) => {
               setClassId(e.target.value);
@@ -150,6 +155,7 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
         {audience === "STUDENT" && (
           <select
             required
+            aria-label="Aluno"
             value={alunoId}
             onChange={(e) => setAlunoId(e.target.value)}
             disabled={!classId}

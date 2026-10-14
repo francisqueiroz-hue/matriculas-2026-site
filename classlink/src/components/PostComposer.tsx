@@ -75,6 +75,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
       <h2 className="text-sm font-semibold text-slate-500">Publicar novo aviso</h2>
       <input
         required
+        aria-label="Título do aviso"
         placeholder="Título"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
@@ -82,6 +83,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
       />
       <textarea
         required
+        aria-label="Mensagem do aviso"
         placeholder="Mensagem"
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -92,6 +94,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
       <div className="flex flex-wrap items-center gap-3">
         {user.role === "ADMIN" && (
           <select
+            aria-label="Quem recebe"
             value={audience}
             onChange={(e) => setAudience(e.target.value as "SCHOOL" | "CLASS")}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
@@ -104,6 +107,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
         {audience === "CLASS" && (
           <select
             required
+            aria-label="Turma"
             value={classId}
             onChange={(e) => setClassId(e.target.value)}
             className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
@@ -119,6 +123,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
 
         <input
           type="file"
+          aria-label="Anexar foto ou vídeo"
           accept="image/*,video/*"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className="text-xs"
