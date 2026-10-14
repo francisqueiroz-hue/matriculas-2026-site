@@ -71,9 +71,15 @@ export default function AgendaPage() {
   const [startsAt, setStartsAt] = useState("");
   const [classId, setClassId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
 
   function load() {
-    apiJson<{ events: EventItem[] }>("/api/events").then((data) => setEvents(data.events));
+    apiJson<{ events: EventItem[] }>("/api/events")
+      .then((data) => {
+        setErroCarga(null);
+        setEvents(data.events);
+      })
+      .catch(() => setErroCarga("Não foi possível carregar a agenda. Atualize a página para tentar de novo."));
   }
 
   useEffect(load, []);
@@ -181,8 +187,17 @@ export default function AgendaPage() {
         </form>
       )}
 
-      {events === null && <p className="text-sm text-slate-500">Carregando agenda...</p>}
-      {events?.length === 0 && <p className="text-sm text-slate-500">Nenhum evento cadastrado.</p>}
+      {erroCarga && (
+        <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          {erroCarga}
+        </p>
+      )}
+      {events === null && !erroCarga && <p className="text-sm text-slate-500">Carregando agenda...</p>}
+      {events?.length === 0 && (
+        <p className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">
+          Nenhum evento cadastrado ainda.{canCreate ? " Use “Novo evento” para avisar as famílias de reuniões, festas e datas importantes." : " Quando a escola marcar reuniões e datas importantes, elas aparecem aqui."}
+        </p>
+      )}
 
       {events && events.length > 0 && (
         <>
