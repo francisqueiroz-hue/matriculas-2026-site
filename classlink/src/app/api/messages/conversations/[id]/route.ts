@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { avisarEquipePorWhatsApp } from "@/lib/avisos-equipe";
+import { avisarEquipePorWhatsApp, parametrosModeloAviso, registrarAviso } from "@/lib/avisos-equipe";
+import { modeloDisponivel } from "@/lib/whatsapp-modelos";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
@@ -8,7 +9,7 @@ import { assertConversationParticipant } from "@/lib/messaging";
 import { exigirPodeConversar, exigirPodeExcluirConversa } from "@/lib/permissoes-mensagens";
 import { sendMessageSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
-import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTextMessage } from "@/lib/whatsapp";
+import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTemplateMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { isEmailConfigured, sendEmailMessage } from "@/lib/email";
 import { MENSAGEM_JANELA_FECHADA, janelaWhatsApp } from "@/lib/canal-envio";
 import { SELECT_PESSOA, nomeParaQuemVe, pessoaParaQuemVe } from "@/lib/nome-institucional";
@@ -50,7 +51,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
         ...conversation,
         guardian: guardianPublico,
         staff: pessoaParaQuemVe(conversation.staff, session.role),
-        ...(souEquipe && { janelaWhatsApp: janelaWhatsApp(whatsappUltimaMensagemEm) }),
+        ...(souEquipe && { janelaWhatsApp: { ...janelaWhatsApp(whatsappUltimaMensagemEm), avisoPorModelo: isWhatsAppConfigured() } }),
       },
       messages: messages.map((m) => ({ ...m, sender: pessoaParaQuemVe(m.sender, session.role) })),
     });
@@ -70,9 +71,11 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
 
     // WhatsApp/e-mail só fazem sentido enviados pela equipe ao responsável — o responsável
     // já está na conversa via app, e essas mensagens sempre partem de quem está na tela do ClassLink.
-    const canalEfetivo = channel && channel !== "APP" && session.sub === conversation.staffId ? channel : "APP";
+    let canalEfetivo: "APP" | "WHATSAPP" | "EMAIL" =
+      channel && channel !== "APP" && session.sub === conversation.staffId ? channel : "APP";
 
     let externalId: string | undefined;
+    let avisoPeloWhatsApp = false;
     if (canalEfetivo === "WHATSAPP") {
       if (!isWhatsAppConfigured()) return NextResponse.json({ error: "Integração com WhatsApp não configurada" }, { status: 400 });
       const guardian = await prisma.user.findUniqueOrThrow({
@@ -81,16 +84,32 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
       });
       const phone = guardian.phone ? normalizePhoneBR(guardian.phone) : null;
       if (!phone) return NextResponse.json({ error: "Responsável não tem telefone cadastrado" }, { status: 400 });
-      // Fora da janela de 24h a Meta aceita o envio e depois descarta: a mensagem ficaria como
-      // "enviada pelo WhatsApp" sem a família nunca receber. Melhor recusar e explicar.
-      if (!janelaWhatsApp(guardian.whatsappUltimaMensagemEm).aberta) {
-        throw new ErroDeUsuario(MENSAGEM_JANELA_FECHADA, 409);
+
+      if (janelaWhatsApp(guardian.whatsappUltimaMensagemEm).aberta) {
+        const sent = await sendWhatsAppTextMessage(phone, body).catch((err: unknown) => {
+          console.error("conversa: falha ao enviar WhatsApp", err);
+          throw new ErroDeUsuario("Não foi possível enviar pelo WhatsApp. Confira o número do responsável e a integração.", 502);
+        });
+        externalId = sent.externalId;
+      } else {
+        // Fora da janela de 24h a Meta descarta texto livre (e aceita o envio, o que enganava a equipe).
+        // O texto completo fica no ClassLink; a família recebe no WhatsApp o aviso padrão aprovado,
+        // com o trecho e o link. A mensagem é do canal ClassLink, então vale o ✓✓ de abertura.
+        const modelo = await modeloDisponivel("aviso");
+        if (!modelo) throw new ErroDeUsuario(MENSAGEM_JANELA_FECHADA, 409);
+        const eu = await prisma.user.findUniqueOrThrow({ where: { id: session.sub }, select: SELECT_PESSOA });
+        const aviso = await sendWhatsAppTemplateMessage(
+          phone,
+          modelo,
+          parametrosModeloAviso(nomeParaQuemVe(eu, "GUARDIAN"), body, `${request.nextUrl.origin}/dashboard/mensagens/${id}`),
+        ).catch((err: unknown) => {
+          console.error("conversa: falha ao enviar aviso padrão do WhatsApp", err);
+          throw new ErroDeUsuario("Não foi possível avisar a família pelo WhatsApp agora. Envie pelo ClassLink.", 502);
+        });
+        await registrarAviso(aviso.externalId, conversation.guardianId, "familia", id);
+        avisoPeloWhatsApp = true;
+        canalEfetivo = "APP";
       }
-      const sent = await sendWhatsAppTextMessage(phone, body).catch((err: unknown) => {
-        console.error("conversa: falha ao enviar WhatsApp", err);
-        throw new ErroDeUsuario("Não foi possível enviar pelo WhatsApp. Confira o número do responsável e a integração.", 502);
-      });
-      externalId = sent.externalId;
     } else if (canalEfetivo === "EMAIL") {
       if (!isEmailConfigured()) return NextResponse.json({ error: "Integração de e-mail não configurada" }, { status: 400 });
       const guardian = await prisma.user.findUniqueOrThrow({ where: { id: conversation.guardianId }, select: { email: true } });
@@ -133,7 +152,10 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
       }
     });
 
-    return NextResponse.json({ message: { ...message, sender: pessoaParaQuemVe(message.sender, session.role) } }, { status: 201 });
+    return NextResponse.json(
+      { message: { ...message, sender: pessoaParaQuemVe(message.sender, session.role) }, avisoPeloWhatsApp },
+      { status: 201 },
+    );
   } catch (error) {
     return handleApiError(error);
   }

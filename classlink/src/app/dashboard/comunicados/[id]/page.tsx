@@ -43,6 +43,13 @@ const RESPOSTAS_POR_TIPO: Record<string, { value: string; label: string; negativ
   CIRCULAR: [{ value: "LIDO", label: "Confirmar leitura" }],
 };
 
+/** Explica o que vale a resposta: autorização só para passeio/evento; reunião confirma presença. */
+const AVISO_VALOR_DA_RESPOSTA: Record<string, string> = {
+  AUTORIZACAO_PASSEIO:
+    "Sua resposta vale como autorização (ou recusa) para a participação do aluno neste passeio ou evento da escola. Fica registrada com data, hora e IP.",
+  CONFIRMACAO_REUNIAO: "Sua resposta confirma (ou não) a presença na reunião. Fica registrada com data e hora.",
+};
+
 const RESPOSTA_LABEL: Record<string, string> = {
   AUTORIZADO: "Autorizado",
   NAO_AUTORIZADO: "Não autorizado",
@@ -138,6 +145,11 @@ export default function ComunicadoDetailPage() {
           {erroResposta && (
             <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
               {erroResposta}
+            </p>
+          )}
+          {AVISO_VALOR_DA_RESPOSTA[comunicado.tipo] && (
+            <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {AVISO_VALOR_DA_RESPOSTA[comunicado.tipo]}
             </p>
           )}
           {alunos.map(({ aluno, resposta }) => (
