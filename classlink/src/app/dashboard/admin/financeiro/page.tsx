@@ -25,7 +25,20 @@ interface ResultadoGeracao {
   ignorados: number;
 }
 
+interface Cobranca {
+  id: string;
+  aluno: string;
+  responsavel: string | null;
+  mesReferencia: string;
+  valor: number;
+  vencimento: string;
+  vencido: boolean;
+  whatsapp: string | null;
+}
+
 function FinanceiroContent() {
+  const [cobrancas, setCobrancas] = useState<Cobranca[] | null>(null);
+  const [erroCobrancas, setErroCobrancas] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [diaVencimento, setDiaVencimento] = useState("");
   const [diaEmissao, setDiaEmissao] = useState("");
@@ -36,6 +49,9 @@ function FinanceiroContent() {
   const [erroGeracao, setErroGeracao] = useState<string | null>(null);
 
   function load() {
+    apiJson<{ itens: Cobranca[] }>("/api/admin/billing/cobrancas")
+      .then((d) => setCobrancas(d.itens))
+      .catch(() => setErroCobrancas(true));
     apiJson<Summary>("/api/admin/billing/summary").then(setSummary);
     apiJson<Config>("/api/admin/billing/config").then((data) => {
       setDiaVencimento(data.diaVencimentoPadrao ? String(data.diaVencimentoPadrao) : "");
@@ -143,6 +159,38 @@ function FinanceiroContent() {
             {resultadoGeracao.ignorados > 0 && ` (${resultadoGeracao.ignorados} já existiam)`}.
           </p>
         )}
+      </div>
+
+      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-sm font-semibold text-slate-500">Cobrar por WhatsApp (boletos em aberto)</h2>
+        <p className="text-xs text-slate-500">
+          Abre o WhatsApp com a mensagem pronta para o responsável financeiro; você revisa e envia. Nada é enviado sozinho.
+        </p>
+        {erroCobrancas && <p className="text-xs text-red-600">Não foi possível carregar os boletos em aberto.</p>}
+        {cobrancas === null && !erroCobrancas && <p className="text-xs text-slate-500">Carregando...</p>}
+        {cobrancas?.length === 0 && <p className="text-xs text-slate-500">Nenhum boleto em aberto.</p>}
+        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          {cobrancas?.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+              <div>
+                <p className="font-medium">
+                  {c.aluno} — {c.mesReferencia}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {c.responsavel ?? "Sem responsável"} · R$ {c.valor.toFixed(2)} · vence {new Date(c.vencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                  {c.vencido && <span className="ml-1 font-semibold text-red-600">· vencido</span>}
+                </p>
+              </div>
+              {c.whatsapp ? (
+                <a href={c.whatsapp} target="_blank" rel="noreferrer" className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
+                  Cobrar por WhatsApp
+                </a>
+              ) : (
+                <span className="text-xs text-slate-400">Sem telefone válido</span>
+              )}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {summary && (

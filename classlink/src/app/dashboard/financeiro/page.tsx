@@ -12,6 +12,8 @@ interface Boleto {
   status: "PENDENTE" | "PAGO" | "VENCIDO" | "ERRO";
   /** Só existe quando o boleto foi realmente emitido no Banco Inter (tem PDF/linha digitável/PIX para pagar). */
   codigoSolicitacao: string | null;
+  linhaDigitavel: string | null;
+  pixCopiaCola: string | null;
 }
 
 interface BillingInfo {
@@ -31,6 +33,28 @@ const STATUS_COLOR: Record<string, string> = {
   VENCIDO: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
   ERRO: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
 };
+
+function BotaoCopiar({ texto, rotulo }: { texto: string; rotulo: string }) {
+  const [copiado, setCopiado] = useState(false);
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      window.prompt(`Copie ${rotulo.toLowerCase()}:`, texto);
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={copiar}
+      className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+    >
+      {copiado ? "Copiado!" : rotulo}
+    </button>
+  );
+}
 
 export default function FinanceiroPage() {
   const [boletos, setBoletos] = useState<Boleto[] | null>(null);
@@ -150,8 +174,10 @@ export default function FinanceiroPage() {
                   <p className="text-xs text-slate-400">Pagamento online ainda não disponível para este mês</p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_COLOR[b.status]}`}>{STATUS_LABEL[b.status]}</span>
+                {b.status !== "ERRO" && b.status !== "PAGO" && b.pixCopiaCola && <BotaoCopiar texto={b.pixCopiaCola} rotulo="Copiar PIX" />}
+                {b.status !== "ERRO" && b.status !== "PAGO" && b.linhaDigitavel && <BotaoCopiar texto={b.linhaDigitavel} rotulo="Copiar linha digitável" />}
                 {b.status !== "ERRO" && b.codigoSolicitacao && (
                   <a
                     href={`/api/billing/boletos/${b.id}/pdf`}
