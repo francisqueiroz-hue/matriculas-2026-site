@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
-import { ROTULO_ENVIO, explicacaoDoCanal, reciboPorCanal, type JanelaWhatsApp } from "@/lib/canal-envio";
+import { ROTULO_ENVIO, explicacaoDoCanal, reciboPorCanal, whatsappDisponivel, type JanelaWhatsApp } from "@/lib/canal-envio";
 
 type Canal = "APP" | "WHATSAPP" | "EMAIL";
 
@@ -24,7 +24,7 @@ interface GuardianConversationResponse {
     id: string;
     staff: { id: string; name: string };
     guardian: { id: string; name: string; phone: string | null; email: string | null };
-    janelaWhatsApp?: { aberta: boolean; ate: string | null };
+    janelaWhatsApp?: { aberta: boolean; ate: string | null; avisoPorModelo?: boolean };
   };
   messages: { id: string; body: string; channel: Canal; createdAt: string; readAt: string | null; sender: { id: string; name: string; role: string } }[];
 }
@@ -79,6 +79,7 @@ function ConversationPageInner() {
   const [canalEnvio, setCanalEnvio] = useState<Canal>("APP");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [envioInfo, setEnvioInfo] = useState<string | null>(null);
   const [showRequisicao, setShowRequisicao] = useState(false);
   const [itensSelecionados, setItensSelecionados] = useState<string[]>([]);
   const [itemOutro, setItemOutro] = useState("");
@@ -107,6 +108,7 @@ function ConversationPageInner() {
           janelaWhatsApp: {
             aberta: res.conversation.janelaWhatsApp?.aberta ?? false,
             ate: res.conversation.janelaWhatsApp?.ate ? new Date(res.conversation.janelaWhatsApp.ate) : null,
+            avisoPorModelo: res.conversation.janelaWhatsApp?.avisoPorModelo ?? false,
           },
           souStaffNaConversa,
           messages: res.messages,
@@ -135,23 +137,27 @@ function ConversationPageInner() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [data?.messages.length]);
 
-  /** O WhatsApp só vale com a janela de 24h aberta; se ela fechou, volta para o ClassLink. */
+  /** WhatsApp vale com a janela de 24h aberta ou, fechada, com o aviso padrão; senão volta para o ClassLink. */
   function canalValido(): Canal {
-    return canalEnvio === "WHATSAPP" && !data?.janelaWhatsApp.aberta ? "APP" : canalEnvio;
+    return canalEnvio === "WHATSAPP" && !whatsappDisponivel(data?.janelaWhatsApp) ? "APP" : canalEnvio;
   }
 
   async function enviarMensagem(body: string, channel: Canal = "APP") {
     setSending(true);
     setSendError(null);
+    setEnvioInfo(null);
     try {
       const path = isEquipe ? `/api/team-messages/conversations/${id}` : `/api/messages/conversations/${id}`;
       const payload = isEquipe ? { body } : { body, channel };
-      const res = await apiJson<{ message: DisplayMessage }>(path, {
+      const res = await apiJson<{ message: DisplayMessage; avisoPeloWhatsApp?: boolean }>(path, {
         method: "POST",
         body: JSON.stringify(payload),
       });
       const message: DisplayMessage = isEquipe ? { ...res.message, channel: null } : res.message;
       setData((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev));
+      if (res.avisoPeloWhatsApp) {
+        setEnvioInfo("Mensagem enviada pelo ClassLink. A família foi avisada no WhatsApp, com um link para abrir.");
+      }
       return true;
     } catch (err) {
       setSendError(err instanceof Error ? err.message : "Erro ao enviar mensagem");
@@ -274,6 +280,11 @@ function ConversationPageInner() {
       </div>
 
       {sendError && <p className="mt-2 text-xs text-red-600">{sendError}</p>}
+      {envioInfo && (
+        <p role="status" className="mt-2 text-xs text-emerald-700">
+          {envioInfo}
+        </p>
+      )}
 
       <form onSubmit={handleSend} className="mt-3 flex flex-wrap gap-2">
         <input
@@ -291,9 +302,15 @@ function ConversationPageInner() {
             className="rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
           >
             <option value="APP">Canal: ClassLink</option>
-            <option value="WHATSAPP" disabled={!guardianTemTelefone || !data.janelaWhatsApp.aberta}>
+            <option value="WHATSAPP" disabled={!guardianTemTelefone || !whatsappDisponivel(data.janelaWhatsApp)}>
               Canal: WhatsApp
-              {!guardianTemTelefone ? " (sem telefone)" : !data.janelaWhatsApp.aberta ? " (indisponível agora)" : ""}
+              {!guardianTemTelefone
+                ? " (sem telefone)"
+                : !whatsappDisponivel(data.janelaWhatsApp)
+                  ? " (indisponível agora)"
+                  : !data.janelaWhatsApp.aberta
+                    ? " (aviso com link)"
+                    : ""}
             </option>
             <option value="EMAIL" disabled={!guardianTemEmail}>
               Canal: E-mail{!guardianTemEmail ? " (sem e-mail)" : ""}

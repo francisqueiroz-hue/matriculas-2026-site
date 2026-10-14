@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JANELA_CONVERSA_MS, explicacaoDoCanal, janelaWhatsApp, reciboPorCanal } from "@/lib/canal-envio";
+import { JANELA_CONVERSA_MS, explicacaoDoCanal, janelaWhatsApp, reciboPorCanal, whatsappDisponivel } from "@/lib/canal-envio";
 
 const agora = new Date("2026-10-14T17:00:00Z").getTime();
 
@@ -34,8 +34,14 @@ describe("explicacaoDoCanal", () => {
     expect(t).toMatch(/não informa se foi lida/);
   });
 
-  it("WhatsApp fechado: indisponível, sugere o ClassLink", () => {
+  it("WhatsApp fechado sem aviso padrão: indisponível, sugere o ClassLink", () => {
     expect(explicacaoDoCanal("WHATSAPP", fechada)).toMatch(/Indisponível.*ClassLink/);
+  });
+
+  it("WhatsApp fechado com aviso padrão: explica que o texto fica no ClassLink e a família recebe um aviso", () => {
+    const t = explicacaoDoCanal("WHATSAPP", { ...fechada, avisoPorModelo: true });
+    expect(t).toMatch(/aviso padrão/);
+    expect(t).toMatch(/fica no ClassLink/);
   });
 
   it("e-mail: não informa abertura", () => {
@@ -54,5 +60,14 @@ describe("reciboPorCanal", () => {
     const r = reciboPorCanal("WHATSAPP", "2026-10-14T17:05:00.000Z");
     expect(r.marca).toBe("✓✓");
     expect(r.texto).toMatch(/^Lida no ClassLink em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/);
+  });
+});
+
+describe("whatsappDisponivel", () => {
+  it("aberta ou com aviso padrão: sim; fechada sem aviso padrão: não", () => {
+    expect(whatsappDisponivel({ aberta: true, ate: new Date() })).toBe(true);
+    expect(whatsappDisponivel({ aberta: false, ate: null, avisoPorModelo: true })).toBe(true);
+    expect(whatsappDisponivel({ aberta: false, ate: null })).toBe(false);
+    expect(whatsappDisponivel(undefined)).toBe(false);
   });
 });

@@ -14,8 +14,8 @@ interface StudentOption {
 }
 
 const TIPOS = [
-  { value: "AUTORIZACAO_PASSEIO", label: "Autorização de passeio" },
-  { value: "CONFIRMACAO_REUNIAO", label: "Confirmação de reunião" },
+  { value: "AUTORIZACAO_PASSEIO", label: "Passeio ou evento (a família responde Autorizo / Não autorizo)" },
+  { value: "CONFIRMACAO_REUNIAO", label: "Reunião (a família confirma presença)" },
   { value: "CIRCULAR", label: "Circular (confirmação de leitura)" },
 ];
 

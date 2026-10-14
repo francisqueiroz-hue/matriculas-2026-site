@@ -12,6 +12,8 @@ export interface JanelaWhatsApp {
   aberta: boolean;
   /** Até quando o texto livre ainda é entregue (null = a família nunca escreveu pelo WhatsApp). */
   ate: Date | null;
+  /** WhatsApp configurado: com a janela fechada, o ClassLink avisa a família por um modelo aprovado. */
+  avisoPorModelo?: boolean;
 }
 
 export function janelaWhatsApp(ultimaMensagemEm: Date | null | undefined, agora = Date.now()): JanelaWhatsApp {
@@ -20,9 +22,14 @@ export function janelaWhatsApp(ultimaMensagemEm: Date | null | undefined, agora 
   return { aberta: agora < ate.getTime(), ate };
 }
 
+/** Dá para usar o canal WhatsApp: janela aberta (texto livre) ou, fechada, o aviso padrão com link. */
+export function whatsappDisponivel(janela: JanelaWhatsApp | undefined): boolean {
+  return Boolean(janela && (janela.aberta || janela.avisoPorModelo));
+}
+
 export const MENSAGEM_JANELA_FECHADA =
-  "O WhatsApp só entrega texto livre até 24 horas depois da última mensagem da família. " +
-  "Envie pelo ClassLink (a família recebe uma notificação no celular) ou espere ela escrever.";
+  "O WhatsApp só entrega texto livre até 24 horas depois da última mensagem da família, e o aviso padrão do " +
+  "WhatsApp não está disponível agora. Envie pelo ClassLink (a família recebe uma notificação no celular).";
 
 export const ROTULO_ENVIO: Record<CanalEnvio, string> = {
   APP: "Enviar pelo ClassLink",
@@ -39,6 +46,12 @@ export function explicacaoDoCanal(canal: CanalEnvio, janela: JanelaWhatsApp): st
     return "Vai para o e-mail da família. O e-mail não informa se foi aberto.";
   }
   if (!janela.aberta || !janela.ate) {
+    if (janela.avisoPorModelo) {
+      return (
+        "A família não escreveu pelo WhatsApp nas últimas 24 horas, então o WhatsApp não entrega texto livre. " +
+        "A mensagem completa fica no ClassLink e a família recebe no WhatsApp um aviso padrão com o trecho e o link para abrir (✓✓ quando abrir)."
+      );
+    }
     return "Indisponível: a família não escreveu pelo WhatsApp nas últimas 24 horas. Use o ClassLink.";
   }
   return `Chega no WhatsApp da família, pelo número da escola. Pode enviar até ${formatarDataHora(janela.ate)}. O WhatsApp não informa se foi lida.`;
