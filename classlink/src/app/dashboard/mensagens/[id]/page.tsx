@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { reciboDeLeitura } from "@/lib/recibo-leitura";
 
 type Canal = "APP" | "WHATSAPP" | "EMAIL";
 
@@ -13,6 +14,8 @@ interface DisplayMessage {
   body: string;
   channel: Canal | null;
   createdAt: string;
+  /** Quando a outra pessoa abriu a mensagem (gravado pelo servidor). */
+  readAt?: string | null;
   sender: { id: string; name: string; role: string };
 }
 
@@ -22,7 +25,7 @@ interface GuardianConversationResponse {
     staff: { id: string; name: string };
     guardian: { id: string; name: string; phone: string | null; email: string | null };
   };
-  messages: { id: string; body: string; channel: Canal; createdAt: string; sender: { id: string; name: string; role: string } }[];
+  messages: { id: string; body: string; channel: Canal; createdAt: string; readAt: string | null; sender: { id: string; name: string; role: string } }[];
 }
 
 interface TeamConversationResponse {
@@ -31,7 +34,7 @@ interface TeamConversationResponse {
     userA: { id: string; name: string; role: string };
     userB: { id: string; name: string; role: string };
   };
-  messages: { id: string; body: string; createdAt: string; sender: { id: string; name: string; role: string } }[];
+  messages: { id: string; body: string; createdAt: string; readAt: string | null; sender: { id: string; name: string; role: string } }[];
 }
 
 /** Estado unificado da conversa, independente do tipo (responsável ou equipe). */
@@ -106,9 +109,18 @@ function ConversationPageInner() {
   }
 
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 4000);
-    return () => clearInterval(interval);
+    // Abrir a conversa é o que registra a leitura: só busca (e, portanto, só marca como lida)
+    // com a aba visível. Aba em segundo plano não pode gerar "leitura".
+    function carregarSeVisivel() {
+      if (document.visibilityState === "visible") load();
+    }
+    carregarSeVisivel();
+    const interval = setInterval(carregarSeVisivel, 4000);
+    document.addEventListener("visibilitychange", carregarSeVisivel);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", carregarSeVisivel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEquipe]);
 
@@ -240,6 +252,7 @@ function ConversationPageInner() {
                   {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                   {m.channel && m.channel !== "APP" && <span>· via {CANAL_LABEL[m.channel]}</span>}
                 </p>
+                {mine && <ReciboMensagem readAt={m.readAt} />}
               </div>
             </div>
           );
@@ -282,5 +295,15 @@ function ConversationPageInner() {
         </button>
       </form>
     </div>
+  );
+}
+
+/** "✓ Enviada" ou "✓✓ Lida em 14/10/2026 às 14:05": comprovante de que a outra pessoa abriu a mensagem. */
+function ReciboMensagem({ readAt }: { readAt?: string | null }) {
+  const recibo = reciboDeLeitura(readAt);
+  return (
+    <p className={`mt-0.5 text-[10px] ${recibo.lida ? "font-semibold text-emerald-200" : "text-indigo-200"}`}>
+      <span aria-hidden="true">{recibo.marca}</span> {recibo.texto}
+    </p>
   );
 }

@@ -6,6 +6,7 @@ const prismaMock = vi.hoisted(() => ({
   classTeacher: { findMany: vi.fn() },
   post: { findMany: vi.fn(), findFirst: vi.fn() },
   postRead: { upsert: vi.fn(), findMany: vi.fn() },
+  user: { findMany: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 const sessaoMock = vi.hoisted(() => ({ atual: { sub: "u1", role: "GUARDIAN", schoolId: "s1" } as { sub: string; role: string; schoolId: string } }));
@@ -84,5 +85,25 @@ describe("Mural: família só vê avisos (e cardápios) da turma dos filhos", ()
     const res = await quemLeu(req(), ctx("post-de-outra-turma"));
     expect(res.status).toBe(404);
     expect(prismaMock.postRead.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("Mural: 'quem leu' mostra também quem ainda não viu", () => {
+  it("lista leram (com horário) e pendentes (responsáveis da turma que não abriram)", async () => {
+    sessaoMock.atual = { sub: "d1", role: "ADMIN", schoolId: "s1" };
+    prismaMock.post.findFirst.mockResolvedValue({ id: "p1", audience: "CLASS", classId: "5ano" });
+    prismaMock.postRead.findMany.mockResolvedValue([{ id: "r1", readAt: new Date("2026-10-14T17:05:00Z"), user: { id: "g1", name: "Ana", role: "GUARDIAN" } }]);
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: "g1", name: "Ana" },
+      { id: "g2", name: "Bruno" },
+    ]);
+
+    const res = await quemLeu(req(), ctx("p1"));
+    const json = await res.json();
+    expect(json.reads).toHaveLength(1);
+    expect(json.pendentes).toEqual([{ id: "g2", name: "Bruno" }]);
+    const where = prismaMock.user.findMany.mock.calls[0][0].where;
+    expect(where.studentLinks.some.student.classId).toBe("5ano");
+    expect(where.role).toBe("GUARDIAN");
   });
 });

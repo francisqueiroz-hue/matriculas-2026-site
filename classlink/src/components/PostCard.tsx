@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
@@ -31,6 +31,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   const [readByMe, setReadByMe] = useState(post.readByMe);
   const [showReaders, setShowReaders] = useState(false);
   const [readers, setReaders] = useState<ReadEntry[] | null>(null);
+  const [pendentes, setPendentes] = useState<{ id: string; name: string }[]>([]);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(post.title);
   const [editBody, setEditBody] = useState(post.body);
@@ -44,16 +45,47 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   const recolher = precisaRecolher(current.body);
   const canSeeReaders = user.role === "ADMIN" || user.role === "STAFF";
 
+  // A leitura é registrada quando a família realmente vê o aviso na tela (metade do cartão
+  // visível por 1 segundo), e não quando a lista carrega: só rolar a página por cima não vale.
+  const cartaoRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (user.role === "GUARDIAN" && !readByMe) {
+    if (user.role !== "GUARDIAN" || readByMe) return;
+    const alvo = cartaoRef.current;
+
+    function registrar() {
       apiJson(`/api/posts/${post.id}/read`, { method: "POST" })
         .then(() => setReadByMe(true))
         .catch(() => {
-          // Confirmação automática: se falhar, o botão manual "Confirmar leitura" continua disponível.
+          // Se falhar, o botão manual "Confirmar leitura" continua disponível.
         });
     }
+
+    if (!alvo || typeof IntersectionObserver === "undefined") {
+      registrar();
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const observer = new IntersectionObserver(
+      ([entrada]) => {
+        if (entrada.isIntersecting && document.visibilityState === "visible") {
+          timer ??= setTimeout(() => {
+            observer.disconnect();
+            registrar();
+          }, 1000);
+        } else if (timer) {
+          clearTimeout(timer);
+          timer = undefined;
+        }
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(alvo);
+    return () => {
+      observer.disconnect();
+      if (timer) clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post.id]);
+  }, [post.id, readByMe]);
 
   async function confirmRead() {
     setConfirmando(true);
@@ -73,8 +105,9 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
       return;
     }
     if (!readers) {
-      const data = await apiJson<{ reads: ReadEntry[] }>(`/api/posts/${post.id}/reads`);
+      const data = await apiJson<{ reads: ReadEntry[]; pendentes: { id: string; name: string }[] }>(`/api/posts/${post.id}/reads`);
       setReaders(data.reads);
+      setPendentes(data.pendentes);
     }
     setShowReaders(true);
   }
@@ -111,7 +144,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   }
 
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <article ref={cartaoRef} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold">{current.title}</h3>
@@ -219,17 +252,25 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
       </div>
 
       {showReaders && (
-        <ul className="mt-2 space-y-1 text-xs text-slate-500">
-          {readers?.length ? (
-            readers.map((r) => (
-              <li key={r.id}>
-                {r.user.name} — {formatarDataHora(r.readAt)}
-              </li>
-            ))
-          ) : (
-            <li>Ninguém confirmou leitura ainda.</li>
+        <div className="mt-2 space-y-2 text-xs text-slate-500">
+          <ul className="space-y-1">
+            {readers?.length ? (
+              readers.map((r) => (
+                <li key={r.id}>
+                  <span className="font-medium text-green-700 dark:text-green-400">✓ Leu</span> · {r.user.name} — {formatarDataHora(r.readAt)}
+                </li>
+              ))
+            ) : (
+              <li>Ninguém confirmou leitura ainda.</li>
+            )}
+          </ul>
+          {pendentes.length > 0 && (
+            <div>
+              <p className="font-medium text-amber-700 dark:text-amber-400">Ainda não viram ({pendentes.length})</p>
+              <p>{pendentes.map((p) => p.name).join(", ")}</p>
+            </div>
           )}
-        </ul>
+        </div>
       )}
     </article>
   );
