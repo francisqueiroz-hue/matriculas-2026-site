@@ -16,7 +16,7 @@ interface StudentOption {
 const TIPOS = [
   { value: "AUTORIZACAO_PASSEIO", label: "Passeio ou evento (a família responde Autorizo / Não autorizo)" },
   { value: "CONFIRMACAO_REUNIAO", label: "Reunião (a família confirma presença)" },
-  { value: "CIRCULAR", label: "Circular (confirmação de leitura)" },
+  { value: "CIRCULAR", label: "Circular (só leitura: o app registra quando a família abrir)" },
 ];
 
 export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
