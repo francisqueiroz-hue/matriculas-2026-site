@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { isBancoInterConfigured, emitirCobranca, consultarCobranca } from "@/lib/banco-inter";
-import { notifyUsers } from "@/lib/push";
+import { origemPublica } from "@/lib/push";
+import { avisarNovoBoleto } from "@/lib/boleto-aviso";
 import { DIA_VENCIMENTO_PADRAO, calcularVencimento, formatarDataISO } from "@/lib/billing";
 
 export interface ResultadoGeracaoBoletos {
@@ -38,7 +39,7 @@ export async function gerarBoletosDoMes(
       guardians: {
         orderBy: { createdAt: "asc" },
         take: 1,
-        include: { guardian: { select: { id: true, name: true, cpf: true, enderecoCobranca: true, active: true } } },
+        include: { guardian: { select: { id: true, name: true, cpf: true, enderecoCobranca: true, active: true, phone: true, whatsappUltimaMensagemEm: true } } },
       },
     },
   });
@@ -67,9 +68,26 @@ export async function gerarBoletosDoMes(
     });
     resultado.criados++;
 
-    if (!interConfigurado) continue; // valor já visível; emissão real fica para quando o Inter for configurado
-
     const responsavel = aluno.guardians[0]?.guardian;
+
+    // O responsável é avisado quando o boleto é gerado pelo ClassLink (a cobrança hoje é manual,
+    // sem automação do banco); o aviso não depende da emissão real no Inter.
+    const avisar = () =>
+      responsavel?.active
+        ? avisarNovoBoleto({
+            responsavel,
+            alunoNome: aluno.name,
+            valor: Number(aluno.mensalidadeValor),
+            vencimento,
+            origem: origemPublica(),
+          })
+        : Promise.resolve();
+
+    if (!interConfigurado) {
+      await avisar(); // valor já visível; emissão real fica para quando o Inter for configurado
+      continue;
+    }
+
     if (!responsavel || !responsavel.active) {
       await prisma.boleto.update({
         where: { id: boleto.id },
@@ -118,11 +136,7 @@ export async function gerarBoletosDoMes(
         },
       });
 
-      void notifyUsers([responsavel.id], {
-        title: "Novo boleto disponível",
-        body: `Mensalidade de ${aluno.name} — vencimento em ${vencimento.toLocaleDateString("pt-BR")}`,
-        url: "/dashboard/financeiro",
-      }).catch((err) => console.error("push notify failed", err));
+      await avisar();
 
       resultado.emitidos++;
     } catch (err) {
