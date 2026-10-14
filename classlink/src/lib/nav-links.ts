@@ -91,6 +91,38 @@ const notasLink: NavLink = {
   icon: "M9 4h9v16H9a3 3 0 01-3-3V7a3 3 0 013-3z M11 9h5 M11 13h5",
 };
 
+/** Seções do menu lateral: agrupam os itens por assunto para a pessoa achar rápido o que procura. */
+const GRUPO_POR_HREF: Record<string, string> = {
+  "/dashboard/mural": "Comunicação",
+  "/dashboard/comunicados": "Comunicação",
+  "/dashboard/enquetes": "Comunicação",
+  "/dashboard/mensagens": "Comunicação",
+  "/dashboard/agenda": "Dia a dia",
+  "/dashboard/cardapio": "Dia a dia",
+  "/dashboard/frequencia": "Dia a dia",
+  "/dashboard/boletim": "Meu(s) filho(s)",
+  "/dashboard/financeiro": "Meu(s) filho(s)",
+  "/dashboard/contratos": "Meu(s) filho(s)",
+  "/dashboard/notas": "Pedagógico",
+};
+
+export interface GrupoNav {
+  titulo: string;
+  links: NavLink[];
+}
+
+/** Divide os links em seções, mantendo a ordem. O que não tem seção definida (área da direção) vai para "Gestão". */
+export function agruparLinks(links: NavLink[]): GrupoNav[] {
+  const grupos: GrupoNav[] = [];
+  for (const link of links) {
+    const titulo = GRUPO_POR_HREF[link.href] ?? "Gestão";
+    const existente = grupos.find((g) => g.titulo === titulo);
+    if (existente) existente.links.push(link);
+    else grupos.push({ titulo, links: [link] });
+  }
+  return grupos;
+}
+
 /** Notas fica visível só para direção (ADMIN) e coordenação (STAFF com isCoordenacao). */
 export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao">): NavLink[] {
   if (user.role === "ADMIN") return [...baseLinks, notasLink, ...adminLinks];
