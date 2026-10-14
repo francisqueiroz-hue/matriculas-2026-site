@@ -32,7 +32,11 @@ export async function POST(request: NextRequest) {
     // (assim a resposta não revela quais logins existem).
     const chave = chaveLogin(identifier, process.env.JWT_ACCESS_SECRET ?? "");
     const agora = new Date();
-    const registro = await prisma.loginTentativa.findUnique({ where: { chave } });
+    // O limitador nunca pode derrubar o login: se a tabela falhar (ex.: migração pendente), registra e segue.
+    const registro = await prisma.loginTentativa.findUnique({ where: { chave } }).catch((e: unknown) => {
+      console.error("limite-login: leitura falhou", e);
+      return null;
+    });
     const situacao = situacaoLogin(registro, agora);
     if (situacao.bloqueado) {
       return NextResponse.json(
@@ -43,11 +47,9 @@ export async function POST(request: NextRequest) {
 
     const falhouLogin = async () => {
       const novo = registrarFalha(registro, agora);
-      await prisma.loginTentativa.upsert({
-        where: { chave },
-        create: { chave, ...novo },
-        update: novo,
-      });
+      await prisma.loginTentativa
+        .upsert({ where: { chave }, create: { chave, ...novo }, update: novo })
+        .catch((e: unknown) => console.error("limite-login: gravação falhou", e));
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
     };
 
@@ -65,7 +67,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (registro) {
-      await prisma.loginTentativa.deleteMany({ where: { chave } });
+      await prisma.loginTentativa
+        .deleteMany({ where: { chave } })
+        .catch((e: unknown) => console.error("limite-login: limpeza falhou", e));
     }
 
     const accessToken = await signAccessToken({

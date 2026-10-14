@@ -32,6 +32,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.JWT_ACCESS_SECRET = "segredo-de-teste";
   prismaMock.loginTentativa.findUnique.mockResolvedValue(null);
+  prismaMock.loginTentativa.upsert.mockResolvedValue({});
+  prismaMock.loginTentativa.deleteMany.mockResolvedValue({ count: 1 });
+  prismaMock.refreshToken.create.mockResolvedValue({});
   prismaMock.user.findUnique.mockResolvedValue(usuario);
 });
 
@@ -74,6 +77,17 @@ describe("POST /api/auth/login com limite de tentativas", () => {
     expect(res.status).toBe(200);
     expect(prismaMock.loginTentativa.deleteMany).toHaveBeenCalledTimes(1);
     expect(prismaMock.loginTentativa.upsert).not.toHaveBeenCalled();
+  });
+
+  it("se a tabela do limitador falhar, o login continua funcionando", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    prismaMock.loginTentativa.findUnique.mockRejectedValue(new Error("relation does not exist"));
+    prismaMock.loginTentativa.upsert.mockRejectedValue(new Error("relation does not exist"));
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    expect((await POST(req())).status).toBe(200);
+    vi.mocked(verifyPassword).mockResolvedValue(false);
+    expect((await POST(req())).status).toBe(401);
+    log.mockRestore();
   });
 
   it("login correto sem falhas anteriores não mexe na tabela", async () => {
