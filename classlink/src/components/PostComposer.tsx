@@ -28,7 +28,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
         setClasses(data.classes);
         if (data.classes.length && user.role === "STAFF") setClassId(data.classes[0].id);
       })
-      .catch(() => {});
+      .catch(() => setError("Não foi possível carregar as turmas. Atualize a página para tentar de novo."));
   }, [user.role]);
 
   async function handleSubmit(e: React.FormEvent) {

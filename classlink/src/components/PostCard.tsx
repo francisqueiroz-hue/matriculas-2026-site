@@ -45,7 +45,9 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
     if (user.role === "GUARDIAN" && !readByMe) {
       apiJson(`/api/posts/${post.id}/read`, { method: "POST" })
         .then(() => setReadByMe(true))
-        .catch(() => {});
+        .catch(() => {
+          // Confirmação automática: se falhar, o botão manual "Confirmar leitura" continua disponível.
+        });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id]);
