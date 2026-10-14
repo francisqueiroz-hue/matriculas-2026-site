@@ -57,6 +57,11 @@ export function samePhoneBR(a: string, b: string): boolean {
   return phoneVariantsBR(b).some((v) => variantes.includes(v));
 }
 
+/** Algum telefone da lista é o mesmo celular de `telefone` (com ou sem o nono dígito)? */
+export function telefoneEmLista(telefone: string, existentes: ReadonlyArray<string | null | undefined>): boolean {
+  return existentes.some((outro) => Boolean(outro) && samePhoneBR(outro as string, telefone));
+}
+
 export async function sendWhatsAppTextMessage(toPhone: string, body: string): Promise<{ externalId: string }> {
   const phoneNumberId = env("WHATSAPP_PHONE_NUMBER_ID");
   const token = env("WHATSAPP_API_TOKEN");
