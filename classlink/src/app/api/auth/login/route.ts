@@ -12,6 +12,7 @@ import {
   refreshCookieOptions,
 } from "@/lib/auth";
 import { handleApiError } from "@/lib/http";
+import { ehPrimeiroAcesso, enviarBoasVindasApp } from "@/lib/boas-vindas";
 import { chaveLogin, mensagemBloqueio, registrarFalha, situacaoLogin } from "@/lib/limite-login";
 
 const loginSchema = z.object({
@@ -79,10 +80,15 @@ export async function POST(request: NextRequest) {
       name: user.name,
     });
 
+    // Antes de criar a sessão: depois dela o responsável já não seria "primeiro acesso".
+    const primeiroAcesso = await ehPrimeiroAcesso(user);
+
     const { token: refreshToken, tokenHash, expiresAt } = generateRefreshToken();
     await prisma.refreshToken.create({
       data: { tokenHash, userId: user.id, expiresAt },
     });
+
+    if (primeiroAcesso) await enviarBoasVindasApp(user);
 
     const response = NextResponse.json({
       user: {

@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
           await registrarUltimaMensagem(equipe.id);
           // Equipe também pode pedir o acesso por "ACESSO".
           if (pediuAcesso) {
-            await responderPedidoDeAcesso(equipe, msg.from, `${request.nextUrl.origin}/login`).catch((err) =>
+            await responderPedidoDeAcesso(equipe, msg.from, `${request.nextUrl.origin}/login`, false).catch((err) =>
               console.error("Falha ao responder pedido de acesso da equipe pelo WhatsApp", err),
             );
             continue;
