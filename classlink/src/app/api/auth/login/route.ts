@@ -12,6 +12,7 @@ import {
   refreshCookieOptions,
 } from "@/lib/auth";
 import { handleApiError } from "@/lib/http";
+import { chaveLogin, mensagemBloqueio, registrarFalha, situacaoLogin } from "@/lib/limite-login";
 
 const loginSchema = z.object({
   identifier: z.string().min(3),
@@ -27,17 +28,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
     }
 
+    // Limite de tentativas: conta falhas por identificador, exista a conta ou não
+    // (assim a resposta não revela quais logins existem).
+    const chave = chaveLogin(identifier, process.env.JWT_ACCESS_SECRET ?? "");
+    const agora = new Date();
+    // O limitador nunca pode derrubar o login: se a tabela falhar (ex.: migração pendente), registra e segue.
+    const registro = await prisma.loginTentativa.findUnique({ where: { chave } }).catch((e: unknown) => {
+      console.error("limite-login: leitura falhou", e);
+      return null;
+    });
+    const situacao = situacaoLogin(registro, agora);
+    if (situacao.bloqueado) {
+      return NextResponse.json(
+        { error: mensagemBloqueio(situacao.segundos) },
+        { status: 429, headers: { "Retry-After": String(situacao.segundos) } },
+      );
+    }
+
+    const falhouLogin = async () => {
+      const novo = registrarFalha(registro, agora);
+      await prisma.loginTentativa
+        .upsert({ where: { chave }, create: { chave, ...novo }, update: novo })
+        .catch((e: unknown) => console.error("limite-login: gravação falhou", e));
+      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
+    };
+
     const user =
       identifier.type === "email"
         ? await prisma.user.findUnique({ where: { email: identifier.value } })
         : await prisma.user.findFirst({ where: { phone: identifier.value } });
     if (!user || !user.active || user.deletedAt) {
-      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
+      return await falhouLogin();
     }
 
     const validPassword = await verifyPassword(body.password, user.passwordHash);
     if (!validPassword) {
-      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
+      return await falhouLogin();
+    }
+
+    if (registro) {
+      await prisma.loginTentativa
+        .deleteMany({ where: { chave } })
+        .catch((e: unknown) => console.error("limite-login: limpeza falhou", e));
     }
 
     const accessToken = await signAccessToken({

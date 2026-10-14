@@ -213,6 +213,15 @@ model RefreshToken {
   @@index([userId])
 }
 
+/// Contador de falhas de login por identificador (HMAC, nunca o e-mail/telefone em texto).
+model LoginTentativa {
+  chave           String    @id
+  falhas          Int
+  primeiraFalhaEm DateTime
+  bloqueadoAte    DateTime?
+  atualizadoEm    DateTime  @updatedAt
+}
+
 model PushToken {
   id        String   @id @default(cuid())
   token     String   @unique
