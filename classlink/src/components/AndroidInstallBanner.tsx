@@ -58,7 +58,7 @@ export function AndroidInstallBanner() {
   }
 
   return (
-    <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+    <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 sm:hidden">
       <p>📲 Instale o ClassLink na tela do seu celular pra abrir mais rápido e não perder os avisos.</p>
       <div className="flex shrink-0 items-center gap-2">
         <button

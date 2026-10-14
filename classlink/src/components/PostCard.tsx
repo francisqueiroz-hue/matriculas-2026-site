@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
+import { precisaRecolher } from "@/lib/texto-recolhivel";
 
 export interface PostItem {
   id: string;
@@ -37,8 +38,10 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  const [expandido, setExpandido] = useState(false);
 
   const canModerate = user.role === "ADMIN" || user.id === post.author.id;
+  const recolher = precisaRecolher(current.body);
   const canSeeReaders = user.role === "ADMIN" || user.role === "STAFF";
 
   useEffect(() => {
@@ -162,7 +165,25 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
           </div>
         </form>
       ) : (
-        <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{current.body}</p>
+        <div>
+          <p
+            className={`whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300 ${
+              recolher && !expandido ? "line-clamp-6" : ""
+            }`}
+          >
+            {current.body}
+          </p>
+          {recolher && (
+            <button
+              type="button"
+              onClick={() => setExpandido((v) => !v)}
+              aria-expanded={expandido}
+              className="mt-1 text-sm font-medium text-indigo-600 hover:underline"
+            >
+              {expandido ? "Mostrar menos" : "Ler mais"}
+            </button>
+          )}
+        </div>
       )}
 
       {post.mediaUrl && post.mediaType === "image" && (

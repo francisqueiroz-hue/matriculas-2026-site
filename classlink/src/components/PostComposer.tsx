@@ -21,6 +21,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aberto, setAberto] = useState(false);
 
   useEffect(() => {
     apiJson<{ classes: ClassOption[] }>("/api/admin/classes")
@@ -60,6 +61,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
       setTitle("");
       setBody("");
       setFile(null);
+      setAberto(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao publicar");
     } finally {
@@ -67,12 +69,29 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
     }
   }
 
+  if (!aberto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
+      >
+        <span aria-hidden="true">＋</span> Novo aviso
+      </button>
+    );
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
       className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
-      <h2 className="text-sm font-semibold text-slate-500">Publicar novo aviso</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-500">Publicar novo aviso</h2>
+        <button type="button" onClick={() => setAberto(false)} className="text-xs text-slate-500 hover:underline">
+          Cancelar
+        </button>
+      </div>
       <input
         required
         aria-label="Título do aviso"
@@ -121,13 +140,22 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
           </select>
         )}
 
-        <input
-          type="file"
-          aria-label="Anexar foto ou vídeo"
-          accept="image/*,video/*"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="text-xs"
-        />
+        <label className="inline-flex max-w-full cursor-pointer items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 focus-within:outline focus-within:outline-2 focus-within:outline-indigo-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+          <span aria-hidden="true">📎</span>
+          <span className="truncate">{file ? file.name : "Anexar foto ou vídeo"}</span>
+          <input
+            type="file"
+            aria-label="Anexar foto ou vídeo"
+            accept="image/*,video/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="sr-only"
+          />
+        </label>
+        {file && (
+          <button type="button" onClick={() => setFile(null)} className="text-xs text-slate-500 hover:underline">
+            Remover anexo
+          </button>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
