@@ -3,6 +3,7 @@ import { avisarEquipePorWhatsApp } from "@/lib/avisos-equipe";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
+import { ErroDeUsuario } from "@/lib/erros";
 import { assertConversationParticipant } from "@/lib/messaging";
 import { exigirPodeConversar, exigirPodeExcluirConversa } from "@/lib/permissoes-mensagens";
 import { sendMessageSchema } from "@/lib/validators";
@@ -68,13 +69,19 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
       const guardian = await prisma.user.findUniqueOrThrow({ where: { id: conversation.guardianId }, select: { phone: true } });
       const phone = guardian.phone ? normalizePhoneBR(guardian.phone) : null;
       if (!phone) return NextResponse.json({ error: "Responsável não tem telefone cadastrado" }, { status: 400 });
-      const sent = await sendWhatsAppTextMessage(phone, body);
+      const sent = await sendWhatsAppTextMessage(phone, body).catch((err: unknown) => {
+        console.error("conversa: falha ao enviar WhatsApp", err);
+        throw new ErroDeUsuario("Não foi possível enviar pelo WhatsApp. Confira o número do responsável e a integração.", 502);
+      });
       externalId = sent.externalId;
     } else if (canalEfetivo === "EMAIL") {
       if (!isEmailConfigured()) return NextResponse.json({ error: "Integração de e-mail não configurada" }, { status: 400 });
       const guardian = await prisma.user.findUniqueOrThrow({ where: { id: conversation.guardianId }, select: { email: true } });
       if (!guardian.email) return NextResponse.json({ error: "Responsável não tem e-mail cadastrado" }, { status: 400 });
-      const sent = await sendEmailMessage({ to: guardian.email, subject: "Nova mensagem do ClassLink", text: body, conversationId: id });
+      const sent = await sendEmailMessage({ to: guardian.email, subject: "Nova mensagem do ClassLink", text: body, conversationId: id }).catch((err: unknown) => {
+        console.error("conversa: falha ao enviar e-mail", err);
+        throw new ErroDeUsuario("Não foi possível enviar o e-mail. Confira o endereço do responsável e a integração.", 502);
+      });
       externalId = sent.externalId;
     }
 

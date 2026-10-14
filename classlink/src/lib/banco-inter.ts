@@ -1,4 +1,5 @@
 import https from "node:https";
+import { ErroDeUsuario } from "@/lib/erros";
 import { readFileSync } from "node:fs";
 
 /**
@@ -188,13 +189,13 @@ async function authorizedRequest<T>(method: string, path: string, body?: unknown
 /** Monta o payload de emissão a partir dos dados do aluno/responsável — mantido puro/testável. */
 export function buildCobrancaPayload(input: EmitirCobrancaInput) {
   if (!input.pagador.cpfCnpj || input.pagador.cpfCnpj.replace(/\D/g, "").length < 11) {
-    throw new Error("CPF do responsável ausente ou inválido");
+    throw new ErroDeUsuario("CPF do responsável ausente ou inválido");
   }
   if (!input.pagador.endereco.cep || !input.pagador.endereco.logradouro) {
-    throw new Error("Endereço de cobrança incompleto");
+    throw new ErroDeUsuario("Endereço de cobrança incompleto");
   }
   if (input.valorNominal <= 0) {
-    throw new Error("Valor da mensalidade deve ser maior que zero");
+    throw new ErroDeUsuario("Valor da mensalidade deve ser maior que zero");
   }
 
   return {

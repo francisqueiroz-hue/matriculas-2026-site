@@ -1,4 +1,5 @@
 import type { AttendanceStatus } from "@prisma/client";
+import { ErroDeUsuario } from "@/lib/erros";
 
 /**
  * Percentual mínimo de frequência exigido para aprovação na educação básica no Brasil
@@ -47,10 +48,10 @@ const MES_REGEX = /^(\d{4})-(\d{2})$/;
 /** Intervalo [início, fim) em UTC do mês "AAAA-MM", usado para consultar Attendance.date. */
 export function mesReferenciaParaIntervalo(mesReferencia: string): { inicio: Date; fim: Date } {
   const match = MES_REGEX.exec(mesReferencia);
-  if (!match) throw new Error("Mês de referência inválido (use AAAA-MM)");
+  if (!match) throw new ErroDeUsuario("Mês de referência inválido (use AAAA-MM)");
   const ano = Number(match[1]);
   const mes = Number(match[2]);
-  if (mes < 1 || mes > 12) throw new Error("Mês de referência inválido (use AAAA-MM)");
+  if (mes < 1 || mes > 12) throw new ErroDeUsuario("Mês de referência inválido (use AAAA-MM)");
   const inicio = new Date(Date.UTC(ano, mes - 1, 1));
   const fim = new Date(Date.UTC(ano, mes, 1));
   return { inicio, fim };
@@ -72,8 +73,8 @@ const DATA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Normaliza uma data "AAAA-MM-DD" para meia-noite UTC (chave usada em Attendance.date). Lança erro se o formato for inválido. */
 export function dataParaMeiaNoiteUtc(data: string): Date {
-  if (!DATA_REGEX.test(data)) throw new Error("Data inválida (use AAAA-MM-DD)");
+  if (!DATA_REGEX.test(data)) throw new ErroDeUsuario("Data inválida (use AAAA-MM-DD)");
   const date = new Date(`${data}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) throw new Error("Data inválida (use AAAA-MM-DD)");
+  if (Number.isNaN(date.getTime())) throw new ErroDeUsuario("Data inválida (use AAAA-MM-DD)");
   return date;
 }

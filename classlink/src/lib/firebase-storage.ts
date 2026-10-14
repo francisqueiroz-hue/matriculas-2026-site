@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getStorage } from "firebase-admin/storage";
+import { ErroDeUsuario } from "@/lib/erros";
 import { getFirebaseAdminApp } from "@/lib/firebase-admin";
 
 export interface UploadResult {
@@ -19,7 +20,7 @@ export function isFirebaseStorageConfigured() {
 export function assertUploadSize(bytes: number, kind: "image" | "video") {
   const limit = kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
   if (bytes > limit) {
-    throw new Error(`Arquivo muito grande. Limite de ${Math.round(limit / 1024 / 1024)}MB para ${kind}.`);
+    throw new ErroDeUsuario(`Arquivo muito grande. Limite de ${Math.round(limit / 1024 / 1024)}MB para ${kind}.`);
   }
 }
 
