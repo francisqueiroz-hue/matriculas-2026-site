@@ -52,7 +52,28 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json({ itens });
+    const pagosBd = await prisma.boleto.findMany({
+      where: { schoolId: session.schoolId, status: "PAGO", student: { deletedAt: null } },
+      orderBy: [{ pagoEm: "desc" }],
+      take: 30,
+      include: {
+        student: {
+          select: { name: true, guardians: { orderBy: { createdAt: "asc" }, take: 1, select: { guardian: { select: { name: true } } } } },
+        },
+      },
+    });
+    const pagos = pagosBd.map((b) => ({
+      id: b.id,
+      aluno: b.student.name,
+      responsavel: b.student.guardians[0]?.guardian.name ?? null,
+      mesReferencia: b.mesReferencia,
+      valor: Number(b.valor),
+      pagoEm: b.pagoEm ? b.pagoEm.toISOString() : null,
+      // Pagamento confirmado pelo banco (boleto emitido) não se desfaz aqui.
+      desfazivel: !b.codigoSolicitacao,
+    }));
+
+    return NextResponse.json({ itens, pagos });
   } catch (error) {
     return handleApiError(error);
   }

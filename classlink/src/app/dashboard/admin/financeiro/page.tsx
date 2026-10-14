@@ -36,7 +36,27 @@ interface Cobranca {
   whatsapp: string | null;
 }
 
+interface Pago {
+  id: string;
+  aluno: string;
+  responsavel: string | null;
+  mesReferencia: string;
+  valor: number;
+  pagoEm: string | null;
+  desfazivel: boolean;
+}
+
+function hojeISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function FinanceiroContent() {
+  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [confirmando, setConfirmando] = useState<string | null>(null);
+  const [dataPgto, setDataPgto] = useState(hojeISO());
+  const [salvandoBaixa, setSalvandoBaixa] = useState<string | null>(null);
+  const [erroBaixa, setErroBaixa] = useState<string | null>(null);
   const [cobrancas, setCobrancas] = useState<Cobranca[] | null>(null);
   const [erroCobrancas, setErroCobrancas] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -49,8 +69,11 @@ function FinanceiroContent() {
   const [erroGeracao, setErroGeracao] = useState<string | null>(null);
 
   function load() {
-    apiJson<{ itens: Cobranca[] }>("/api/admin/billing/cobrancas")
-      .then((d) => setCobrancas(d.itens))
+    apiJson<{ itens: Cobranca[]; pagos: Pago[] }>("/api/admin/billing/cobrancas")
+      .then((d) => {
+        setCobrancas(d.itens);
+        setPagos(d.pagos);
+      })
       .catch(() => setErroCobrancas(true));
     apiJson<Summary>("/api/admin/billing/summary").then(setSummary);
     apiJson<Config>("/api/admin/billing/config").then((data) => {
@@ -60,6 +83,23 @@ function FinanceiroContent() {
   }
 
   useEffect(load, []);
+
+  async function baixar(id: string, acao: "PAGO" | "DESFAZER") {
+    setSalvandoBaixa(id);
+    setErroBaixa(null);
+    try {
+      await apiJson(`/api/admin/billing/boletos/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(acao === "PAGO" ? { acao, dataPagamento: dataPgto } : { acao }),
+      });
+      setConfirmando(null);
+      load();
+    } catch (err) {
+      setErroBaixa(err instanceof Error ? err.message : "Não foi possível atualizar o boleto");
+    } finally {
+      setSalvandoBaixa(null);
+    }
+  }
 
   async function gerarBoletosDoMes() {
     setGerando(true);
@@ -181,16 +221,90 @@ function FinanceiroContent() {
                   {c.vencido && <span className="ml-1 font-semibold text-red-600">· vencido</span>}
                 </p>
               </div>
-              {c.whatsapp ? (
-                <a href={c.whatsapp} target="_blank" rel="noreferrer" className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
-                  Cobrar por WhatsApp
-                </a>
-              ) : (
-                <span className="text-xs text-slate-400">Sem telefone válido</span>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {confirmando === c.id ? (
+                  <>
+                    <label className="text-xs text-slate-500">
+                      Pago em{" "}
+                      <input
+                        type="date"
+                        value={dataPgto}
+                        max={hojeISO()}
+                        onChange={(e) => setDataPgto(e.target.value)}
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={salvandoBaixa === c.id || !dataPgto}
+                      onClick={() => baixar(c.id, "PAGO")}
+                      className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {salvandoBaixa === c.id ? "Salvando..." : "Confirmar pagamento"}
+                    </button>
+                    <button type="button" onClick={() => setConfirmando(null)} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs dark:border-slate-700">
+                      Cancelar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {c.whatsapp ? (
+                      <a href={c.whatsapp} target="_blank" rel="noreferrer" className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
+                        Cobrar por WhatsApp
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-400">Sem telefone válido</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmando(c.id);
+                        setDataPgto(hojeISO());
+                        setErroBaixa(null);
+                      }}
+                      className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                    >
+                      Marcar como pago
+                    </button>
+                  </>
+                )}
+              </div>
             </li>
           ))}
         </ul>
+        {erroBaixa && <p className="text-xs text-red-600">{erroBaixa}</p>}
+        {pagos.length > 0 && (
+          <details className="pt-2">
+            <summary className="cursor-pointer text-xs font-semibold text-slate-500">Marcados como pagos (últimos {pagos.length}) — desfazer se foi engano</summary>
+            <ul className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
+              {pagos.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <div>
+                    <p className="font-medium">
+                      {p.aluno} — {p.mesReferencia}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {p.responsavel ?? "Sem responsável"} · R$ {p.valor.toFixed(2)}
+                      {p.pagoEm && ` · pago em ${new Date(p.pagoEm).toLocaleDateString("pt-BR")}`}
+                    </p>
+                  </div>
+                  {p.desfazivel ? (
+                    <button
+                      type="button"
+                      disabled={salvandoBaixa === p.id}
+                      onClick={() => baixar(p.id, "DESFAZER")}
+                      className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800"
+                    >
+                      Desfazer
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-400">Confirmado pelo banco</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
 
       {summary && (
