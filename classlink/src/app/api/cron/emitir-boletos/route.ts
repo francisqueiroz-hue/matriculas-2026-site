@@ -7,6 +7,9 @@ import { gerarBoletosDoMes } from "@/lib/boleto-emissao";
 
 const DIA_EMISSAO_PADRAO = 1;
 
+// Emissão + avisos de várias famílias podem passar do limite padrão da função.
+export const maxDuration = 60;
+
 // Vercel Cron só invoca via GET; aceitamos POST também para schedulers externos.
 export async function GET(request: NextRequest) {
   return handle(request);

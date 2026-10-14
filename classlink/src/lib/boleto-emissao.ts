@@ -2,6 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { isBancoInterConfigured, emitirCobranca, consultarCobranca } from "@/lib/banco-inter";
 import { origemPublica } from "@/lib/push";
 import { avisarNovoBoleto } from "@/lib/boleto-aviso";
+import { executarComLimite } from "@/lib/concorrencia";
+
+/** Avisos (push + WhatsApp) simultâneos: acelera o lote sem estourar limites dos provedores. */
+const AVISOS_SIMULTANEOS = 5;
 import { DIA_VENCIMENTO_PADRAO, calcularVencimento, formatarDataISO } from "@/lib/billing";
 
 export interface ResultadoGeracaoBoletos {
@@ -32,6 +36,8 @@ export async function gerarBoletosDoMes(
 ): Promise<ResultadoGeracaoBoletos> {
   const resultado: ResultadoGeracaoBoletos = { criados: 0, emitidos: 0, erros: 0, ignorados: 0 };
   const interConfigurado = isBancoInterConfigured();
+  // Os avisos são rede lenta: ficam para depois do loop e saem em paralelo limitado.
+  const avisos: Array<() => Promise<unknown>> = [];
 
   const alunos = await prisma.student.findMany({
     where: { schoolId: escola.id, deletedAt: null, mensalidadeValor: { not: null } },
@@ -72,19 +78,20 @@ export async function gerarBoletosDoMes(
 
     // O responsável é avisado quando o boleto é gerado pelo ClassLink (a cobrança hoje é manual,
     // sem automação do banco); o aviso não depende da emissão real no Inter.
-    const avisar = () =>
-      responsavel?.active
-        ? avisarNovoBoleto({
-            responsavel,
-            alunoNome: aluno.name,
-            valor: Number(aluno.mensalidadeValor),
-            vencimento,
-            origem: origemPublica(),
-          })
-        : Promise.resolve();
+    const avisar = () => {
+      if (!responsavel?.active) return;
+      const dados = {
+        responsavel,
+        alunoNome: aluno.name,
+        valor: Number(aluno.mensalidadeValor),
+        vencimento,
+        origem: origemPublica(),
+      };
+      avisos.push(() => avisarNovoBoleto(dados));
+    };
 
     if (!interConfigurado) {
-      await avisar(); // valor já visível; emissão real fica para quando o Inter for configurado
+      avisar(); // valor já visível; emissão real fica para quando o Inter for configurado
       continue;
     }
 
@@ -136,7 +143,7 @@ export async function gerarBoletosDoMes(
         },
       });
 
-      await avisar();
+      avisar();
 
       resultado.emitidos++;
     } catch (err) {
@@ -148,5 +155,6 @@ export async function gerarBoletosDoMes(
     }
   }
 
+  await executarComLimite(avisos, AVISOS_SIMULTANEOS);
   return resultado;
 }
