@@ -61,9 +61,11 @@ export default function EsqueciSenhaPage() {
             </p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium">E-mail ou telefone</label>
+                <label htmlFor="esqueci-identificador" className="mb-1 block text-sm font-medium">E-mail ou telefone</label>
                 <input
+                  id="esqueci-identificador"
                   type="text"
+                  autoComplete="username"
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}

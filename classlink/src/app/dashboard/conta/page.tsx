@@ -98,6 +98,8 @@ export default function ContaPage() {
           <form onSubmit={handleAddEmail} className="mt-3 space-y-2">
             <input
               type="email"
+              aria-label="Seu e-mail"
+              autoComplete="email"
               required
               placeholder="seuemail@exemplo.com"
               value={newEmail}
@@ -125,6 +127,8 @@ export default function ContaPage() {
         <form onSubmit={handleChangePassword} className="mt-3 space-y-2">
           <input
             type="password"
+            aria-label="Senha atual"
+            autoComplete="current-password"
             required
             placeholder="Senha atual"
             value={currentPassword}
@@ -133,6 +137,8 @@ export default function ContaPage() {
           />
           <input
             type="password"
+            aria-label="Nova senha"
+            autoComplete="new-password"
             required
             minLength={8}
             placeholder="Nova senha (mín. 8 caracteres)"
@@ -162,6 +168,7 @@ export default function ContaPage() {
 
         {!confirming ? (
           <button
+            type="button"
             onClick={() => setConfirming(true)}
             className="mt-3 rounded-md border border-red-400 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 dark:text-red-300"
           >
@@ -171,6 +178,8 @@ export default function ContaPage() {
           <form onSubmit={handleDelete} className="mt-3 space-y-2">
             <input
               type="password"
+              aria-label="Confirme sua senha"
+              autoComplete="current-password"
               required
               placeholder="Confirme sua senha"
               value={password}
