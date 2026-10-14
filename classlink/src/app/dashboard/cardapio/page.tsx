@@ -12,6 +12,8 @@ const REFEICOES_PADRAO = ["Lanche da manhã", "Almoço", "Lanche da tarde"];
 interface Conteudo {
   refeicoes: string[];
   itens: Record<Dia, string[]>;
+  /** Dia sem cardápio (feriado etc.), com a explicação mostrada às famílias. */
+  semCardapio?: Partial<Record<Dia, string>>;
 }
 
 interface Cardapio {
@@ -56,6 +58,7 @@ function VerCardapio({ c }: { c: Cardapio }) {
     <div className="space-y-3">
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {DIAS.map((dia, i) => {
+          const nota = c.conteudo.semCardapio?.[dia]?.trim();
           const itens = c.conteudo.refeicoes
             .map((refeicao, r) => ({ refeicao, item: c.conteudo.itens[dia]?.[r]?.trim() }))
             .filter((x) => x.item);
@@ -64,7 +67,12 @@ function VerCardapio({ c }: { c: Cardapio }) {
               <p className="text-sm font-semibold">
                 {NOME_DIA[dia]} <span className="font-normal text-slate-500">{diaMes(somarDias(c.semanaInicio, i))}</span>
               </p>
-              {itens.length === 0 ? (
+              {nota ? (
+                <p className="mt-1 text-sm font-medium text-amber-800 dark:text-amber-300">
+                  {nota}
+                  <span className="block text-xs font-normal text-slate-500">Sem cardápio neste dia</span>
+                </p>
+              ) : itens.length === 0 ? (
                 <p className="mt-1 text-xs text-slate-400">—</p>
               ) : (
                 <ul className="mt-1 space-y-1">
@@ -123,6 +131,14 @@ function Editor({
       ...atual,
       conteudo: { ...atual.conteudo, itens: { ...atual.conteudo.itens, [dia]: atual.conteudo.itens[dia].map((v, i) => (i === r ? valor : v)) } },
     }));
+  }
+  function setSemCardapio(dia: Dia, valor: string) {
+    setF((a) => {
+      const semCardapio = { ...(a.conteudo.semCardapio ?? {}) };
+      if (valor.trim()) semCardapio[dia] = valor;
+      else delete semCardapio[dia];
+      return { ...a, conteudo: { ...a.conteudo, semCardapio } };
+    });
   }
   function renomearRefeicao(r: number, nome: string) {
     setF((a) => ({ ...a, conteudo: { ...a.conteudo, refeicoes: a.conteudo.refeicoes.map((n, i) => (i === r ? nome : n)) } }));
@@ -265,6 +281,16 @@ function Editor({
             <legend className="px-1 text-sm font-semibold">
               {NOME_DIA[dia]} <span className="font-normal text-slate-500">{diaMes(somarDias(f.semanaInicio, i))}</span>
             </legend>
+            <label className="mt-1 block text-xs">
+              <span className="mb-0.5 block font-medium text-amber-800">Sem cardápio neste dia?</span>
+              <input
+                maxLength={80}
+                value={f.conteudo.semCardapio?.[dia] ?? ""}
+                onChange={(e) => setSemCardapio(dia, e.target.value)}
+                placeholder="Ex.: Feriado"
+                className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+              />
+            </label>
             {f.conteudo.refeicoes.map((nome, r) => (
               <label key={r} className="mt-2 block text-xs">
                 <span className="mb-0.5 block font-medium uppercase text-slate-500">{nome || "Refeição"}</span>

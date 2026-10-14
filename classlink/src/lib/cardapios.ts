@@ -29,6 +29,11 @@ export const conteudoCardapioSchema = z
   .object({
     refeicoes: z.array(z.string().trim().min(1).max(40)).min(1).max(8),
     itens: z.object(Object.fromEntries(DIAS.map((d) => [d, z.array(z.string().trim().max(300))])) as Record<Dia, z.ZodArray<z.ZodString>>),
+    /** Dia sem cardápio (feriado, recesso...): a nota aparece no lugar das refeições. Ex.: { qui: "Feriado" }. */
+    semCardapio: z
+      .object(Object.fromEntries(DIAS.map((d) => [d, z.string().trim().max(80).optional()])) as Record<Dia, z.ZodOptional<z.ZodString>>)
+      .strict()
+      .optional(),
   })
   .refine((c) => DIAS.every((d) => c.itens[d].length === c.refeicoes.length), {
     message: "Cada dia precisa ter um campo para cada refeição",
@@ -141,6 +146,8 @@ export function tituloCardapio(semanaInicio: string, turma?: string | null): str
 /** Texto do cardápio para o Mural (e para a notificação). */
 export function textoCardapio(semanaInicio: string, conteudo: ConteudoCardapio, observacoes?: string | null): string {
   const blocos = DIAS.map((dia, i) => {
+    const nota = conteudo.semCardapio?.[dia]?.trim();
+    if (nota) return `${NOME_DIA[dia]} (${diaMes(somarDias(semanaInicio, i))})\n${nota} — sem cardápio neste dia`;
     const linhas = conteudo.refeicoes
       .map((refeicao, r) => ({ refeicao, item: conteudo.itens[dia][r]?.trim() }))
       .filter((l) => l.item)
