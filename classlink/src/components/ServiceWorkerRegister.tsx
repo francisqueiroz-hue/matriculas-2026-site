@@ -6,7 +6,9 @@ import { useEffect } from "react";
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Sem service worker o app funciona normalmente; só não há instalação/offline.
+      });
     }
   }, []);
 

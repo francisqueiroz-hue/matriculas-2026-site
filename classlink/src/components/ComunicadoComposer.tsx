@@ -39,14 +39,14 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
         setClasses(data.classes);
         if (data.classes.length && user.role === "STAFF") setClassId(data.classes[0].id);
       })
-      .catch(() => {});
+      .catch(() => setError("Não foi possível carregar as turmas. Atualize a página para tentar de novo."));
   }, [user.role]);
 
   useEffect(() => {
     if (audience !== "STUDENT" || !classId) return;
     apiJson<{ students: StudentOption[] }>(`/api/admin/students?classId=${classId}`)
       .then((data) => setStudents(data.students))
-      .catch(() => {});
+      .catch(() => setError("Não foi possível carregar os alunos da turma. Selecione a turma de novo."));
   }, [audience, classId]);
 
   async function handleSubmit(e: React.FormEvent) {
