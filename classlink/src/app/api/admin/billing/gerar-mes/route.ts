@@ -5,6 +5,9 @@ import { handleApiError } from "@/lib/http";
 import { mesReferenciaAtual, agoraNoFusoDaEscola } from "@/lib/billing";
 import { gerarBoletosDoMes } from "@/lib/boleto-emissao";
 
+// Emissão + avisos de várias famílias podem passar do limite padrão da função.
+export const maxDuration = 60;
+
 /**
  * Gera agora os boletos (valor + vencimento) do mês corrente para os alunos desta escola
  * que ainda não têm um registro — sem esperar o job agendado (que só roda no dia de
