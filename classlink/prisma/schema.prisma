@@ -184,6 +184,7 @@ model User {
 
   comunicadosCriados  Comunicado[]         @relation("ComunicadoAuthor")
   respostasComunicado RespostaComunicado[] @relation("RespostaResponsavel")
+  comunicadoLeituras  ComunicadoLeitura[]
   notasLancadas       Nota[]               @relation("NotaLancadaPor")
 
   // Responsável: rematrículas confirmadas pelo aviso do painel
@@ -427,10 +428,25 @@ model Comunicado {
   updatedAt   DateTime @updatedAt
 
   respostas RespostaComunicado[]
+  leituras  ComunicadoLeitura[]
 
   @@index([schoolId])
   @@index([classId])
   @@index([alunoId])
+}
+
+// Abertura do comunicado pelo responsável: gravada pelo servidor na primeira vez que ele abre
+// (horário nunca vem do cliente). Comprova leitura em circulares e é o "visto" nos demais tipos.
+model ComunicadoLeitura {
+  id           String     @id @default(cuid())
+  comunicado   Comunicado @relation(fields: [comunicadoId], references: [id], onDelete: Cascade)
+  comunicadoId String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  lidoEm       DateTime   @default(now())
+
+  @@unique([comunicadoId, userId])
+  @@index([comunicadoId])
 }
 
 model RespostaComunicado {

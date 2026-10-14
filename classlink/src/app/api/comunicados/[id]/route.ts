@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getPublicoAlvo } from "@/lib/comunicados";
+import { registrarAbertura, separarAbertura } from "@/lib/comunicado-leitura";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunicados/[id]">) {
@@ -44,9 +45,14 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunic
         resposta: respostaPorAluno.get(l.student.id) ?? null,
       }));
 
+      // Abrir o comunicado é o que registra a leitura (horário do servidor, primeira abertura).
+      // Só entra quem tem filho no público-alvo: sem filho elegível, não há leitura a registrar.
+      const leituraEm = alunos.length > 0 ? await registrarAbertura(id, session.sub) : null;
+
       return NextResponse.json({
         comunicado: { ...comunicado, criadoPor: pessoaParaQuemVe(comunicado.criadoPor, session.role) },
         alunos,
+        leituraEm,
       });
     }
 
@@ -55,10 +61,14 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunic
       where: { comunicadoId: id, resposta: { not: "PENDENTE_EXPIRADO" } },
     });
 
+    const leituras = await prisma.comunicadoLeitura.findMany({ where: { comunicadoId: id }, select: { userId: true, lidoEm: true } });
+    const { abriram, naoAbriram } = separarAbertura(publicoAlvo, leituras);
+
     return NextResponse.json({
       comunicado,
       totalPublicoAlvo: publicoAlvo.length,
       totalRespostas: respostas,
+      abertura: { abriram, naoAbriram },
     });
   } catch (error) {
     return handleApiError(error);

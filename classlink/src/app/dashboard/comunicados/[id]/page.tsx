@@ -24,6 +24,11 @@ interface AlunoResposta {
   resposta: { resposta: string; dataHoraResposta: string } | null;
 }
 
+interface Abertura {
+  abriram: { guardian: { id: string; name: string }; lidoEm: string }[];
+  naoAbriram: { id: string; name: string }[];
+}
+
 interface PendenteEntry {
   guardian: { id: string; name: string; email: string };
   aluno: { id: string; name: string };
@@ -40,7 +45,8 @@ const RESPOSTAS_POR_TIPO: Record<string, { value: string; label: string; negativ
     { value: "CONFIRMADO", label: "Confirmo presença" },
     { value: "NAO_COMPARECERA", label: "Não poderei comparecer", negativa: true },
   ],
-  CIRCULAR: [{ value: "LIDO", label: "Confirmar leitura" }],
+  // Circular é só leitura: não há o que responder, o app registra sozinho quando a família abre.
+  CIRCULAR: [],
 };
 
 /** Explica o que vale a resposta: autorização só para passeio/evento; reunião confirma presença. */
@@ -66,6 +72,8 @@ export default function ComunicadoDetailPage() {
   const [comunicado, setComunicado] = useState<Comunicado | null>(null);
   const [alunos, setAlunos] = useState<AlunoResposta[] | null>(null);
   const [stats, setStats] = useState<{ totalRespostas: number; totalPublicoAlvo: number } | null>(null);
+  const [abertura, setAbertura] = useState<Abertura | null>(null);
+  const [leituraEm, setLeituraEm] = useState<string | null>(null);
   const [pendentes, setPendentes] = useState<PendenteEntry[] | null>(null);
   const [enviando, setEnviando] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -73,19 +81,21 @@ export default function ComunicadoDetailPage() {
   const [erroResposta, setErroResposta] = useState<string | null>(null);
 
   function loadGuardianView() {
-    apiJson<{ comunicado: Comunicado; alunos: AlunoResposta[] }>(`/api/comunicados/${id}`).then((data) => {
+    apiJson<{ comunicado: Comunicado; alunos: AlunoResposta[]; leituraEm: string | null }>(`/api/comunicados/${id}`).then((data) => {
       setComunicado(data.comunicado);
       setAlunos(data.alunos);
+      setLeituraEm(data.leituraEm);
     });
   }
 
   function loadStaffView() {
-    apiJson<{ comunicado: Comunicado; totalRespostas: number; totalPublicoAlvo: number }>(`/api/comunicados/${id}`).then(
-      (data) => {
-        setComunicado(data.comunicado);
-        setStats({ totalRespostas: data.totalRespostas, totalPublicoAlvo: data.totalPublicoAlvo });
-      },
-    );
+    apiJson<{ comunicado: Comunicado; totalRespostas: number; totalPublicoAlvo: number; abertura: Abertura }>(
+      `/api/comunicados/${id}`,
+    ).then((data) => {
+      setComunicado(data.comunicado);
+      setStats({ totalRespostas: data.totalRespostas, totalPublicoAlvo: data.totalPublicoAlvo });
+      setAbertura(data.abertura);
+    });
     apiJson<{ pendentes: PendenteEntry[] }>(`/api/comunicados/${id}/pendentes`).then((data) => setPendentes(data.pendentes));
   }
 
@@ -152,6 +162,13 @@ export default function ComunicadoDetailPage() {
               {AVISO_VALOR_DA_RESPOSTA[comunicado.tipo]}
             </p>
           )}
+          {comunicado.tipo === "CIRCULAR" && (
+            <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950/40 dark:text-green-300">
+              {leituraEm
+                ? `✓ Leitura registrada em ${formatarDataHora(leituraEm)}. Não é preciso responder.`
+                : "Esta é uma circular: basta abrir para a leitura ficar registrada."}
+            </p>
+          )}
           {alunos.map(({ aluno, resposta }) => (
             <div key={aluno.id} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <p className="font-medium">{aluno.name}</p>
@@ -165,7 +182,7 @@ export default function ComunicadoDetailPage() {
                 >
                   {RESPOSTA_LABEL[resposta.resposta] ?? resposta.resposta} em {formatarDataHora(resposta.dataHoraResposta)}
                 </p>
-              ) : (
+              ) : opcoes.length > 0 ? (
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   {opcoes.map((op) => (
                     <button
@@ -183,7 +200,7 @@ export default function ComunicadoDetailPage() {
                     </button>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
           ))}
         </div>
@@ -194,7 +211,9 @@ export default function ComunicadoDetailPage() {
           {stats && (
             <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <span className="text-sm font-medium">
-                {stats.totalRespostas} de {stats.totalPublicoAlvo} responderam
+                {comunicado.tipo === "CIRCULAR"
+                  ? `${abertura?.abriram.length ?? 0} de ${stats.totalPublicoAlvo} famílias abriram`
+                  : `${stats.totalRespostas} de ${stats.totalPublicoAlvo} responderam`}
               </span>
               <a
                 href={`/api/comunicados/${id}/export`}
@@ -205,6 +224,42 @@ export default function ComunicadoDetailPage() {
             </div>
           )}
 
+          {abertura && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="mb-2 font-semibold">Abertura</h2>
+              <ul className="space-y-1 text-sm">
+                {abertura.abriram.length === 0 && <li className="text-slate-500">Nenhuma família abriu ainda.</li>}
+                {abertura.abriram.map((a) => (
+                  <li key={a.guardian.id}>
+                    <span className="font-medium text-green-700 dark:text-green-400">✓ Abriu</span> · {a.guardian.name} — {formatarDataHora(a.lidoEm)}
+                  </li>
+                ))}
+              </ul>
+              {abertura.naoAbriram.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Ainda não abriram ({abertura.naoAbriram.length})</p>
+                  <ul className="mt-1 space-y-1 text-sm">
+                    {abertura.naoAbriram.map((p) => (
+                      <li key={p.id} className="flex items-center justify-between gap-2">
+                        <span>{p.name}</span>
+                        <button
+                          type="button"
+                          disabled={enviando === p.id}
+                          onClick={() => reenviar(p.id)}
+                          className="rounded-md border border-indigo-600 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                        >
+                          Reenviar notificação
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {feedback && <p className="mt-2 text-xs text-green-600">{feedback}</p>}
+            </div>
+          )}
+
+          {comunicado.tipo !== "CIRCULAR" && (
           <div>
             <h2 className="mb-2 font-semibold">Ainda não responderam</h2>
             {feedback && <p className="mb-2 text-xs text-green-600">{feedback}</p>}
@@ -229,6 +284,7 @@ export default function ComunicadoDetailPage() {
               ))}
             </ul>
           </div>
+          )}
         </div>
       )}
     </div>
