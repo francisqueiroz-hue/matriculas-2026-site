@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Sess��o guiada: Claude opera o console da Meta</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Sess��o guiada: Claude opera o console da Meta</h1>
+</header>
+<h1
+id="sessão-guiada-o-claude-opera-o-console-da-meta-no-seu-computador">Sessão
+guiada: o Claude opera o console da Meta no seu computador</h1>
+<p>Objetivo: o Claude conduzir, na sua tela, as partes mecânicas da
+criação do app Meta (developers.facebook.com), enquanto
+<strong>você</strong> faz o que é pessoal e sensível. É opcional: o
+passo a passo manual (<code>PASSO-A-PASSO-APP-META.md</code>) continua
+válido.</p>
+<blockquote>
+<p><strong>Aviso de fonte:</strong> estas instruções vêm das regras
+internas das ferramentas de navegador e de uso do computador do Claude,
+que li nesta sessão. Os caminhos de menu do aplicativo podem mudar com
+atualizações; confirme na tela do seu Claude. Não testei esta sessão no
+seu computador.</p>
+</blockquote>
+<h2 id="escolha-a-ferramenta">1. Escolha a ferramenta</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Opção</th>
+<th>O que é</th>
+<th>Quando usar</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>A. Navegador embutido do aplicativo Claude
+(recomendada)</strong></td>
+<td>Painel de navegador dentro do aplicativo Claude para computador.
+Você vê tudo e pode assumir a qualquer momento. Mantém seus logins entre
+sessões</td>
+<td>Console da Meta, passo a passo à vista</td>
+</tr>
+<tr class="even">
+<td><strong>B. Claude no Chrome (extensão)</strong></td>
+<td>Extensão que age no seu Chrome real, em abas novas, com os seus
+logins</td>
+<td>Se você já está logado na Meta no Chrome e prefere usá-lo</td>
+</tr>
+<tr class="odd">
+<td><strong>C. Controle do computador</strong></td>
+<td>Capturas de tela e cliques no desktop</td>
+<td>Só para aplicativos nativos. <strong>Não use para sites</strong>;
+navegadores ficam em modo somente leitura nesse modo</td>
+</tr>
+</tbody>
+</table>
+<h2 id="preparar-uma-vez">2. Preparar (uma vez)</h2>
+<ol type="1">
+<li>Tenha o <strong>aplicativo Claude para computador (Windows)</strong>
+instalado e com a sua conta logada. A sua conta já tem um computador
+vinculado (“Claude Desktop (Windows)”).</li>
+<li>Opção B: instale e conecte a extensão <strong>Claude no
+Chrome</strong> e mantenha o Chrome aberto.</li>
+<li>Para uma sessão na nuvem (por exemplo, o claude.ai no navegador): na
+tela de conversa, o menu <strong>+</strong> deve oferecer
+<strong>Dispositivos</strong>; escolha o seu computador <strong>antes de
+enviar a primeira mensagem</strong>. O aplicativo precisa estar
+<strong>aberto e online</strong>.</li>
+<li>Opção A: o painel do navegador abre com
+<strong>Ctrl+Shift+B</strong> (ou pelo ícone de globo/Navegador no
+painel lateral). Ele precisa estar <strong>visível</strong>, para você
+acompanhar.</li>
+<li>Se o Claude pedir, <strong>aprove os sites</strong>
+(developers.facebook.com e facebook.com). Você pode recusar qualquer
+site.</li>
+</ol>
+<h2 id="quem-faz-o-quê">3. Quem faz o quê</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Etapa</th>
+<th>Quem</th>
+<th>Observação</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Fazer login no Facebook/Meta, senha, 2FA, captcha</td>
+<td><strong>Você</strong></td>
+<td>O Claude não digita senha nem códigos</td>
+</tr>
+<tr class="even">
+<td>Aceitar termos de desenvolvedor e verificações de identidade</td>
+<td><strong>Você</strong></td>
+<td>Ato pessoal</td>
+</tr>
+<tr class="odd">
+<td>Criar o app, escolher tipo Business, nome, e-mail de contato</td>
+<td>Claude, com sua conferência</td>
+<td>Você confirma antes de “Criar”</td>
+</tr>
+<tr class="even">
+<td>Adicionar produto Instagram e abrir “API setup with Instagram
+login”</td>
+<td>Claude</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td>Autorizar a conta <span class="citation"
+data-cites="espacokidseinstitutofokus">@espacokidseinstitutofokus</span>
+(tela de consentimento do Instagram)</td>
+<td><strong>Você</strong></td>
+<td>Exige o login da conta</td>
+</tr>
+<tr class="even">
+<td><strong>Gerar e copiar o token</strong></td>
+<td><strong>Você, com o painel do Claude fechado ou em outra aba que o
+Claude não veja</strong></td>
+<td><strong>O token aparece na tela. Se o Claude fizer captura, ele o
+enxerga. Trate como senha</strong></td>
+</tr>
+<tr class="odd">
+<td>Guardar o token em segredo/variável de ambiente</td>
+<td><strong>Você</strong></td>
+<td>Nunca no chat, em arquivo ou repositório</td>
+</tr>
+<tr class="even">
+<td>Anotar nomes de telas, permissões e erros</td>
+<td>Claude</td>
+<td>Sem copiar token</td>
+</tr>
+</tbody>
+</table>
+<p>Regras que o Claude segue: avisar antes de ações que abrem caixas de
+confirmação; parar e perguntar após 2 ou 3 falhas seguidas; não sair do
+assunto; não clicar em links suspeitos; não mexer em dinheiro (nenhuma
+cobrança ou anúncio nesta sessão).</p>
+<h2 id="roteiro-da-sessão">4. Roteiro da sessão</h2>
+<ol type="1">
+<li>Abra o painel do navegador (Opção A) com a conta Meta já logada
+<strong>por você</strong>.</li>
+<li>Cole o pedido da seção 5 na conversa.</li>
+<li>O Claude pede acesso ao navegador/site; <strong>você
+aprova</strong>.</li>
+<li>Ele navega, descreve o que vê e executa as etapas dele; nas suas
+etapas, ele <strong>para e avisa</strong>.</li>
+<li>Quando for gerar o token: <strong>feche ou oculte o painel</strong>,
+gere e copie o token, guarde no segredo, e só então volte e diga “token
+guardado”. Não cole o token na conversa.</li>
+<li>O Claude resume o que foi feito (nome do app, permissões, telas) e
+atualiza o guia com as diferenças encontradas.</li>
+<li>Ao terminar, ele <strong>fecha as abas que abriu</strong>.</li>
+</ol>
+<h2 id="pedido-para-colar-no-claude">5. Pedido para colar no Claude</h2>
+<blockquote>
+<p>Vamos configurar o app Meta para o publicador de Instagram da escola,
+seguindo o <code>PASSO-A-PASSO-APP-META.md</code>. Use o navegador
+embutido (ou Claude no Chrome). Eu já estou logado. Você cuida de criar
+o app (tipo Business, nome “Fokus Publicador”), adicionar o produto
+Instagram com “API setup with Instagram login” e conferir as permissões
+<code>instagram_business_basic</code> e
+<code>instagram_business_content_publish</code>. <strong>Pare antes de
+autorizar a conta e antes de gerar o token: essas etapas são
+minhas.</strong> Nunca peça, leia, digite ou repita senhas, códigos 2FA
+ou o token. Não clique em nada que gere cobrança ou anúncio. Descreva o
+que vê em cada tela e anote as diferenças em relação ao guia.</p>
+</blockquote>
+<h2 id="segurança-e-privacidade">6. Segurança e privacidade</h2>
+<ul>
+<li>Tela compartilhada = tela vista. Qualquer informação visível pode
+ser capturada pelo Claude; por isso o token e a senha são sempre etapas
+suas, fora da visão.</li>
+<li>A sessão usa <strong>os seus logins</strong>; o Claude não deve sair
+de contas nem alterar credenciais.</li>
+<li>Depois de terminar, revise a lista de aplicativos conectados da
+conta Meta e remova o que não reconhecer.</li>
+<li>Em caso de dúvida, interrompa a sessão, feche o painel e continue
+manualmente pelo guia.</li>
+</ul>
+<h2 id="se-não-funcionar">7. Se não funcionar</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Sintoma</th>
+<th>Provável causa</th>
+<th>O que fazer</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Claude diz que o navegador está offline</td>
+<td>Aplicativo fechado ou sem internet</td>
+<td>Abra o aplicativo Claude e tente de novo</td>
+</tr>
+<tr class="even">
+<td>Painel do navegador não aparece</td>
+<td>Outro conteúdo ocupa o painel lateral</td>
+<td>Ctrl+Shift+B ou feche o que estiver aberto</td>
+</tr>
+<tr class="odd">
+<td>Site “não permitido”</td>
+<td>Falta aprovação</td>
+<td>Aprove o site quando o pedido aparecer</td>
+</tr>
+<tr class="even">
+<td>Janela de confirmação trava o navegador</td>
+<td>Caixa modal do site</td>
+<td>Feche-a manualmente</td>
+</tr>
+<tr class="odd">
+<td>Sem opção <strong>Dispositivos</strong></td>
+<td>Recurso indisponível na sua conta/versão</td>
+<td>Use o passo a passo manual</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
