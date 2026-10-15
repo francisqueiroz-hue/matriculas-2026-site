@@ -12,6 +12,15 @@ export async function avisosWhatsAppDisponiveis(): Promise<boolean> {
   return isWhatsAppConfigured() && (await modeloDisponivel("aviso")) !== null;
 }
 
+/**
+ * Quem ativou os avisos em Conta recebe sempre. Quem não tem nenhum aparelho com notificação
+ * (não entrou no app ou não ativou o push) também recebe: é o mesmo cuidado que as famílias
+ * têm quando não acessam o app — a mensagem não pode ficar sem ser vista.
+ */
+export function deveAvisarPorWhatsApp(destinatario: { avisosWhatsApp: boolean; aparelhosComPush: number }): boolean {
+  return destinatario.avisosWhatsApp || destinatario.aparelhosComPush === 0;
+}
+
 export function trechoAviso(texto: string): string {
   const limpo = texto.replace(/\s+/g, " ").trim();
   return limpo.length > LIMITE_TRECHO ? `${limpo.slice(0, LIMITE_TRECHO - 1)}…` : limpo;
@@ -52,8 +61,8 @@ interface NovaMensagem {
 
 /**
  * Avisa um membro da equipe (ADMIN/STAFF) no WhatsApp pessoal, pelo número da escola,
- * que chegou mensagem nova no ClassLink — só se ele ativou isso em Conta, tem celular
- * cadastrado e o modelo aprovado está configurado. Se já houver outra mensagem não lida
+ * que chegou mensagem nova no ClassLink — se ele ativou isso em Conta ou não tem push ativo,
+ * tem celular cadastrado e o modelo aprovado está configurado. Se já houver outra mensagem não lida
  * recente na mesma conversa, não repete o aviso (evita uma mensagem de WhatsApp por
  * frase). Nunca lança erro: aviso é um extra e não pode atrapalhar o envio da mensagem.
  */
@@ -63,9 +72,10 @@ export async function avisarEquipePorWhatsApp(msg: NovaMensagem): Promise<boolea
 
     const destinatario = await prisma.user.findUnique({
       where: { id: msg.destinatarioId },
-      select: { role: true, phone: true, avisosWhatsApp: true, active: true, deletedAt: true, whatsappUltimaMensagemEm: true },
+      select: { role: true, phone: true, avisosWhatsApp: true, active: true, deletedAt: true, whatsappUltimaMensagemEm: true, _count: { select: { pushTokens: true } } },
     });
-    if (!destinatario || destinatario.role === "GUARDIAN" || !destinatario.avisosWhatsApp) return false;
+    if (!destinatario || destinatario.role === "GUARDIAN") return false;
+    if (!deveAvisarPorWhatsApp({ avisosWhatsApp: destinatario.avisosWhatsApp, aparelhosComPush: destinatario._count.pushTokens })) return false;
     if (!destinatario.active || destinatario.deletedAt) return false;
     const telefone = destinatario.phone ? normalizePhoneBR(destinatario.phone) : null;
     if (!telefone) return false;

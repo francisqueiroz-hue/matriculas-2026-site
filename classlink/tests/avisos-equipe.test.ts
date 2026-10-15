@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parametrosModeloAviso, trechoAviso } from "@/lib/avisos-equipe";
+import { deveAvisarPorWhatsApp, parametrosModeloAviso, trechoAviso } from "@/lib/avisos-equipe";
 import { buildTemplatePayload, sanitizeTemplateParam } from "@/lib/whatsapp";
 
 describe("aviso de mensagem para a equipe", () => {
@@ -28,5 +28,17 @@ describe("parâmetros de modelo aceitos pela Meta", () => {
   it("o payload do modelo já sai higienizado", () => {
     const payload = buildTemplatePayload("5521987654321", { name: "aviso", language: "pt_BR" }, ["A\nB"]);
     expect(payload.template.components[0]).toEqual({ type: "body", parameters: [{ type: "text", text: "A B" }] });
+  });
+});
+
+describe("quem recebe o aviso pelo WhatsApp", () => {
+  it("quem ativou recebe, mesmo com push", () => {
+    expect(deveAvisarPorWhatsApp({ avisosWhatsApp: true, aparelhosComPush: 2 })).toBe(true);
+  });
+  it("sem push, recebe automaticamente", () => {
+    expect(deveAvisarPorWhatsApp({ avisosWhatsApp: false, aparelhosComPush: 0 })).toBe(true);
+  });
+  it("com push e sem ativar, não recebe", () => {
+    expect(deveAvisarPorWhatsApp({ avisosWhatsApp: false, aparelhosComPush: 1 })).toBe(false);
   });
 });
