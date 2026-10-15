@@ -95,6 +95,9 @@ export function AvisosWhatsAppEquipe() {
           <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} className="h-4 w-4" />
           Quero receber os avisos de mensagens no WhatsApp
         </label>
+        <p className="text-xs text-slate-500">
+          Se este aparelho não tiver as notificações do app ativas, o aviso chega pelo WhatsApp mesmo sem marcar, desde que o celular esteja cadastrado.
+        </p>
         {mensagem && (
           <p className={`text-sm ${mensagem.tipo === "ok" ? "text-emerald-700" : "text-red-600"}`} role="status">
             {mensagem.texto}
