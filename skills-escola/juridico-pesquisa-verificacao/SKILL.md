@@ -26,5 +26,8 @@ Resultado por item: **[VERIFICADO — fonte + link + data de consulta]**, **[PAR
 ## Saída
 Tabela: tema → norma/precedente → órgão e número → tese → status (vigente/superado) → favorável/contrário → link → nível de confiança. Seguida de **lacunas** (o que não consegui confirmar) e **próximos passos**. Para estratégia de superação de precedente, use `ajeap`.
 
+## Radar jurídico (monitoramento periódico)
+Para acompanhar novidades da área (diário ou semanal), pesquise **somente fontes oficiais**: Diário Oficial da União e do estado, Planalto (leis e MPs novas), informativos do STF, STJ e TST, súmulas e temas novos, CNJ, CNE/MEC, ANPD, Receita. Filtre pelo perfil do usuário (educação, consumidor, trabalhista, tributário, LGPD, contratos). Saída em até 1 página: o que mudou, norma/precedente com link e data, **impacto prático** (escola, contrato, prazo), ação sugerida, urgência (Alta/Média/Baixa) e o que ficou **não confirmado**. Não repita itens já informados; não dê parecer sobre caso sem os fatos. Quando o radar apontar mudança que afete contrato, comunicado ou política da escola, encaminhe para `juridico-contratos`, `juridico-direito-educacional` ou `juridico-lgpd`. Para publicação de conteúdo jurídico educativo nas redes, siga o Código de Ética da OAB e as regras de publicidade da advocacia (sem captação de clientela nem promessa de resultado) [conferir normas vigentes].
+
 ## Regras
 Não inventar nº de processo, tema, súmula ou link. Não "completar" ementa de memória. Datas e artigos conferidos duas vezes. Em tema de alta relevância (liberdade, patrimônio relevante, prazo), recomendar conferência pelo advogado nos autos.

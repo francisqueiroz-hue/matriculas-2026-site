@@ -32,4 +32,4 @@ Compare períodos iguais (semana × semana, mesmo número de posts). Separe org�
 Classifique: dúvida de matrícula (responder rápido e levar ao WhatsApp), elogio, reclamação (resposta empática pública curta e detalhe em privado), caso sensível (saúde, incidente, dados de aluno: **não discutir em público**, encaminhar à direção), spam/ofensa (arquivar). Não confirme se alguém é aluno nem exponha dado de família (LGPD). Respostas devem seguir o tom da skill `escola-comunicacao-familias`.
 
 ## Saída
-Resumo executivo → tabela de métricas com variação → insights (fato / interpretação / hipótese) → ações com responsável, prazo e indicador → o que falta medir. Para criar os posts, use `instagram-matriculas-fokus`; para a arte, `escola-imagens-marca`.
+Resumo executivo → tabela de métricas com variação → insights (fato / interpretação / hipótese) → ações com responsável, prazo e indicador → o que falta medir. Para pesquisar trends, criar o pacote do dia e programar publicações, use `escola-instagram-studio`; para legendas, `instagram-matriculas-fokus`; para a arte, `escola-imagens-marca`.

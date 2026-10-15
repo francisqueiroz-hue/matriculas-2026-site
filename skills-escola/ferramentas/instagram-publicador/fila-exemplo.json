@@ -1,0 +1,8 @@
+[
+  {"id": "2026-10-16-feed-01", "tipo": "IMAGE", "data_hora": "2026-10-16T09:00:00-03:00",
+   "legenda": "[EXEMPLO] Texto da legenda aqui.", "midia": "https://exemplo.com/arte.jpg",
+   "status": "rascunho", "aprovado_por": null},
+  {"id": "2026-10-16-story-01", "tipo": "STORIES", "data_hora": "2026-10-16T12:00:00-03:00",
+   "legenda": "", "midia": "https://exemplo.com/story.jpg",
+   "status": "rascunho", "aprovado_por": null}
+]
