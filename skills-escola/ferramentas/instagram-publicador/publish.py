@@ -2,7 +2,8 @@
 """Publicador de fila do Instagram (Graph API) — só publica itens aprovados e no horário.
 
 Credenciais por variáveis de ambiente (nunca em arquivo):
-  IG_USER_ID, IG_ACCESS_TOKEN, IG_GRAPH_VERSION (ex.: v21.0 — confirme a versão vigente)
+  IG_USER_ID, IG_ACCESS_TOKEN, IG_GRAPH_VERSION (confirme a versão vigente na documentação da Meta)
+  IG_GRAPH_HOST (opcional): graph.facebook.com (padrão, Login do Facebook) ou graph.instagram.com (Login do Instagram)
 
 Uso:
   python3 publish.py fila.json --dry-run     # simula, não chama a API
@@ -85,7 +86,7 @@ def montar_container(item):
 
 
 def publicar(item, cfg, chamar=http, dormir=time.sleep):
-    base = f"https://graph.facebook.com/{cfg['versao']}"
+    base = f"https://{cfg.get('host', 'graph.facebook.com')}/{cfg['versao']}"
     uid = cfg["user_id"]
     tok = {"access_token": cfg["token"]}
     if item["tipo"] == "CAROUSEL":
@@ -118,7 +119,7 @@ def aguardar(cid, base, tok, chamar, dormir, tentativas=30):
 
 
 def cota_ok(cfg, chamar=http):
-    base = f"https://graph.facebook.com/{cfg['versao']}"
+    base = f"https://{cfg.get('host', 'graph.facebook.com')}/{cfg['versao']}"
     r = chamar("GET", f"{base}/{cfg['user_id']}/content_publishing_limit",
                {"access_token": cfg["token"], "fields": "quota_usage,config"})
     d = (r.get("data") or [{}])[0]
@@ -136,7 +137,8 @@ def main(argv=None, chamar=http):
         fila = json.load(f)
     agora = datetime.now(timezone.utc)
     cfg = {"user_id": os.environ.get("IG_USER_ID"), "token": os.environ.get("IG_ACCESS_TOKEN"),
-           "versao": os.environ.get("IG_GRAPH_VERSION")}
+           "versao": os.environ.get("IG_GRAPH_VERSION"),
+           "host": os.environ.get("IG_GRAPH_HOST") or "graph.facebook.com"}
     if not a.dry_run and not all(cfg.values()):
         print("Defina IG_USER_ID, IG_ACCESS_TOKEN e IG_GRAPH_VERSION.", file=sys.stderr)
         return 2

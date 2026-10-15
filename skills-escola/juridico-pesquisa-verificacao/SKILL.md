@@ -26,8 +26,16 @@ Resultado por item: **[VERIFICADO — fonte + link + data de consulta]**, **[PAR
 ## Saída
 Tabela: tema → norma/precedente → órgão e número → tese → status (vigente/superado) → favorável/contrário → link → nível de confiança. Seguida de **lacunas** (o que não consegui confirmar) e **próximos passos**. Para estratégia de superação de precedente, use `ajeap`.
 
-## Radar jurídico (monitoramento periódico)
-Para acompanhar novidades da área (diário ou semanal), pesquise **somente fontes oficiais**: Diário Oficial da União e do estado, Planalto (leis e MPs novas), informativos do STF, STJ e TST, súmulas e temas novos, CNJ, CNE/MEC, ANPD, Receita. Filtre pelo perfil do usuário (educação, consumidor, trabalhista, tributário, LGPD, contratos). Saída em até 1 página: o que mudou, norma/precedente com link e data, **impacto prático** (escola, contrato, prazo), ação sugerida, urgência (Alta/Média/Baixa) e o que ficou **não confirmado**. Não repita itens já informados; não dê parecer sobre caso sem os fatos. Quando o radar apontar mudança que afete contrato, comunicado ou política da escola, encaminhe para `juridico-contratos`, `juridico-direito-educacional` ou `juridico-lgpd`. Para publicação de conteúdo jurídico educativo nas redes, siga o Código de Ética da OAB e as regras de publicidade da advocacia (sem captação de clientela nem promessa de resultado) [conferir normas vigentes].
+## Radar normativo (Boletim Normativo) — complementa o Vigia, não o substitui
+Escopo: **mudanças de lei, norma, súmula, tema e precedente**. Fora do escopo (já cobertos pelo Radar Diário Fokus e pelo Vigia — AJEAP e minutas): processos, prazos, movimentações, Gmail, painel Vigia, análise AJEAP e rascunho de peças.
+Regras de convivência (inegociáveis):
+1. **Somente leitura**; nunca grave no painel, em ArtifactData, na coleção `processos` nem no Doc "Radar Diário Fokus". Escreva só no próprio Doc privado "Boletim Normativo — Fokus", atualizado em lugar, sem criar cópias.
+2. Não use Gmail, Calendar, Docusign, Dropbox, Box, Notion, Canva nem Meta Ads; não envie mensagem.
+3. Busque **só a tese e o órgão**, nunca nome de parte nem número de processo; não consulte processos.
+4. Fontes **oficiais**: Planalto, DOU e Diário Oficial estadual, informativos de STF, STJ e TST, CNJ, MEC/CNE, ANPD, Receita.
+5. Cada item traz **tags de área/tese** no vocabulário do campo `tipo` dos processos, para que o advogado ou o Vigia cruzem (a skill não cruza).
+6. Sem novidade relevante: "sem alterações em <data>", sem notificação.
+Item: data, tipo, fonte com link, resumo, tags, impacto prático (escola, contrato, prazo), efeito sobre precedentes (superado, alterado, novo), urgência (Alta/Média/Baixa), confiança (verificado ou não confirmado). Mudança que afete contrato, comunicado ou política da escola: encaminhe a `juridico-contratos`, `juridico-direito-educacional` ou `juridico-lgpd`. Conteúdo jurídico nas redes: Código de Ética da OAB e regras de publicidade da advocacia, sem captação de clientela nem promessa de resultado [conferir normas vigentes]. Roteiro de integração e texto da rotina: `INTEGRACAO-VIGIA-RADAR.md` (no repositório).
 
 ## Regras
 Não inventar nº de processo, tema, súmula ou link. Não "completar" ementa de memória. Datas e artigos conferidos duas vezes. Em tema de alta relevância (liberdade, patrimônio relevante, prazo), recomendar conferência pelo advogado nos autos.

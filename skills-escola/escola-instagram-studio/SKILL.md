@@ -7,6 +7,9 @@ description: "Rotina diária de Instagram da escola (Espaço Kids / Instituto Fo
 
 Complementa `instagram-matriculas-fokus` (voz e fórmulas de legenda, dados fixos da marca), `escola-imagens-marca` (arte) e `escola-instagram-monitor` (métricas). Use os dados fixos da marca daquela skill; não invente preço, vaga, depoimento, resultado ou prêmio.
 
+## 0. Convivência com as rotinas existentes
+A rotina **Fokus Captação** já faz monitor da planilha, briefing semanal de mercado e relatório de aprendizado, e entrega o plano de ativos. Esta skill **não refaz** isso: ela **consome** o briefing e o banco de inteligência (leitura) e **executa** o dia a dia (pauta, peças, fila). Não grava na planilha de captação, não envia mensagens e não publica sem aprovação. Regra de indicação: siga a skill `instagram-matriculas-fokus` até o gestor definir qual vale (ela diz para não citar desconto nem kit; a rotina de captação cita atividade extra e kit).
+
 ## 1. Pesquisa de trends da região (diária, ~10 min)
 Fontes (pesquise na web, cite o link e a data; separe **fato** de **hipótese**):
 - Agenda local: Prefeitura de Niterói, eventos da Região Oceânica, feriados, calendário escolar e datas do mês (Dia das Crianças, Dia do Professor, volta às aulas, chuvas, clima, férias).
