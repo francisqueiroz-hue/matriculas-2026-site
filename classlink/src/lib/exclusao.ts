@@ -75,6 +75,9 @@ export async function excluirAluno(
   if (!aluno) return null;
 
   await prisma.student.update({ where: { id: aluno.id }, data: { deletedAt: new Date() } });
+  // Laudo é dado de saúde (sensível) e voluntário: sai junto com o aluno (minimização, LGPD).
+  // Consentimentos ficam guardados como prova de quando e por quem foram dados.
+  await prisma.matriculaDocumento.deleteMany({ where: { studentId: aluno.id, tipo: "LAUDO" } });
 
   const resultado: ResultadoExclusaoAluno = { responsaveisExcluidos: [], responsaveisMantidos: [] };
   for (const { guardian } of aluno.guardians) {

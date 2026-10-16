@@ -116,6 +116,8 @@ model School {
   solicitacoesMatricula SolicitacaoMatricula[]
   contratos             Contrato[]
   contratoConfigs       ContratoConfig[]
+  matriculaDocumentos   MatriculaDocumento[]
+  consentimentosLgpd    ConsentimentoLgpd[]
 }
 
 model User {
@@ -202,6 +204,9 @@ model User {
 
   // Avisos enviados pelo WhatsApp da escola e respostas recebidas por lá (responder pelo WhatsApp)
   whatsappVinculos WhatsAppVinculoConversa[]
+
+  // Consentimentos LGPD registrados em nome deste responsável (SetNull ao excluir a conta)
+  consentimentosLgpd ConsentimentoLgpd[]
 
   @@index([schoolId])
 }
@@ -295,6 +300,8 @@ model Student {
   comunicadosIndividuais Comunicado[]
   enquetesIndividuais    Enquete[]
   contratos              Contrato[]
+  documentosMatricula    MatriculaDocumento[]
+  consentimentosLgpd     ConsentimentoLgpd[]
 
   @@index([schoolId])
   @@index([classId])
@@ -966,4 +973,65 @@ model EnqueteItem {
 
   @@index([envioId])
   @@index([perguntaId])
+}
+
+// ─── Ficha da matrícula: checklist de documentos e consentimentos LGPD ───────────
+
+enum MatriculaDocumentoTipo {
+  CERTIDAO_NASCIMENTO
+  CPF
+  VACINACAO
+  COMPROVANTE_RESIDENCIA
+  HISTORICO_ESCOLAR
+  LAUDO // voluntário e sensível: visível e editável só pela direção (ADMIN)
+}
+
+enum ConsentimentoFinalidade {
+  DADOS_DA_CRIANCA
+  USO_DE_IMAGEM
+  DADO_DE_SAUDE
+}
+
+// Checklist de documentos por aluno e ano letivo. Só registra se foi entregue (não guarda
+// o arquivo). Pendência de documento nunca bloqueia aula, prova ou outro documento.
+model MatriculaDocumento {
+  id         String                 @id @default(cuid())
+  schoolId   String
+  studentId  String
+  anoLetivo  Int
+  tipo       MatriculaDocumentoTipo
+  recebido   Boolean                @default(false)
+  recebidoEm DateTime?
+  prazo      DateTime?
+  observacao String?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, anoLetivo, tipo])
+  @@index([schoolId, anoLetivo, recebido])
+}
+
+// Consentimento LGPD por finalidade. Revogar preenche revogadoEm — o registro nunca é
+// apagado (prova de quando e por quem o consentimento foi dado e retirado).
+model ConsentimentoLgpd {
+  id                String                  @id @default(cuid())
+  schoolId          String
+  studentId         String
+  finalidade        ConsentimentoFinalidade
+  versaoTexto       String
+  consentidoPorId   String?
+  consentidoPorNome String
+  consentidoEm      DateTime                @default(now())
+  revogadoEm        DateTime?
+  createdAt         DateTime                @default(now())
+
+  school        School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student       Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  consentidoPor User?   @relation(fields: [consentidoPorId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, finalidade])
+  @@index([schoolId])
 }

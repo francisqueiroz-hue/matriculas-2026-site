@@ -109,6 +109,7 @@ const GRUPO_POR_HREF: Record<string, string> = {
   "/dashboard/financeiro": "Meu(s) filho(s)",
   "/dashboard/contratos": "Meu(s) filho(s)",
   "/dashboard/notas": "Pedagógico",
+  "/dashboard/fichas": "Secretaria",
 };
 
 export interface GrupoNav {
@@ -128,11 +129,18 @@ export function agruparLinks(links: NavLink[]): GrupoNav[] {
   return grupos;
 }
 
+const fichasLink: NavLink = {
+  href: "/dashboard/fichas",
+  label: "Fichas de matrícula",
+  icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2 M9 5a2 2 0 012-2h2a2 2 0 012 2v0a2 2 0 01-2 2h-2a2 2 0 01-2-2z M9 12h6 M9 16h4",
+};
+
 /** Notas fica visível só para direção (ADMIN) e coordenação (STAFF com isCoordenacao). */
 export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao">): NavLink[] {
-  if (user.role === "ADMIN") return [...baseLinks, notasLink, ...adminLinks];
+  if (user.role === "ADMIN") return [...baseLinks, notasLink, ...adminLinks, fichasLink];
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks];
-  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink];
+  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, fichasLink];
+  if (user.role === "STAFF") return [...baseLinks, fichasLink];
   return baseLinks;
 }
 
