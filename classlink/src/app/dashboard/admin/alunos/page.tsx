@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiFetch, apiJson } from "@/lib/api-client";
 
@@ -283,9 +284,14 @@ function AlunosContent() {
                 <span className="font-medium">
                   {s.name} <span className="text-xs text-slate-500">({s.class.name})</span>
                 </span>
-                <button type="button" onClick={() => handleDelete(s.id, s.name)} className="text-xs text-red-600 hover:underline">
-                  Excluir
-                </button>
+                <span className="flex items-center gap-3">
+                  <Link href={`/dashboard/fichas?aluno=${s.id}`} className="text-xs text-indigo-700 hover:underline">
+                    Ficha da matrícula
+                  </Link>
+                  <button type="button" onClick={() => handleDelete(s.id, s.name)} className="text-xs text-red-600 hover:underline">
+                    Excluir
+                  </button>
+                </span>
               </div>
 
               <ul className="mt-2 space-y-1 text-sm">

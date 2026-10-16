@@ -11,12 +11,16 @@ describe("menu lateral agrupado", () => {
   it("direção: o que não tem seção própria cai em Gestão e nenhum link se perde", () => {
     const links = getNavLinks({ role: "ADMIN", isCoordenacao: false });
     const grupos = agruparLinks(links);
-    expect(grupos.map((g) => g.titulo)).toEqual(["Comunicação", "Dia a dia", "Pedagógico", "Gestão"]);
+    expect(grupos.map((g) => g.titulo)).toEqual(["Comunicação", "Dia a dia", "Pedagógico", "Gestão", "Secretaria"]);
     expect(grupos.flatMap((g) => g.links)).toHaveLength(links.length);
     expect(grupos.find((g) => g.titulo === "Gestão")?.links.some((l) => l.label === "Painel")).toBe(true);
   });
 
-  it("professor sem coordenação: só Comunicação e Dia a dia", () => {
-    expect(agruparLinks(getNavLinks({ role: "STAFF", isCoordenacao: false })).map((g) => g.titulo)).toEqual(["Comunicação", "Dia a dia"]);
+  it("professor sem coordenação: Comunicação, Dia a dia e a ficha da matrícula (Secretaria)", () => {
+    expect(agruparLinks(getNavLinks({ role: "STAFF", isCoordenacao: false })).map((g) => g.titulo)).toEqual([
+      "Comunicação",
+      "Dia a dia",
+      "Secretaria",
+    ]);
   });
 });
