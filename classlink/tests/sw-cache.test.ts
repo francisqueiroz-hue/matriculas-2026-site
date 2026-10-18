@@ -68,6 +68,17 @@ describe("service worker: o que pode ir para o cache", () => {
     expect(guarda({ type: "opaque", ok: false, status: 0 })).toBe(false);
     expect(guarda({ type: "cors" })).toBe(false);
   });
+
+  it("recusa respostas de página (HTML) ou de dados RSC, mesmo num caminho permitido", () => {
+    expect(guarda({ headers: { "Content-Type": "image/png" } })).toBe(true);
+    expect(guarda({ headers: { "Content-Type": "application/javascript; charset=utf-8" } })).toBe(true);
+    expect(guarda({ headers: { "Content-Type": "text/css; charset=utf-8" } })).toBe(true);
+    expect(guarda({ headers: { "Content-Type": "application/manifest+json" } })).toBe(true);
+    expect(guarda({ headers: { "Content-Type": "text/html; charset=utf-8" } })).toBe(false);
+    expect(guarda({ headers: { "Content-Type": "application/xhtml+xml" } })).toBe(false);
+    expect(guarda({ headers: { "Content-Type": "text/x-component" } })).toBe(false);
+    expect(guarda({ headers: { "Content-Type": "application/x-rsc" } })).toBe(false);
+  });
 });
 
 describe("GET /sw.js", () => {
@@ -82,6 +93,9 @@ describe("GET /sw.js", () => {
     expect(corpo).toContain("self.skipWaiting()");
     expect(corpo).toContain("self.clients.claim()");
     expect(corpo).toContain('addEventListener("notificationclick"');
+    // O install também passa pelo predicado (nada de cache.addAll direto).
+    expect(corpo).not.toContain("addAll(");
+    expect(corpo).toMatch(/respostaPodeIrParaCache\(response\) \? cache\.put\(caminho, response\)/);
     // Só compila (não executa): erro de sintaxe no script quebraria o service worker inteiro.
     expect(() => new Function(corpo)).not.toThrow();
   });

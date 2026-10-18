@@ -126,8 +126,13 @@ export async function requestPushToken(pedirPermissao = false): Promise<string |
   }
 }
 
-/** Prazo curto para as etapas de push no logout: sair da conta não pode ficar esperando. */
-const PRAZO_LOGOUT_MS = 5_000;
+/**
+ * Prazos das etapas de push no logout: sair da conta não pode ficar esperando. Cada chamada
+ * do navegador/Firebase tem o seu, para nenhuma promessa travada segurar as seguintes.
+ */
+const PRAZO_TOKEN_LOGOUT_MS = 1_500;
+const PRAZO_DELETE_TOKEN_MS = 1_200;
+const PRAZO_INSCRICAO_MS = 600;
 
 /**
  * Token FCM que este aparelho JÁ tem, para o logout avisar o servidor qual token apagar.
@@ -137,31 +142,43 @@ const PRAZO_LOGOUT_MS = 5_000;
 export async function tokenPushExistente(): Promise<string | null> {
   if (!VAPID_KEY || typeof Notification === "undefined" || Notification.permission !== "granted") return null;
   if (!("serviceWorker" in navigator)) return null;
-  const messaging = await getMessagingInstance();
+  const messaging = await comPrazo(getMessagingInstance(), PRAZO_INSCRICAO_MS, "tempo esgotado");
   if (!messaging) return null;
-  const registration = await navigator.serviceWorker.getRegistration("/");
+  const registration = await comPrazo(navigator.serviceWorker.getRegistration("/"), PRAZO_INSCRICAO_MS, "tempo esgotado");
   if (!registration?.active) return null;
   // Sem inscrição, o getToken do Firebase criaria uma nova — aqui só interessa a existente.
-  if (!(await registration.pushManager.getSubscription())) return null;
-  return comPrazo(getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration }), PRAZO_LOGOUT_MS, "tempo esgotado");
+  if (!(await comPrazo(registration.pushManager.getSubscription(), PRAZO_INSCRICAO_MS, "tempo esgotado"))) return null;
+  return comPrazo(getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration }), PRAZO_TOKEN_LOGOUT_MS, "tempo esgotado");
 }
 
 /**
  * Desliga o push deste aparelho no logout. Com `tokenObtido` (tokenPushExistente deu certo
- * nesta página), usa o deleteToken do Firebase, que apaga o token no FCM e cancela a
- * inscrição. Sem ele, só cancela a inscrição do navegador — chamar deleteToken antes de um
- * getToken faria o Firebase registrar outro service worker (/firebase-messaging-sw.js).
+ * nesta página), tenta o deleteToken do Firebase, que apaga o token no FCM e cancela a
+ * inscrição. Se ele falhar ou demorar (o Firebase só cancela a inscrição depois da revogação
+ * remota), ou sem `tokenObtido`, cancela a inscrição do navegador direto — assim o aparelho
+ * para de receber mesmo que o logout no servidor e o Firebase falhem juntos.
+ * Chamar deleteToken antes de um getToken faria o Firebase registrar outro service worker
+ * (/firebase-messaging-sw.js), por isso ele só roda com `tokenObtido`.
  */
 export async function desligarPushDoAparelho(tokenObtido: boolean): Promise<void> {
   if (tokenObtido) {
-    const messaging = await getMessagingInstance();
-    if (messaging) {
-      await comPrazo(deleteToken(messaging), PRAZO_LOGOUT_MS, "tempo esgotado");
-      return;
+    try {
+      const messaging = await comPrazo(getMessagingInstance(), PRAZO_INSCRICAO_MS, "tempo esgotado");
+      if (messaging) {
+        await comPrazo(deleteToken(messaging), PRAZO_DELETE_TOKEN_MS, "tempo esgotado");
+        return;
+      }
+    } catch (err) {
+      console.warn("[logout] deleteToken do Firebase falhou; cancelando a inscrição direto", err);
     }
   }
+  await cancelarInscricaoPush();
+}
+
+/** Cancela a inscrição de push do navegador, se houver (com prazo em cada etapa). */
+async function cancelarInscricaoPush(): Promise<void> {
   if (!("serviceWorker" in navigator)) return;
-  const registration = await navigator.serviceWorker.getRegistration("/");
-  const inscricao = await registration?.pushManager.getSubscription();
-  if (inscricao) await inscricao.unsubscribe();
+  const registration = await comPrazo(navigator.serviceWorker.getRegistration("/"), PRAZO_INSCRICAO_MS, "tempo esgotado");
+  const inscricao = registration ? await comPrazo(registration.pushManager.getSubscription(), PRAZO_INSCRICAO_MS, "tempo esgotado") : null;
+  if (inscricao) await comPrazo(inscricao.unsubscribe(), PRAZO_INSCRICAO_MS, "tempo esgotado");
 }

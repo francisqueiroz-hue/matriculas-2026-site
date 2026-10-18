@@ -52,6 +52,10 @@ function respostaPodeIrParaCache(response) {
   if (!response || !response.ok || response.status !== 200 || response.type !== "basic") return false;
   var cacheControl = (response.headers.get("Cache-Control") || "").toLowerCase();
   if (/(^|[\s,])(no-store|private)([\s,=]|$)/.test(cacheControl)) return false;
+  // Página (HTML) ou dados de página do Next (RSC) nunca, mesmo vindo de um caminho permitido.
+  var tipo = (response.headers.get("Content-Type") || "").toLowerCase();
+  if (tipo.indexOf("text/html") !== -1 || tipo.indexOf("application/xhtml") !== -1) return false;
+  if (tipo.indexOf("text/x-component") !== -1 || /\brsc\b/.test(tipo)) return false;
   return true;
 }
 `;

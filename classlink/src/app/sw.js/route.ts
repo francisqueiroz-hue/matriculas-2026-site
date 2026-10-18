@@ -23,8 +23,23 @@ export async function GET() {
 const CACHE_NAME = "classlink-shell-v2";
 const APP_SHELL = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
 ${FONTE_REGRAS_CACHE_SW}
+// Pré-carrega o app-shell item a item, pelas mesmas regras do fetch abaixo. A falha de um
+// item não impede a instalação (o service worker novo precisa entrar para apagar a v1).
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((cache) =>
+        Promise.all(
+          APP_SHELL.map((caminho) =>
+            fetch(caminho, { cache: "no-cache" })
+              .then((response) => (respostaPodeIrParaCache(response) ? cache.put(caminho, response) : undefined))
+              .catch(() => {}),
+          ),
+        ),
+      )
+      .catch(() => {}),
+  );
   self.skipWaiting();
 });
 
