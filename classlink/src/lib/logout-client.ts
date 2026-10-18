@@ -4,11 +4,15 @@ import { apiFetch } from "@/lib/api-client";
 import { desligarPushDoAparelho, tokenPushExistente } from "@/lib/firebase-client";
 
 /**
- * Prazo de cada etapa do logout. Somados, limitam o pior caso a 10 s: depois disso quem
+ * Prazo de cada etapa do logout. Somados, limitam o pior caso a 16 s: depois disso quem
  * chama redireciona para o login, mesmo que alguma etapa nunca termine. O aviso ao servidor
- * tem o maior prazo porque é ele que apaga os cookies da sessão.
+ * tem o maior prazo porque é ele que apaga os cookies da sessão — se a resposta se perder
+ * (ex.: função da Vercel iniciando a frio), a pessoa continuaria logada no aparelho.
  */
-export const PRAZOS_LOGOUT_MS = { token: 2_000, servidor: 4_000, push: 3_000, caches: 1_000 } as const;
+export const PRAZOS_LOGOUT_MS = { token: 2_000, servidor: 10_000, push: 3_000, caches: 1_000 } as const;
+
+/** Pior caso total do logout (soma dos prazos). */
+export const PIOR_CASO_LOGOUT_MS = Object.values(PRAZOS_LOGOUT_MS).reduce((a, b) => a + b, 0);
 
 /** Espera a promessa até `ms`; depois disso (ou se ela falhar) segue com `null`, sem lançar. */
 async function noPrazo<T>(promessa: () => Promise<T>, ms: number, etapa: string): Promise<T | null> {

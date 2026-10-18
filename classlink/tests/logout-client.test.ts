@@ -101,14 +101,14 @@ describe("sairDaConta: caminho normal", () => {
 });
 
 describe("sairDaConta: travamentos (R1)", () => {
-  it("tudo trava: termina em até 10 s e aborta a requisição do logout", async () => {
+  it("tudo trava: termina em até 16 s e aborta a requisição do logout", async () => {
     firebaseMock.getToken.mockImplementation(nunca);
     apiFetchMock.mockImplementation(nunca);
     inscricao.unsubscribe.mockImplementation(nunca);
     cachesMock.keys.mockImplementation(nunca);
     const { sairDaConta } = await carregar();
 
-    const { terminou } = await sairComRelogio(sairDaConta, 10_000);
+    const { terminou } = await sairComRelogio(sairDaConta, 16_000);
     expect(terminou()).toBe(true);
     const signal: AbortSignal = apiFetchMock.mock.calls[0][1].signal;
     expect(signal.aborted).toBe(true);
@@ -116,7 +116,7 @@ describe("sairDaConta: travamentos (R1)", () => {
     expect(inscricao.unsubscribe).toHaveBeenCalled();
   });
 
-  it("até as APIs locais travam (Firebase, service worker, inscrição): termina em até 10 s", async () => {
+  it("até as APIs locais travam (Firebase, service worker, inscrição): termina em até 16 s", async () => {
     firebaseMock.isSupported.mockImplementation(nunca);
     navegador.serviceWorker.getRegistration.mockImplementation(nunca);
     registro.pushManager.getSubscription.mockImplementation(nunca);
@@ -124,14 +124,14 @@ describe("sairDaConta: travamentos (R1)", () => {
     cachesMock.keys.mockImplementation(nunca);
     const { sairDaConta } = await carregar();
 
-    const { terminou } = await sairComRelogio(sairDaConta, 10_000);
+    const { terminou } = await sairComRelogio(sairDaConta, 16_000);
     expect(terminou()).toBe(true);
   });
 
   it("o servidor nunca responde: ainda desliga o push e limpa as caches", async () => {
     apiFetchMock.mockImplementation(nunca);
     const { sairDaConta } = await carregar();
-    const { terminou } = await sairComRelogio(sairDaConta, 10_000);
+    const { terminou } = await sairComRelogio(sairDaConta, 16_000);
     expect(terminou()).toBe(true);
     expect(firebaseMock.deleteToken).toHaveBeenCalled();
     expect(cachesMock.delete).toHaveBeenCalled();
@@ -143,7 +143,7 @@ describe("desligar o push quando o Firebase falha (R2)", () => {
     apiFetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
     firebaseMock.deleteToken.mockRejectedValue(new Error("messaging/token-unsubscribe-failed"));
     const { sairDaConta } = await carregar();
-    const { terminou } = await sairComRelogio(sairDaConta, 10_000);
+    const { terminou } = await sairComRelogio(sairDaConta, 16_000);
     expect(terminou()).toBe(true);
     expect(firebaseMock.deleteToken).toHaveBeenCalled();
     expect(inscricao.unsubscribe).toHaveBeenCalledTimes(1);
@@ -153,7 +153,7 @@ describe("desligar o push quando o Firebase falha (R2)", () => {
   it("deleteToken nunca termina: depois do prazo, cancela a inscrição do navegador", async () => {
     firebaseMock.deleteToken.mockImplementation(nunca);
     const { sairDaConta } = await carregar();
-    const { terminou } = await sairComRelogio(sairDaConta, 10_000);
+    const { terminou } = await sairComRelogio(sairDaConta, 16_000);
     expect(terminou()).toBe(true);
     expect(inscricao.unsubscribe).toHaveBeenCalledTimes(1);
   });
