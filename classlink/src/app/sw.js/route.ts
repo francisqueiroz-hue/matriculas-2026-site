@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { limparValorPublico } from "@/lib/firebase-config-publica";
+import { FONTE_REGRAS_CACHE_SW } from "@/lib/sw-cache";
 
 /**
- * Service worker único do app: cache básico de app-shell (offline mínimo) +
+ * Service worker único do app: cache de arquivos estáticos públicos (offline mínimo) +
  * mensagens em segundo plano do Firebase Cloud Messaging. Servido dinamicamente
  * para poder injetar a config pública do Firebase sem build step separado.
  */
@@ -17,9 +18,11 @@ export async function GET() {
   };
 
   const body = `
-const CACHE_NAME = "classlink-shell-v1";
+// v2: a v1 guardava páginas e dados do /dashboard (dados pessoais). Trocar o nome faz o
+// "activate" abaixo apagar a cache v1 nos aparelhos que já tinham o app instalado.
+const CACHE_NAME = "classlink-shell-v2";
 const APP_SHELL = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
-
+${FONTE_REGRAS_CACHE_SW}
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
   self.skipWaiting();
@@ -27,26 +30,34 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))),
+    Promise.all([
+      caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))),
+      self.clients.claim(),
+    ]),
   );
-  self.clients.claim();
 });
 
-// Network-first para navegação/API, cache-first para assets estáticos já vistos.
+// Só arquivos estáticos e públicos passam por aqui (regras em requisicaoPodeIrParaCache):
+// network-first — busca na rede e guarda uma cópia; sem rede, usa a cópia guardada.
+// Páginas, dados de página (RSC), /dashboard e /api não são interceptados: a rede responde
+// direto e nada disso é guardado no aparelho.
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  if (request.method !== "GET") return;
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (!requisicaoPodeIrParaCache(request, self.location.origin)) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        if (respostaPodeIrParaCache(response)) {
+          const copy = response.clone();
+          caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.put(request, copy))
+            .catch(() => {});
+        }
         return response;
       })
-      .catch(() => caches.match(request)),
+      .catch(() => caches.match(request).then((guardada) => guardada || Response.error())),
   );
 });
 
@@ -93,6 +104,8 @@ if (${Boolean(firebaseConfig.apiKey)}) {
     headers: {
       "Content-Type": "application/javascript; charset=utf-8",
       "Service-Worker-Allowed": "/",
+      // Sem cache HTTP: uma versão nova do service worker chega logo aos aparelhos.
+      "Cache-Control": "no-cache, no-store, must-revalidate",
     },
   });
 }

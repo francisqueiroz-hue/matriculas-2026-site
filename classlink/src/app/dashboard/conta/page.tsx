@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { limparCachesDoApp } from "@/lib/logout-client";
 import { AvisosWhatsAppEquipe } from "@/components/AvisosWhatsAppEquipe";
 import { NomeParaFamilias } from "@/components/NomeParaFamilias";
 import { NotificacoesAparelho } from "@/components/NotificacoesAparelho";
@@ -66,6 +67,8 @@ export default function ContaPage() {
     setLoading(true);
     try {
       await apiJson("/api/account/delete", { method: "POST", body: JSON.stringify({ password }) });
+      // Conta excluída: apaga as caches do app neste aparelho (não lança erro).
+      await limparCachesDoApp();
       router.push("/login");
       router.refresh();
     } catch (err) {

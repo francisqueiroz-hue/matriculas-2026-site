@@ -1,5 +1,5 @@
 import { initializeApp, getApps, type FirebaseOptions } from "firebase/app";
-import { getMessaging, getToken, isSupported, type Messaging } from "firebase/messaging";
+import { deleteToken, getMessaging, getToken, isSupported, type Messaging } from "firebase/messaging";
 import { limparValorPublico as limpar } from "@/lib/firebase-config-publica";
 
 const firebaseConfig: FirebaseOptions = {
@@ -124,4 +124,44 @@ export async function requestPushToken(pedirPermissao = false): Promise<string |
     await etapa("Refazer inscrição no push", () => garantirInscricao(registration, chave, true));
     return etapa("Registro no Firebase", obterToken);
   }
+}
+
+/** Prazo curto para as etapas de push no logout: sair da conta não pode ficar esperando. */
+const PRAZO_LOGOUT_MS = 5_000;
+
+/**
+ * Token FCM que este aparelho JÁ tem, para o logout avisar o servidor qual token apagar.
+ * Não pede permissão e não cria inscrição de push nova: sem permissão "granted", sem
+ * service worker ativo ou sem inscrição existente, retorna null.
+ */
+export async function tokenPushExistente(): Promise<string | null> {
+  if (!VAPID_KEY || typeof Notification === "undefined" || Notification.permission !== "granted") return null;
+  if (!("serviceWorker" in navigator)) return null;
+  const messaging = await getMessagingInstance();
+  if (!messaging) return null;
+  const registration = await navigator.serviceWorker.getRegistration("/");
+  if (!registration?.active) return null;
+  // Sem inscrição, o getToken do Firebase criaria uma nova — aqui só interessa a existente.
+  if (!(await registration.pushManager.getSubscription())) return null;
+  return comPrazo(getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration }), PRAZO_LOGOUT_MS, "tempo esgotado");
+}
+
+/**
+ * Desliga o push deste aparelho no logout. Com `tokenObtido` (tokenPushExistente deu certo
+ * nesta página), usa o deleteToken do Firebase, que apaga o token no FCM e cancela a
+ * inscrição. Sem ele, só cancela a inscrição do navegador — chamar deleteToken antes de um
+ * getToken faria o Firebase registrar outro service worker (/firebase-messaging-sw.js).
+ */
+export async function desligarPushDoAparelho(tokenObtido: boolean): Promise<void> {
+  if (tokenObtido) {
+    const messaging = await getMessagingInstance();
+    if (messaging) {
+      await comPrazo(deleteToken(messaging), PRAZO_LOGOUT_MS, "tempo esgotado");
+      return;
+    }
+  }
+  if (!("serviceWorker" in navigator)) return;
+  const registration = await navigator.serviceWorker.getRegistration("/");
+  const inscricao = await registration?.pushManager.getSubscription();
+  if (inscricao) await inscricao.unsubscribe();
 }
