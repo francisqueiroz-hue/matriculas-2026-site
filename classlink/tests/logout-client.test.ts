@@ -69,7 +69,7 @@ afterEach(() => {
 });
 
 describe("sairDaConta: caminho normal", () => {
-  it("envia o token do aparelho, apaga no Firebase e limpa as caches", async () => {
+  it("envia o token do aparelho, cancela a inscrição capturada e limpa as caches", async () => {
     const { sairDaConta } = await carregar();
     const { terminou, promessa } = await sairComRelogio(sairDaConta, 0);
     await promessa;
@@ -77,7 +77,8 @@ describe("sairDaConta: caminho normal", () => {
     const [caminho, init] = apiFetchMock.mock.calls[0];
     expect(caminho).toBe("/api/auth/logout");
     expect(JSON.parse(init.body)).toEqual({ pushToken: "tok-1" });
-    expect(firebaseMock.deleteToken).toHaveBeenCalledTimes(1);
+    expect(inscricao.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(firebaseMock.deleteToken).not.toHaveBeenCalled();
     expect(cachesMock.delete).toHaveBeenCalledWith("classlink-shell-v2");
   });
 
@@ -112,7 +113,6 @@ describe("sairDaConta: travamentos (R1)", () => {
     expect(terminou()).toBe(true);
     const signal: AbortSignal = apiFetchMock.mock.calls[0][1].signal;
     expect(signal.aborted).toBe(true);
-    // Sem token, o push é desligado direto pela inscrição do navegador.
     expect(inscricao.unsubscribe).toHaveBeenCalled();
   });
 
@@ -128,39 +128,47 @@ describe("sairDaConta: travamentos (R1)", () => {
     expect(terminou()).toBe(true);
   });
 
-  it("o servidor nunca responde: ainda desliga o push e limpa as caches", async () => {
+  it("o servidor nunca responde: ainda cancela a inscrição e limpa as caches", async () => {
     apiFetchMock.mockImplementation(nunca);
     const { sairDaConta } = await carregar();
     const { terminou } = await sairComRelogio(sairDaConta, 16_000);
     expect(terminou()).toBe(true);
-    expect(firebaseMock.deleteToken).toHaveBeenCalled();
+    expect(inscricao.unsubscribe).toHaveBeenCalledTimes(1);
     expect(cachesMock.delete).toHaveBeenCalled();
   });
 });
 
-describe("desligar o push quando o Firebase falha (R2)", () => {
-  it("logout no servidor e revogação do Firebase falham juntos: cancela a inscrição do navegador", async () => {
+describe("desligar o push no logout (R2/PRIV-002)", () => {
+  it("logout no servidor falha: a inscrição do aparelho é cancelada mesmo assim, sem deleteToken", async () => {
     apiFetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
-    firebaseMock.deleteToken.mockRejectedValue(new Error("messaging/token-unsubscribe-failed"));
     const { sairDaConta } = await carregar();
     const { terminou } = await sairComRelogio(sairDaConta, 16_000);
     expect(terminou()).toBe(true);
-    expect(firebaseMock.deleteToken).toHaveBeenCalled();
     expect(inscricao.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(firebaseMock.deleteToken).not.toHaveBeenCalled();
     expect(cachesMock.delete).toHaveBeenCalled();
   });
 
-  it("deleteToken nunca termina: depois do prazo, cancela a inscrição do navegador", async () => {
-    firebaseMock.deleteToken.mockImplementation(nunca);
+  it("unsubscribe atrasado da inscrição antiga não afeta a inscrição criada depois por outra conta", async () => {
+    let terminarAntigo: (v: boolean) => void = () => {};
+    inscricao.unsubscribe.mockImplementation(() => new Promise<boolean>((r) => (terminarAntigo = r)));
     const { sairDaConta } = await carregar();
+
+    // O cancelamento da inscrição antiga estoura o prazo e o logout segue (redireciona).
     const { terminou } = await sairComRelogio(sairDaConta, 16_000);
     expect(terminou()).toBe(true);
-    expect(inscricao.unsubscribe).toHaveBeenCalledTimes(1);
-  });
 
-  it("deleteToken funciona: não cancela a inscrição de novo", async () => {
-    const { sairDaConta } = await carregar();
-    await (await sairComRelogio(sairDaConta, 0)).promessa;
-    expect(inscricao.unsubscribe).not.toHaveBeenCalled();
+    // Outra conta entra e o aparelho ganha uma inscrição nova.
+    const nova = { unsubscribe: vi.fn(async () => true) };
+    registro.pushManager.getSubscription.mockResolvedValue(nova);
+
+    // Só agora o unsubscribe antigo termina.
+    terminarAntigo(true);
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(inscricao.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(nova.unsubscribe).not.toHaveBeenCalled();
+    expect(await (registro.pushManager.getSubscription as () => Promise<unknown>)()).toBe(nova);
+    expect(firebaseMock.deleteToken).not.toHaveBeenCalled();
   });
 });

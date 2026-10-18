@@ -1,7 +1,7 @@
 "use client";
 
 import { apiFetch } from "@/lib/api-client";
-import { desligarPushDoAparelho, tokenPushExistente } from "@/lib/firebase-client";
+import { cancelarInscricaoCapturada, inscricaoPushAtual, tokenPushExistente } from "@/lib/firebase-client";
 
 /**
  * Prazo de cada etapa do logout. Somados, limitam o pior caso a 16 s: depois disso quem
@@ -9,7 +9,7 @@ import { desligarPushDoAparelho, tokenPushExistente } from "@/lib/firebase-clien
  * tem o maior prazo porque é ele que apaga os cookies da sessão — se a resposta se perder
  * (ex.: função da Vercel iniciando a frio), a pessoa continuaria logada no aparelho.
  */
-export const PRAZOS_LOGOUT_MS = { token: 2_000, servidor: 10_000, push: 3_000, caches: 1_000 } as const;
+export const PRAZOS_LOGOUT_MS = { inscricao: 1_000, token: 2_000, servidor: 10_000, push: 2_000, caches: 1_000 } as const;
 
 /** Pior caso total do logout (soma dos prazos). */
 export const PIOR_CASO_LOGOUT_MS = Object.values(PRAZOS_LOGOUT_MS).reduce((a, b) => a + b, 0);
@@ -35,11 +35,15 @@ async function noPrazo<T>(promessa: () => Promise<T>, ms: number, etapa: string)
 
 /**
  * Sai da conta e limpa o aparelho: avisa o servidor (que revoga a sessão e apaga o token de
- * push deste aparelho), desliga o push no navegador e apaga as caches do app.
+ * push deste aparelho), cancela a inscrição de push e apaga as caches do app.
  * Cada etapa tem prazo próprio e nunca lança erro: quem chama redireciona para o login sempre.
  */
 export async function sairDaConta(): Promise<void> {
-  const pushToken = await noPrazo(() => tokenPushExistente(), PRAZOS_LOGOUT_MS.token, "token de push do aparelho");
+  // Captura a inscrição de push de AGORA: é ela (e só ela) que será cancelada no fim.
+  const inscricao = await noPrazo(() => inscricaoPushAtual(), PRAZOS_LOGOUT_MS.inscricao, "inscrição de push do aparelho");
+  const pushToken = inscricao
+    ? await noPrazo(() => tokenPushExistente(), PRAZOS_LOGOUT_MS.token, "token de push do aparelho")
+    : null;
 
   // Aborta a requisição se o prazo vencer, para não ficar pendurada em segundo plano.
   const controle = new AbortController();
@@ -55,7 +59,7 @@ export async function sairDaConta(): Promise<void> {
   );
   controle.abort();
 
-  await noPrazo(() => desligarPushDoAparelho(pushToken !== null), PRAZOS_LOGOUT_MS.push, "desligar o push do aparelho");
+  await noPrazo(() => cancelarInscricaoCapturada(inscricao), PRAZOS_LOGOUT_MS.push, "cancelar a inscrição de push");
 
   await limparCachesDoApp();
 }

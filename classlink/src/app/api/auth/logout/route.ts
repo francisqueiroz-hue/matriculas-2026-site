@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ACCESS_COOKIE, REFRESH_COOKIE, hashRefreshToken, verifyAccessToken } from "@/lib/auth";
+import {
+  ACCESS_COOKIE,
+  REFRESH_COOKIE,
+  accessCookieOptions,
+  hashRefreshToken,
+  refreshCookieOptions,
+  verifyAccessToken,
+} from "@/lib/auth";
 import { handleApiError } from "@/lib/http";
 import { TAMANHO_MAXIMO_CORPO_LOGOUT, lerTokenPushDoLogout } from "@/lib/logout-corpo";
 
@@ -23,15 +30,26 @@ export async function POST(request: NextRequest) {
     }
 
     if (tokenHash) {
+      const agora = new Date();
       await prisma.refreshToken.updateMany({
         where: { tokenHash, revokedAt: null },
-        data: { revokedAt: new Date() },
+        data: { revokedAt: agora },
+      });
+      // Logout explícito: o token morre na hora. Só revogar deixaria a janela de reuso de 15 s
+      // (situacaoRefresh, "reuso_recente") renovar a sessão logo depois de sair. Vencer o
+      // token faz situacaoRefresh devolver "invalido". Sem exigir revokedAt null: cobre também
+      // um token já rotacionado há poucos segundos, que ainda estaria dentro da janela.
+      await prisma.refreshToken.updateMany({
+        where: { tokenHash, expiresAt: { gt: agora } },
+        data: { expiresAt: agora },
       });
     }
 
     const response = NextResponse.json({ ok: true });
-    response.cookies.delete(ACCESS_COOKIE);
-    response.cookies.delete(REFRESH_COOKIE);
+    // Apaga com os mesmos atributos da criação: o refresh vive em path "/api/auth", e um
+    // delete com o path padrão ("/") deixaria o cookie real no navegador.
+    response.cookies.set(ACCESS_COOKIE, "", { ...accessCookieOptions, maxAge: 0 });
+    response.cookies.set(REFRESH_COOKIE, "", { ...refreshCookieOptions, maxAge: 0 });
     return response;
   } catch (error) {
     return handleApiError(error);

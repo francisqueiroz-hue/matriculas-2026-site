@@ -12,10 +12,13 @@ vi.mock("@/lib/auth", () => ({
   REFRESH_COOKIE: "classlink_refresh",
   hashRefreshToken: (t: string) => `hash-${t}`,
   verifyAccessToken,
+  accessCookieOptions: { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 900 },
+  refreshCookieOptions: { httpOnly: true, secure: true, sameSite: "lax", path: "/api/auth", maxAge: 2592000 },
 }));
 
 import { POST } from "@/app/api/auth/logout/route";
 import { lerTokenPushDoLogout, TAMANHO_MAXIMO_CORPO_LOGOUT } from "@/lib/logout-corpo";
+import { situacaoRefresh, type RefreshArmazenado } from "@/lib/renovacao-sessao";
 
 function req(corpo?: string, cookies = "classlink_access=acc; classlink_refresh=ref") {
   return new NextRequest("http://t/api/auth/logout", {
@@ -49,17 +52,79 @@ describe("lerTokenPushDoLogout", () => {
 });
 
 describe("POST /api/auth/logout", () => {
-  it("sem corpo: revoga a sessão, apaga cookies e não mexe em push", async () => {
+  it("sem corpo: revoga e vence o refresh, e não mexe em push", async () => {
     const res = await POST(req());
     expect(res.status).toBe(200);
     expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledWith({
       where: { tokenHash: "hash-ref", revokedAt: null },
       data: { revokedAt: expect.any(Date) },
     });
+    // Sem exigir revokedAt null: também mata um token já rotacionado há pouco.
+    expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { tokenHash: "hash-ref", expiresAt: { gt: expect.any(Date) } },
+      data: { expiresAt: expect.any(Date) },
+    });
     expect(prismaMock.pushToken.deleteMany).not.toHaveBeenCalled();
-    const setCookie = res.headers.get("set-cookie") ?? "";
-    expect(setCookie).toContain("classlink_access=;");
-    expect(setCookie).toContain("classlink_refresh=;");
+  });
+
+  it("apaga os cookies com os mesmos atributos da criação (refresh em /api/auth, access em /)", async () => {
+    const res = await POST(req());
+    const cookies = res.headers.getSetCookie();
+    const refresh = cookies.find((c) => c.startsWith("classlink_refresh="));
+    const access = cookies.find((c) => c.startsWith("classlink_access="));
+    expect(refresh).toMatch(/^classlink_refresh=;/);
+    expect(refresh).toMatch(/Path=\/api\/auth(;|$)/);
+    expect(refresh).toMatch(/Max-Age=0/);
+    expect(refresh).toMatch(/HttpOnly/i);
+    expect(refresh).toMatch(/Secure/i);
+    expect(refresh).toMatch(/SameSite=lax/i);
+    expect(access).toMatch(/^classlink_access=;/);
+    expect(access).toMatch(/Path=\/(;|$)/);
+    expect(access).toMatch(/Max-Age=0/);
+    expect(access).toMatch(/HttpOnly/i);
+  });
+
+  it("depois do logout o refresh não renova mais, nem dentro da janela de reuso", async () => {
+    // Aplica as escritas do logout num registro em memória, como o banco faria.
+    const registro: RefreshArmazenado = {
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 30 * 86_400_000),
+      user: { active: true, deletedAt: null },
+    };
+    prismaMock.refreshToken.updateMany.mockImplementation(async ({ where, data }) => {
+      if (where.revokedAt === null && registro.revokedAt !== null) return { count: 0 };
+      if (where.expiresAt?.gt && !(registro.expiresAt > where.expiresAt.gt)) return { count: 0 };
+      Object.assign(registro, data);
+      return { count: 1 };
+    });
+    await POST(req());
+    const umSegundoDepois = new Date(Date.now() + 1_000);
+    expect(situacaoRefresh(registro, umSegundoDepois)).toBe("invalido");
+  });
+
+  it("token já rotacionado há poucos segundos também morre no logout", async () => {
+    const registro: RefreshArmazenado = {
+      revokedAt: new Date(Date.now() - 3_000),
+      expiresAt: new Date(Date.now() + 30 * 86_400_000),
+      user: { active: true, deletedAt: null },
+    };
+    expect(situacaoRefresh(registro, new Date())).toBe("reuso_recente");
+    prismaMock.refreshToken.updateMany.mockImplementation(async ({ where, data }) => {
+      if (where.revokedAt === null && registro.revokedAt !== null) return { count: 0 };
+      Object.assign(registro, data);
+      return { count: 1 };
+    });
+    await POST(req());
+    expect(situacaoRefresh(registro, new Date(Date.now() + 1_000))).toBe("invalido");
+  });
+
+  it("rotação normal (sem logout) continua aceitando reuso recente", () => {
+    const rotacionado: RefreshArmazenado = {
+      revokedAt: new Date(Date.now() - 1_000),
+      expiresAt: new Date(Date.now() + 30 * 86_400_000),
+      user: { active: true, deletedAt: null },
+    };
+    expect(situacaoRefresh(rotacionado, new Date())).toBe("reuso_recente");
   });
 
   it("com token: apaga só o token deste aparelho, filtrado pelo usuário da sessão", async () => {
@@ -92,7 +157,7 @@ describe("POST /api/auth/logout", () => {
     expect((await POST(req(JSON.stringify({ pushToken: 42 })))).status).toBe(200);
     expect((await POST(req(JSON.stringify({ pushToken: "x".repeat(10_000) })))).status).toBe(200);
     expect(prismaMock.pushToken.deleteMany).not.toHaveBeenCalled();
-    expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledTimes(3);
+    expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledTimes(6);
   });
 
   it("falha ao apagar o token: registra o erro e o logout termina com sucesso", async () => {
