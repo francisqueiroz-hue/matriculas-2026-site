@@ -1035,3 +1035,18 @@ model ConsentimentoLgpd {
   @@index([studentId, finalidade])
   @@index([schoolId])
 }
+
+// Violações de CSP (modo Report-Only) agrupadas por diretiva + origem bloqueada + página.
+// Guarda só dados técnicos reduzidos (sem URLs completas, consulta, IP ou usuário).
+model CspViolacao {
+  id          String   @id @default(cuid())
+  chave       String   @unique
+  diretiva    String
+  bloqueado   String
+  pagina      String
+  total       Int      @default(1)
+  primeiraVez DateTime @default(now())
+  ultimaVez   DateTime @default(now())
+
+  @@index([ultimaVez])
+}
