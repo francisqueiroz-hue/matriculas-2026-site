@@ -3,6 +3,7 @@ import { getStorage } from "firebase-admin/storage";
 import { ErroDeUsuario } from "@/lib/erros";
 import { credenciaisDaConta, getFirebaseAdminApp } from "@/lib/firebase-admin";
 import { limparValorPublico } from "@/lib/firebase-config-publica";
+import { apagarDoBlob, isBlobConfigured, linkDoBlob, salvarNoBlob } from "@/lib/blob-storage";
 
 export interface UploadResult {
   /** Caminho interno do objeto no bucket — não é uma URL pública (o bucket fica privado por padrão). */
@@ -14,8 +15,16 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB (imagem já deve chegar comprimi
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50MB
 const SIGNED_URL_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
+/**
+ * Onde as mídias ficam: no Vercel Blob (privado) quando há um Blob store conectado ao
+ * projeto; senão, no Firebase Storage. O resto do app não precisa saber qual é.
+ */
+export function provedorDeMidia(): "blob" | "firebase" {
+  return isBlobConfigured() ? "blob" : "firebase";
+}
+
 export function isFirebaseStorageConfigured() {
-  return Boolean(getFirebaseAdminApp() && candidatosDeBucket(process.env).length > 0);
+  return isBlobConfigured() || Boolean(getFirebaseAdminApp() && candidatosDeBucket(process.env).length > 0);
 }
 
 /**
@@ -109,6 +118,16 @@ export async function uploadMedia(
   const extension = mimeType.split("/")[1] ?? (kind === "image" ? "jpg" : "mp4");
   const path = `${folder}/${randomUUID()}.${extension}`;
 
+  if (provedorDeMidia() === "blob") {
+    try {
+      await salvarNoBlob(path, buffer, mimeType);
+    } catch (err) {
+      console.error("Vercel Blob: falha ao gravar", err);
+      throw new ErroStorage(`Não foi possível guardar a imagem: ${(err as Error)?.message ?? String(err)}`);
+    }
+    return { path, resourceType: kind };
+  }
+
   const file = (await getBucket()).file(path);
   try {
     await file.save(buffer, { metadata: { contentType: mimeType }, resumable: false });
@@ -122,12 +141,23 @@ export async function uploadMedia(
 
 /** Gera uma URL assinada de leitura, válida por tempo limitado, para exibir a mídia no app. */
 export async function getSignedMediaUrl(path: string): Promise<string> {
+  if (provedorDeMidia() === "blob") return linkDoBlob(path, SIGNED_URL_TTL_MS);
   const [url] = await (await getBucket()).file(path).getSignedUrl({ action: "read", expires: Date.now() + SIGNED_URL_TTL_MS });
   return url;
 }
 
 /** Diagnóstico: grava e apaga um arquivo de teste no bucket. */
 export async function testarStorage(): Promise<{ ok: boolean; detalhe?: string }> {
+  if (provedorDeMidia() === "blob") {
+    const caminho = `classlink/diagnostico/teste-${randomUUID()}.txt`;
+    try {
+      await salvarNoBlob(caminho, Buffer.from("ok"), "text/plain");
+      await apagarDoBlob(caminho).catch(() => undefined);
+      return { ok: true, detalhe: "Vercel Blob (privado)" };
+    } catch (err) {
+      return { ok: false, detalhe: `Vercel Blob: ${(err as Error)?.message ?? String(err)}` };
+    }
+  }
   try {
     const bucket = await getBucket();
     const arquivo = bucket.file(`diagnostico/teste-${randomUUID()}.txt`);
