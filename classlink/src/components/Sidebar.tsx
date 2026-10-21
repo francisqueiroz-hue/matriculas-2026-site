@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { NavIcon } from "@/components/NavIcon";
-import { sairDaConta } from "@/lib/logout-client";
+import { MENSAGEM_LOGOUT_NAO_CONFIRMADO, sairDaConta } from "@/lib/logout-client";
 import { agruparLinks, getNavLinks, useComunicadosPendentes } from "@/lib/nav-links";
 import { useMensagensNaoLidas } from "@/components/AvisosMensagens";
 import { LogoEspacoKids, LogoInstitutoFokus } from "@/components/Logos";
@@ -24,6 +24,7 @@ export function Sidebar() {
   const comunicadosPendentes = useComunicadosPendentes(user.role);
   const mensagensNaoLidas = useMensagensNaoLidas().total;
   const [recolhido, setRecolhido] = useState(false);
+  const [saindo, setSaindo] = useState(false);
 
   const grupos = agruparLinks(getNavLinks(user));
 
@@ -47,8 +48,16 @@ export function Sidebar() {
   }
 
   async function handleLogout() {
-    // Revoga a sessão e limpa o aparelho (token de push e caches); nunca impede o redirecionamento.
-    await sairDaConta();
+    if (saindo) return;
+    setSaindo(true);
+    // Revoga a sessão e limpa o aparelho (token de push e caches). Sem confirmação do
+    // servidor os cookies ficam e o login devolveria ao painel: avisa e deixa tentar de novo.
+    const confirmado = await sairDaConta();
+    if (!confirmado) {
+      setSaindo(false);
+      window.alert(MENSAGEM_LOGOUT_NAO_CONFIRMADO);
+      return;
+    }
     router.push("/login");
     router.refresh();
   }
@@ -168,9 +177,11 @@ export function Sidebar() {
         </Link>
         <button type="button"
           onClick={handleLogout}
-          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+          disabled={saindo}
+          aria-busy={saindo}
+          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
         >
-          Sair
+          {saindo ? "Saindo…" : "Sair"}
         </button>
       </div>
     </aside>

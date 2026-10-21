@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiJson } from "@/lib/api-client";
 import { requestPushToken } from "@/lib/firebase-client";
 import { isIosDevice } from "@/lib/device";
+import { registrarPush } from "@/lib/registro-push";
 
 type Estado = "carregando" | "instalar-iphone" | "sem-suporte" | "bloqueado" | "pendente" | "ativo";
 
@@ -50,7 +51,7 @@ export function NotificacoesAparelho() {
         return;
       }
       try {
-        await apiJson("/api/push/register", { method: "POST", body: JSON.stringify({ token }) });
+        await registrarPush(() => apiJson("/api/push/register", { method: "POST", body: JSON.stringify({ token }) }));
       } catch (err) {
         throw new Error(`Salvar o aparelho — ${err instanceof Error ? err.message : String(err)}`);
       }
