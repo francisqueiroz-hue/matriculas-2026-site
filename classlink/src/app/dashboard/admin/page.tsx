@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { DiagnosticoAvisos } from "@/components/DiagnosticoAvisos";
+import { SaudeSistema } from "@/components/SaudeSistema";
 import { apiJson } from "@/lib/api-client";
 
 interface Metrics {
@@ -141,6 +142,7 @@ export default function AdminMetricsPage() {
         )}
 
         <DiagnosticoAvisos />
+        <SaudeSistema />
       </div>
     </AdminGuard>
   );

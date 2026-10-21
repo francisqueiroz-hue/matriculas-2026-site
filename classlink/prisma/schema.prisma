@@ -1038,6 +1038,21 @@ model ConsentimentoLgpd {
 
 // Violações de CSP (modo Report-Only) agrupadas por diretiva + origem bloqueada + página.
 // Guarda só dados técnicos reduzidos (sem URLs completas, consulta, IP ou usuário).
+// Erros inesperados do servidor (respostas 500), agrupados. A Vercel Hobby guarda só 1 hora
+// de logs; aqui fica o histórico mostrado no Painel. Só a 1ª linha da mensagem, sem dados
+// pessoais (e-mails, telefones e números longos são mascarados antes de gravar).
+model ErroServidor {
+  id          String   @id @default(cuid())
+  chave       String   @unique
+  origem      String
+  mensagem    String
+  total       Int      @default(1)
+  primeiraVez DateTime @default(now())
+  ultimaVez   DateTime @default(now())
+
+  @@index([ultimaVez])
+}
+
 model CspViolacao {
   id          String   @id @default(cuid())
   chave       String   @unique
