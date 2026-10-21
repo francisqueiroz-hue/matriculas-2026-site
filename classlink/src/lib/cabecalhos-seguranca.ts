@@ -19,7 +19,8 @@ export const CSP_COMPLETA = [
   "media-src 'self' blob: https://storage.googleapis.com",
   "font-src 'self' data:",
   // Firebase (instalações, FCM) e Storage ficam em *.googleapis.com.
-  "connect-src 'self' https://*.googleapis.com",
+  // Vercel Blob: envio direto de arquivos grandes (link pré-assinado) a partir do navegador.
+  "connect-src 'self' https://*.googleapis.com https://vercel.com https://*.blob.vercel-storage.com",
   "worker-src 'self'",
   "manifest-src 'self'",
   "frame-src 'self' blob:",
