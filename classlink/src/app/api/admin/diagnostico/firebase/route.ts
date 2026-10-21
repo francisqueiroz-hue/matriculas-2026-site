@@ -31,7 +31,9 @@ export async function POST(request: NextRequest) {
       {
         titulo: "Storage aceita imagens e vídeos (Mural, cardápios)",
         ok: storage.ok,
-        detalhe: storage.ok ? undefined : storage.detalhe,
+        detalhe: storage.ok
+          ? undefined
+          : `${storage.detalhe} — Sem o plano pago do Firebase, use o Vercel Blob: na Vercel, abra Storage → Create → Blob, conecte ao projeto (Production e Preview) e faça Redeploy.`,
       },
     ];
     const resultado: ResultadoTesteFirebase = { ok: itens.every((i) => i.ok), itens };
