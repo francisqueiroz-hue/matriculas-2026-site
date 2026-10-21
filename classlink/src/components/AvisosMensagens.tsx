@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { apiFetch, apiJson } from "@/lib/api-client";
 import { requestPushToken } from "@/lib/firebase-client";
+import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
 
 interface UltimaMensagem {
   id: string;
@@ -28,8 +29,9 @@ export function useMensagensNaoLidas() {
   return useContext(MensagensNaoLidasContext);
 }
 
-const INTERVALO_VISIVEL_MS = 15_000;
-const INTERVALO_OCULTO_MS = 30_000;
+// Contador do menu: 20 s com a aba visível, espaçando até 60 s sem novidade; em segundo plano,
+// a cada 60 s (o aviso na área de trabalho depende disso quando não há notificação push).
+const CONSULTA_CONTADOR = { baseMs: 20_000, maxMs: 60_000, ocultoMs: 60_000 };
 const DISPENSOU_AVISOS_KEY = "classlink-avisos-mensagens-dispensado";
 
 /** Bip curto gerado no navegador (sem arquivo de áudio). Falha em silêncio se o navegador bloquear. */
@@ -99,24 +101,29 @@ export function AvisosMensagensProvider({ children }: { children: React.ReactNod
     pathnameRef.current = pathname;
   }, [pathname]);
 
-  const verificar = useCallback(async () => {
+  const totalVisto = useRef(0);
+
+  /** Consulta o resumo; devolve true se mudou algo (mensagem nova ou contador diferente). */
+  const verificar = useCallback(async (): Promise<boolean> => {
     let dados: Resumo;
     try {
       dados = await apiJson<Resumo>("/api/notificacoes/mensagens");
     } catch {
-      return; // sem conexão ou sessão expirada: tenta de novo no próximo ciclo
+      return false; // sem conexão ou sessão expirada: tenta de novo no próximo ciclo
     }
     setResumo(dados);
+    const totalMudou = dados.total !== totalVisto.current;
+    totalVisto.current = dados.total;
 
     const idNova = dados.ultima?.id ?? null;
     const primeiraCarga = ultimaVista.current === undefined;
     const mudou = idNova !== null && idNova !== ultimaVista.current;
     ultimaVista.current = idNova;
-    if (primeiraCarga || !mudou || !dados.ultima) return;
+    if (primeiraCarga || !mudou || !dados.ultima) return totalMudou;
 
     // Mensagem nova. Se a pessoa já está olhando essa conversa, não precisa avisar.
     const naConversa = pathnameRef.current === dados.ultima.url.split("?")[0];
-    if (naConversa && document.visibilityState === "visible") return;
+    if (naConversa && document.visibilityState === "visible") return true;
 
     tocarSom();
     if (document.visibilityState === "visible") {
@@ -124,28 +131,12 @@ export function AvisosMensagensProvider({ children }: { children: React.ReactNod
     } else {
       void mostrarNotificacao(dados.ultima, dados.total);
     }
+    return true;
   }, []);
 
-  // Consulta periódica (mais espaçada com a aba em segundo plano) e ao voltar para a aba.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    let ativo = true;
-    const ciclo = async () => {
-      await verificar();
-      if (!ativo) return;
-      timer = setTimeout(ciclo, document.visibilityState === "visible" ? INTERVALO_VISIVEL_MS : INTERVALO_OCULTO_MS);
-    };
-    void ciclo();
-    const aoVoltar = () => {
-      if (document.visibilityState === "visible") void verificar();
-    };
-    document.addEventListener("visibilitychange", aoVoltar);
-    return () => {
-      ativo = false;
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", aoVoltar);
-    };
-  }, [verificar]);
+  // Consulta adaptativa (ver lib/consulta-adaptativa): espaça sem novidade, volta ao ritmo
+  // normal com mensagem nova ou ao voltar para a aba, e não consulta sem internet.
+  useConsultaAdaptativa(verificar, CONSULTA_CONTADOR);
 
   // Ao trocar de página (ex.: abrir a conversa, que marca como lida), atualiza o contador.
   useEffect(() => {
