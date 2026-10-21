@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
 import { ROTULO_ENVIO, explicacaoDoCanal, reciboPorCanal, whatsappDisponivel, type JanelaWhatsApp } from "@/lib/canal-envio";
 
 type Canal = "APP" | "WHATSAPP" | "EMAIL";
@@ -84,10 +85,20 @@ function ConversationPageInner() {
   const [itensSelecionados, setItensSelecionados] = useState<string[]>([]);
   const [itemOutro, setItemOutro] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Última mensagem vista: diz à consulta adaptativa se chegou algo novo.
+  const ultimaVistaRef = useRef<string | null>(null);
 
-  function load() {
+  /** Carrega a conversa; devolve true se apareceu mensagem nova desde a última consulta. */
+  function novidade(mensagens: { id: string }[]): boolean {
+    const ultima = mensagens[mensagens.length - 1]?.id ?? null;
+    const mudou = ultima !== ultimaVistaRef.current;
+    ultimaVistaRef.current = ultima;
+    return mudou;
+  }
+
+  async function load(): Promise<boolean> {
     if (isEquipe) {
-      apiJson<TeamConversationResponse>(`/api/team-messages/conversations/${id}`).then((res) => {
+      return apiJson<TeamConversationResponse>(`/api/team-messages/conversations/${id}`).then((res) => {
         const counterpart = user.id === res.conversation.userA.id ? res.conversation.userB : res.conversation.userA;
         setData({
           counterpart,
@@ -97,9 +108,10 @@ function ConversationPageInner() {
           souStaffNaConversa: false,
           messages: res.messages.map((m) => ({ ...m, channel: null })),
         });
+        return novidade(res.messages);
       });
     } else {
-      apiJson<GuardianConversationResponse>(`/api/messages/conversations/${id}`).then((res) => {
+      return apiJson<GuardianConversationResponse>(`/api/messages/conversations/${id}`).then((res) => {
         const souStaffNaConversa = user.id === res.conversation.staff.id;
         setData({
           counterpart: souStaffNaConversa ? res.conversation.guardian : res.conversation.staff,
@@ -113,25 +125,24 @@ function ConversationPageInner() {
           souStaffNaConversa,
           messages: res.messages,
         });
+        return novidade(res.messages);
       });
     }
   }
 
+  // Abrir a conversa é o que registra a leitura: só consulta (e, portanto, só marca como lida)
+  // com a aba visível. Começa a cada 4 s e espaça até 20 s enquanto ninguém escreve; mensagem
+  // nova, envio ou voltar para a aba trazem de volta aos 4 s.
+  const reiniciarConsulta = useConsultaAdaptativa(
+    async () => (document.visibilityState === "visible" ? load() : false),
+    { baseMs: 4_000, maxMs: 20_000, ocultoMs: null },
+  );
+
+  // Trocou de conversa: começa do zero.
   useEffect(() => {
-    // Abrir a conversa é o que registra a leitura: só busca (e, portanto, só marca como lida)
-    // com a aba visível. Aba em segundo plano não pode gerar "leitura".
-    function carregarSeVisivel() {
-      if (document.visibilityState === "visible") load();
-    }
-    carregarSeVisivel();
-    const interval = setInterval(carregarSeVisivel, 4000);
-    document.addEventListener("visibilitychange", carregarSeVisivel);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", carregarSeVisivel);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, isEquipe]);
+    ultimaVistaRef.current = null;
+    reiniciarConsulta();
+  }, [id, isEquipe, reiniciarConsulta]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -155,6 +166,7 @@ function ConversationPageInner() {
       });
       const message: DisplayMessage = isEquipe ? { ...res.message, channel: null } : res.message;
       setData((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev));
+      reiniciarConsulta(); // conversa ativa: volta a consultar no ritmo rápido
       if (res.avisoPeloWhatsApp) {
         setEnvioInfo("Mensagem enviada pelo ClassLink. A família foi avisada no WhatsApp, com um link para abrir.");
       }

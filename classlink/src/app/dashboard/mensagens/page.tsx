@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
 
 interface GuardianConversation {
   id: string;
@@ -63,7 +64,10 @@ export default function MensagensPage() {
   const [showNew, setShowNew] = useState(false);
   const [starting, setStarting] = useState(false);
 
-  function loadConversations() {
+  // Resumo da última lista: diz à consulta adaptativa se algo mudou.
+  const assinaturaRef = useRef("");
+
+  function loadConversations(): Promise<boolean> {
     const pedidos: Promise<ConversaExibida[]>[] = [
       apiJson<{ conversations: GuardianConversation[]; podeExcluir?: boolean }>("/api/messages/conversations").then((data) => {
         setPodeExcluir(Boolean(data.podeExcluir));
@@ -96,18 +100,18 @@ export default function MensagensPage() {
       );
     }
 
-    Promise.all(pedidos).then((listas) => {
+    return Promise.all(pedidos).then((listas) => {
       const todas = listas.flat().sort((a, b) => (a.criadaEm < b.criadaEm ? 1 : -1));
       setConversas(todas);
+      const assinatura = todas.map((c) => `${c.id}:${c.criadaEm}:${c.naoLidas}`).join("|");
+      const mudou = assinatura !== assinaturaRef.current;
+      assinaturaRef.current = assinatura;
+      return mudou;
     });
   }
 
-  useEffect(() => {
-    loadConversations();
-    const interval = setInterval(loadConversations, 8000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Só com a aba visível: começa a cada 10 s e espaça até 45 s sem novidade.
+  useConsultaAdaptativa(loadConversations, { baseMs: 10_000, maxMs: 45_000, ocultoMs: null });
 
   async function startConversation(counterpartUserId: string, tipo: "responsavel" | "equipe") {
     setStarting(true);
