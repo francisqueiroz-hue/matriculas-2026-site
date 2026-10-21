@@ -7,6 +7,7 @@ import { handleApiError } from "@/lib/http";
 import { forgotPasswordSchema } from "@/lib/validators";
 import { enviarAcessoPeloApp } from "@/lib/envio-acesso";
 import { isEmailConfigured, sendPlainEmail } from "@/lib/email";
+import { encerrarTodasAsSessoes } from "@/lib/renovacao-sessao";
 
 const MENSAGEM_PADRAO =
   "Se encontrarmos uma conta com esse e-mail ou telefone, enviamos uma nova senha por WhatsApp ou e-mail.";
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
         if (entregue) {
           await prisma.$transaction([
             prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(temporaryPassword) } }),
-            prisma.refreshToken.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+            prisma.refreshToken.updateMany(encerrarTodasAsSessoes(user.id)),
           ]);
         }
       }

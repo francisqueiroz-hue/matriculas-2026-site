@@ -4,6 +4,7 @@ import { hashPassword } from "@/lib/auth";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { mensagemAcesso } from "@/lib/acesso";
 import { TEXTO_BOAS_VINDAS_WHATSAPP } from "@/lib/boas-vindas";
+import { encerrarTodasAsSessoes } from "@/lib/renovacao-sessao";
 
 /**
  * Responde, no próprio WhatsApp, a uma família que pediu o acesso ("ACESSO"/"SENHA").
@@ -40,7 +41,7 @@ export async function responderPedidoDeAcesso(
 
   await prisma.$transaction([
     prisma.user.update({ where: { id: responsavel.id }, data: { passwordHash: await hashPassword(senha) } }),
-    prisma.refreshToken.updateMany({ where: { userId: responsavel.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+    prisma.refreshToken.updateMany(encerrarTodasAsSessoes(responsavel.id)),
   ]);
 }
 

@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { JANELA_REUSO_MS, caminhoParaRenovar, situacaoRefresh, type RefreshArmazenado } from "@/lib/renovacao-sessao";
+import {
+  JANELA_REUSO_MS,
+  caminhoParaRenovar,
+  encerrarTodasAsSessoes,
+  situacaoRefresh,
+  type RefreshArmazenado,
+} from "@/lib/renovacao-sessao";
 
 // Estas rotas importam o banco só por meio do helper; ele é simulado aqui.
 const renovarSessao = vi.fn();
@@ -103,5 +109,21 @@ describe("GET /api/auth/renovar", () => {
       const res = await chamar(`https://app.test/api/auth/renovar?next=${encodeURIComponent(next)}`, "classlink_refresh=X");
       expect(res.headers.get("location")).toBe("https://app.test/dashboard");
     }
+  });
+});
+
+describe("encerrarTodasAsSessoes (troca de senha, exclusão)", () => {
+  it("vence todos os tokens ainda vivos do usuário, inclusive os trocados há pouco", () => {
+    const { where, data } = encerrarTodasAsSessoes("u1", agora);
+    // Sem filtrar revokedAt null: um token rotacionado há 5 s ainda renovaria pela janela de reuso.
+    expect(where).toEqual({ userId: "u1", expiresAt: { gt: agora } });
+    expect(data).toEqual({ revokedAt: agora, expiresAt: agora });
+  });
+
+  it("token revogado há 5 s pela rotação deixa de renovar depois de encerrar as sessões", () => {
+    const rotacionado = base({ revokedAt: new Date(agora.getTime() - 5_000) });
+    expect(situacaoRefresh(rotacionado, agora)).toBe("reuso_recente");
+    const { data } = encerrarTodasAsSessoes("u1", agora);
+    expect(situacaoRefresh({ ...rotacionado, ...data }, agora)).toBe("invalido");
   });
 });
