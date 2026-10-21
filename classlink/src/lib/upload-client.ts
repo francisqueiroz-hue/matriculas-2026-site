@@ -11,7 +11,10 @@ export async function uploadMediaFile(file: File): Promise<{ url: string; path: 
     toUpload = await imageCompression(file, {
       maxSizeMB: 1.5,
       maxWidthOrHeight: 1920,
-      useWebWorker: true,
+      // Sem web worker: no modo worker a biblioteca baixa o próprio código de um CDN externo
+      // (cdn.jsdelivr.net) — dependência de terceiros e bloqueado pela CSP. Uma imagem por
+      // vez comprime rápido na própria página.
+      useWebWorker: false,
       fileType: file.type,
     });
   }
