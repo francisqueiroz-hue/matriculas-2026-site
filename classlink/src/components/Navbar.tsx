@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { NavIcon } from "@/components/NavIcon";
-import { apiFetch } from "@/lib/api-client";
+import { sairDaConta } from "@/lib/logout-client";
 import { getNavLinks, useComunicadosPendentes } from "@/lib/nav-links";
 import { useMensagensNaoLidas } from "@/components/AvisosMensagens";
 import { LogoEspacoKids, LogoInstitutoFokus } from "@/components/Logos";
@@ -22,7 +22,8 @@ export function Navbar() {
   const links = getNavLinks(user);
 
   async function handleLogout() {
-    await apiFetch("/api/auth/logout", { method: "POST" });
+    // Revoga a sessão e limpa o aparelho (token de push e caches); nunca impede o redirecionamento.
+    await sairDaConta();
     router.push("/login");
     router.refresh();
   }

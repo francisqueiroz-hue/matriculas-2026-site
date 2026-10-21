@@ -125,3 +125,56 @@ export async function requestPushToken(pedirPermissao = false): Promise<string |
     return etapa("Registro no Firebase", obterToken);
   }
 }
+
+/**
+ * Prazos das chamadas de push no logout: sair da conta não pode ficar esperando. Cada chamada
+ * do navegador/Firebase tem o seu, para nenhuma promessa travada segurar as seguintes.
+ */
+const PRAZO_TOKEN_LOGOUT_MS = 1_500;
+const PRAZO_INSCRICAO_MS = 600;
+
+/**
+ * Inscrição de push que este aparelho tem AGORA (sem criar nenhuma). O logout guarda este
+ * objeto e cancela exatamente ele — ver cancelarInscricaoCapturada.
+ */
+export async function inscricaoPushAtual(): Promise<PushSubscription | null> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
+  const registration = await comPrazo(navigator.serviceWorker.getRegistration("/"), PRAZO_INSCRICAO_MS, "tempo esgotado");
+  if (!registration) return null;
+  return comPrazo(registration.pushManager.getSubscription(), PRAZO_INSCRICAO_MS, "tempo esgotado");
+}
+
+/**
+ * Token FCM que este aparelho JÁ tem, para o logout avisar o servidor qual token apagar.
+ * Não pede permissão e não cria inscrição de push nova: sem permissão "granted", sem
+ * service worker ativo ou sem inscrição existente, retorna null.
+ */
+export async function tokenPushExistente(): Promise<string | null> {
+  if (!VAPID_KEY || typeof Notification === "undefined" || Notification.permission !== "granted") return null;
+  if (!("serviceWorker" in navigator)) return null;
+  const messaging = await comPrazo(getMessagingInstance(), PRAZO_INSCRICAO_MS, "tempo esgotado");
+  if (!messaging) return null;
+  const registration = await comPrazo(navigator.serviceWorker.getRegistration("/"), PRAZO_INSCRICAO_MS, "tempo esgotado");
+  if (!registration?.active) return null;
+  // Sem inscrição, o getToken do Firebase criaria uma nova — aqui só interessa a existente.
+  if (!(await comPrazo(registration.pushManager.getSubscription(), PRAZO_INSCRICAO_MS, "tempo esgotado"))) return null;
+  return comPrazo(getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration }), PRAZO_TOKEN_LOGOUT_MS, "tempo esgotado");
+}
+
+/**
+ * Desliga o push deste aparelho no logout cancelando a inscrição capturada no início dele.
+ *
+ * Não usa o deleteToken do Firebase de propósito: ele espera a revogação remota e só então
+ * cancela a inscrição que estiver ativa NAQUELE momento. Se demorasse e outra conta entrasse
+ * no aparelho, apagaria o token e a inscrição da conta nova. Cancelar o objeto capturado só
+ * afeta a inscrição antiga — mesmo que termine atrasado.
+ *
+ * No próximo login, o getToken do Firebase vê que a inscrição mudou (endpoint diferente do
+ * guardado no IndexedDB), descarta o token antigo e gera outro. O token antigo, se ainda
+ * estiver no servidor (logout que não chegou), passa a falhar no FCM e é apagado pelo envio
+ * (TOKEN_INVALIDO em src/lib/push.ts).
+ */
+export async function cancelarInscricaoCapturada(inscricao: PushSubscription | null): Promise<void> {
+  if (!inscricao) return;
+  await inscricao.unsubscribe();
+}
