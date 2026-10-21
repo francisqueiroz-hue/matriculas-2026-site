@@ -20,6 +20,8 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
   const [classId, setClassId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  // Progresso do envio direto de arquivos grandes (vídeos); null = sem barra.
+  const [progresso, setProgresso] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aberto, setAberto] = useState(false);
 
@@ -35,12 +37,15 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setProgresso(null);
     setLoading(true);
     try {
       let mediaUrl: string | undefined;
       let mediaType: "image" | "video" | undefined;
       if (file) {
-        const uploaded = await uploadMediaFile(file);
+        const uploaded = await uploadMediaFile(file, { escolaId: user.schoolId, aoProgredir: setProgresso }).catch((err: unknown) => {
+          throw new Error(`Não foi possível enviar o anexo: ${err instanceof Error ? err.message : String(err)}`);
+        });
         mediaUrl = uploaded.path;
         mediaType = uploaded.mediaType;
       }
@@ -66,6 +71,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
       setError(err instanceof Error ? err.message : "Erro ao publicar");
     } finally {
       setLoading(false);
+      setProgresso(null);
     }
   }
 
@@ -165,7 +171,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
         disabled={loading}
         className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
       >
-        {loading ? "Publicando..." : "Publicar"}
+        {loading ? (progresso !== null && progresso < 100 ? `Enviando arquivo… ${progresso}%` : "Publicando...") : "Publicar"}
       </button>
     </form>
   );

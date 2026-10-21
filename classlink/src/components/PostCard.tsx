@@ -220,12 +220,26 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
       )}
 
       {post.mediaUrl && post.mediaType === "image" && (
-        // URL assinada e temporária do Firebase Storage: o otimizador do Next não a reaproveita.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={post.mediaUrl} alt={`Foto do aviso: ${current.title}`} className="mt-3 max-h-96 w-full rounded-lg object-cover" />
+        // Imagem inteira, sem cortes, em qualquer formato (vertical de status, horizontal, quadrada);
+        // tocar abre no tamanho original. URL assinada e temporária: o otimizador do Next não a reaproveita.
+        <a
+          href={post.mediaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Abrir imagem em tamanho original"
+          className="mt-3 flex justify-center rounded-lg bg-slate-50 dark:bg-slate-800/50"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={post.mediaUrl}
+            alt={`Foto do aviso: ${current.title}`}
+            loading="lazy"
+            className="block h-auto max-h-[80vh] w-auto max-w-full rounded-lg object-contain"
+          />
+        </a>
       )}
       {post.mediaUrl && post.mediaType === "video" && (
-        <video src={post.mediaUrl} controls aria-label={`Vídeo do aviso: ${current.title}`} className="mt-3 max-h-96 w-full rounded-lg" />
+        <video src={post.mediaUrl} controls aria-label={`Vídeo do aviso: ${current.title}`} className="mt-3 max-h-[80vh] w-full rounded-lg bg-black object-contain" />
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
