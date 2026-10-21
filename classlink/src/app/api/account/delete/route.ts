@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { verifyPassword, ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
 import { handleApiError } from "@/lib/http";
+import { encerrarTodasAsSessoes } from "@/lib/renovacao-sessao";
 
 const deleteSchema = z.object({ password: z.string().min(1) });
 
@@ -40,10 +41,7 @@ export async function POST(request: NextRequest) {
       }),
       prisma.guardianStudent.deleteMany({ where: { guardianId: user.id } }),
       prisma.pushToken.deleteMany({ where: { userId: user.id } }),
-      prisma.refreshToken.updateMany({
-        where: { userId: user.id, revokedAt: null },
-        data: { revokedAt: new Date() },
-      }),
+      prisma.refreshToken.updateMany(encerrarTodasAsSessoes(user.id)),
     ]);
 
     const response = NextResponse.json({ ok: true });

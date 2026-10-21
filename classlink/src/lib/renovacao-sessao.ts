@@ -34,3 +34,16 @@ export function situacaoRefresh(stored: RefreshArmazenado | null | undefined, ag
 export function caminhoParaRenovar(pathname: string, search = ""): string {
   return `/api/auth/renovar?next=${encodeURIComponent(`${pathname}${search}`)}`;
 }
+
+/**
+ * Argumentos de `refreshToken.updateMany` que encerram na hora TODAS as sessões de um usuário
+ * (troca/redefinição de senha, exclusão). Só revogar não basta: a janela de reuso acima ainda
+ * aceitaria por 15 s um token recém-revogado (ou já trocado há pouco), e quem o tivesse
+ * ganharia uma sessão nova depois da troca de senha. Vencer o token o torna "invalido".
+ */
+export function encerrarTodasAsSessoes(userId: string, agora = new Date()) {
+  return {
+    where: { userId, expiresAt: { gt: agora } },
+    data: { revokedAt: agora, expiresAt: agora },
+  };
+}

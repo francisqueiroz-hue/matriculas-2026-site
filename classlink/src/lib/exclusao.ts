@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
+import { encerrarTodasAsSessoes } from "@/lib/renovacao-sessao";
 
 /**
  * Exclusão de quem saiu da escola (equipe, responsáveis e alunos).
@@ -36,7 +37,7 @@ export async function excluirUsuario(userId: string, schoolId: string): Promise<
         passwordHash: senhaDescartada,
       },
     }),
-    prisma.refreshToken.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: agora } }),
+    prisma.refreshToken.updateMany(encerrarTodasAsSessoes(user.id, agora)),
     prisma.pushToken.deleteMany({ where: { userId: user.id } }),
     // Sai das turmas em que dava aula e dos vínculos com alunos (só os vínculos, não os alunos).
     prisma.classTeacher.deleteMany({ where: { teacherId: user.id } }),
