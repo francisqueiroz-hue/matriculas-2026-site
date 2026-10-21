@@ -40,7 +40,9 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
       let mediaUrl: string | undefined;
       let mediaType: "image" | "video" | undefined;
       if (file) {
-        const uploaded = await uploadMediaFile(file);
+        const uploaded = await uploadMediaFile(file).catch((err: unknown) => {
+          throw new Error(`Não foi possível enviar o anexo: ${err instanceof Error ? err.message : String(err)}`);
+        });
         mediaUrl = uploaded.path;
         mediaType = uploaded.mediaType;
       }
