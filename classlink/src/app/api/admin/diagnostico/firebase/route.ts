@@ -4,6 +4,7 @@ import { handleApiError } from "@/lib/http";
 import { conferirMesmoProjeto, testarChaveNoGoogle, type ResultadoTesteFirebase } from "@/lib/firebase-config-publica";
 import { origemPublica } from "@/lib/push";
 import { credenciaisDaConta, testarContaDeServico } from "@/lib/firebase-admin";
+import { testarStorage } from "@/lib/firebase-storage";
 
 /** Botão "Testar chave do Firebase" do diagnóstico: confere o projeto e faz o pedido real ao Google. */
 export async function POST(request: NextRequest) {
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
       NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
       FIREBASE_PROJECT_ID: credenciaisDaConta(process.env).projectId,
     };
-    const conta = await testarContaDeServico();
+    const [conta, storage] = await Promise.all([testarContaDeServico(), testarStorage()]);
     const itens = [
       ...conferirMesmoProjeto(env),
       await testarChaveNoGoogle(env, origemPublica() ?? request.nextUrl.origin),
@@ -26,6 +27,11 @@ export async function POST(request: NextRequest) {
         detalhe: conta.ok
           ? undefined
           : `${conta.detalhe} — No Firebase: Configurações do projeto → Contas de serviço → Gerar nova chave privada. Abra o arquivo JSON baixado, copie TODO o conteúdo (de { até }) e cole em FIREBASE_PRIVATE_KEY na Vercel (Type Secret) — o e-mail e o projeto são lidos do próprio arquivo. Depois faça Redeploy.`,
+      },
+      {
+        titulo: "Storage aceita imagens e vídeos (Mural, cardápios)",
+        ok: storage.ok,
+        detalhe: storage.ok ? undefined : storage.detalhe,
       },
     ];
     const resultado: ResultadoTesteFirebase = { ok: itens.every((i) => i.ok), itens };
