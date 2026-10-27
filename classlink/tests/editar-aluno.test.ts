@@ -7,6 +7,7 @@ const prismaMock = vi.hoisted(() => {
     class: { findFirst: vi.fn() },
     alteracaoCadastro: { createMany: vi.fn() },
     $transaction: vi.fn(),
+    $queryRaw: vi.fn(async () => []),
   };
   m.$transaction.mockImplementation(async (fn: (tx: typeof m) => unknown) => fn(m));
   return m;
@@ -41,9 +42,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
   sessaoMock.atual = { sub: "u1", role: "ADMIN", schoolId: "s1" };
-  prismaMock.student.findFirst.mockResolvedValue({ id: "a1", name: "Sarah", schoolId: "s1", birthDate: null, class: { name: "Infantil 3" } });
+  prismaMock.student.findFirst.mockResolvedValue({ id: "a1", name: "Sarah", schoolId: "s1", birthDate: null, class: { id: "t1", name: "Infantil 3", year: 2026 } });
   prismaMock.student.update.mockImplementation(async ({ data }) => ({ id: "a1", name: "Sarah", ...data }));
-  prismaMock.class.findFirst.mockResolvedValue({ id: "t2", schoolId: "s1", name: "Infantil 4" });
+  prismaMock.class.findFirst.mockResolvedValue({ id: "t2", name: "Infantil 4", year: 2026 });
   prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => unknown) => fn(prismaMock));
 });
 

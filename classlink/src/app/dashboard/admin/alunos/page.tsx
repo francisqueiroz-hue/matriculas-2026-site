@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiFetch, apiJson } from "@/lib/api-client";
@@ -54,6 +54,8 @@ function AlunosContent() {
   const [historicoAlunoId, setHistoricoAlunoId] = useState<string | null>(null);
   const [historico, setHistorico] = useState<HistoricoItem[] | null>(null);
   const [historicoErro, setHistoricoErro] = useState<string | null>(null);
+  // Aluno cuja resposta é esperada: resposta atrasada de outro aluno é descartada.
+  const historicoPedido = useRef<string | null>(null);
 
   function load() {
     apiJson<{ students: StudentItem[] }>("/api/admin/students").then((data) => setStudents(data.students));
@@ -238,7 +240,10 @@ function AlunosContent() {
       });
       setFeedback((prev) => ({ ...prev, [editingStudentId]: "Nome do aluno atualizado." }));
       setEditingStudentId(null);
-      if (historicoAlunoId === editingStudentId) setHistoricoAlunoId(null);
+      if (historicoAlunoId === editingStudentId) {
+        historicoPedido.current = null;
+        setHistoricoAlunoId(null);
+      }
       load();
     } catch (err) {
       setEditStudentError(err instanceof Error ? err.message : "Erro ao salvar");
@@ -247,17 +252,19 @@ function AlunosContent() {
 
   async function toggleHistorico(studentId: string) {
     if (historicoAlunoId === studentId) {
+      historicoPedido.current = null;
       setHistoricoAlunoId(null);
       return;
     }
+    historicoPedido.current = studentId;
     setHistoricoAlunoId(studentId);
     setHistorico(null);
     setHistoricoErro(null);
     try {
       const data = await apiJson<{ historico: HistoricoItem[] }>(`/api/admin/students/${studentId}/historico`);
-      setHistorico(data.historico);
+      if (historicoPedido.current === studentId) setHistorico(data.historico);
     } catch (err) {
-      setHistoricoErro(err instanceof Error ? err.message : "Erro ao carregar o histórico");
+      if (historicoPedido.current === studentId) setHistoricoErro(err instanceof Error ? err.message : "Erro ao carregar o histórico");
     }
   }
 

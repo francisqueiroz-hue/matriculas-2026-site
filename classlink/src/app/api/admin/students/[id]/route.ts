@@ -12,28 +12,28 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
     const { id } = await ctx.params;
     const body = updateStudentSchema.parse(await request.json());
 
-    const existing = await prisma.student.findFirst({
-      where: { id, schoolId: session.schoolId, deletedAt: null },
-      include: { class: { select: { name: true } } },
-    });
-    if (!existing) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
-
     // A turma precisa ser da mesma escola — o id vem do cliente.
-    let novaTurma = existing.class.name;
-    if (body.classId) {
-      const cls = await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId } });
-      if (!cls) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
-      novaTurma = cls.name;
-    }
+    const novaTurma = body.classId
+      ? await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId }, select: { id: true, name: true, year: true } })
+      : null;
+    if (body.classId && !novaTurma) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
 
-    const novoNascimento = body.birthDate ? new Date(body.birthDate) : existing.birthDate;
-    const alteracoes = alteracoesAluno(
-      { nome: existing.name, turma: existing.class.name, nascimento: existing.birthDate },
-      { nome: body.name || existing.name, turma: novaTurma, nascimento: novoNascimento },
-    );
-
-    // Atualização e histórico na mesma transação: não há alteração de cadastro sem rastro.
+    // Leitura, atualização e histórico na mesma transação, com o aluno travado (FOR UPDATE):
+    // duas edições simultâneas não comparam com o mesmo "antes", e não há alteração sem rastro.
     const student = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Student" WHERE "id" = ${id} FOR UPDATE`;
+      const existing = await tx.student.findFirst({
+        where: { id, schoolId: session.schoolId, deletedAt: null },
+        include: { class: { select: { id: true, name: true, year: true } } },
+      });
+      if (!existing) return null;
+
+      const novoNascimento = body.birthDate ? new Date(body.birthDate) : existing.birthDate;
+      const alteracoes = alteracoesAluno(
+        { nome: existing.name, turma: existing.class, nascimento: existing.birthDate },
+        { nome: body.name || existing.name, turma: novaTurma ?? existing.class, nascimento: novoNascimento },
+      );
+
       const atualizado = await tx.student.update({
         where: { id },
         data: {
@@ -56,6 +56,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
       }
       return atualizado;
     });
+    if (!student) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
     return NextResponse.json({ student });
   } catch (error) {
     return handleApiError(error);
