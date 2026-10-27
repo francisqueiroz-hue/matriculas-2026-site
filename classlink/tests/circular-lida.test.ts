@@ -53,6 +53,16 @@ describe("circular: abrir conta como lida", () => {
     ];
     expect(countPendentes(lista, "GUARDIAN")).toBe(1);
   });
+
+  it("equipe não tem número de comunicados no menu", () => {
+    const aberta = { dataCriacao: iso(20), prazoResposta: null, totalRespostas: 1, totalPublicoAlvo: 5 };
+    const lista = [
+      { ...aberta, tipo: "CIRCULAR" },
+      { ...aberta, tipo: "AUTORIZACAO_PASSEIO" },
+    ];
+    expect(countPendentes(lista, "ADMIN")).toBe(0);
+    expect(countPendentes(lista, "STAFF")).toBe(0);
+  });
 });
 
 const base = {
