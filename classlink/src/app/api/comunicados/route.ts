@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { createComunicadoSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { getPublicoAlvo } from "@/lib/comunicados";
+import { separarAbertura } from "@/lib/comunicado-leitura";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 
 export async function GET() {
@@ -55,13 +56,18 @@ export async function GET() {
           session.role === "GUARDIAN"
             ? { where: { responsavelId: session.sub }, select: { alunoId: true, resposta: true } }
             : { select: { resposta: true } },
+        // Circular é só leitura: o que conta é a abertura (ComunicadoLeitura), não uma resposta.
+        leituras:
+          session.role === "GUARDIAN"
+            ? { where: { userId: session.sub }, select: { userId: true, lidoEm: true } }
+            : { select: { userId: true, lidoEm: true } },
       },
       orderBy: { dataCriacao: "desc" },
     });
 
     const comunicadosComContagem = await Promise.all(
       comunicados.map(async (c) => {
-        const { respostas, ...comNomeReal } = c;
+        const { respostas, leituras, ...comNomeReal } = c;
         // Família vê quem publicou pelo cargo/nome institucional.
         const rest = { ...comNomeReal, criadoPor: pessoaParaQuemVe(c.criadoPor, session.role) };
         if (session.role === "GUARDIAN") {
@@ -74,10 +80,15 @@ export async function GET() {
                 : vinculos.some((v) => v.studentId === c.alunoId)
                   ? 1
                   : 0;
-          return { ...rest, minhasRespostas: respostas, alunosAlvo };
+          return { ...rest, minhasRespostas: respostas, alunosAlvo, lidoEm: leituras[0]?.lidoEm ?? null };
+        }
+        const publicoAlvo = await getPublicoAlvo(c.id);
+        if (c.tipo === "CIRCULAR") {
+          // Uma linha por família (responsável com vários filhos conta uma vez), como no detalhe.
+          const { abriram, naoAbriram } = separarAbertura(publicoAlvo, leituras);
+          return { ...rest, totalRespostas: abriram.length, totalPublicoAlvo: abriram.length + naoAbriram.length };
         }
         const respondidas = respostas.filter((r) => r.resposta !== "PENDENTE_EXPIRADO").length;
-        const publicoAlvo = await getPublicoAlvo(c.id);
         return { ...rest, totalRespostas: respondidas, totalPublicoAlvo: publicoAlvo.length };
       }),
     );
