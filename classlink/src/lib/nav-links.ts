@@ -162,6 +162,9 @@ export function countPendentes(comunicados: ComunicadoResumo[], role: string): n
   return comunicados.filter((c) => {
     // Mesma regra dos cards da lista: conta só o que ainda espera resposta (irmãos incluídos).
     if (role === "GUARDIAN") return situacaoDoComunicado(c) === "PENDENTE";
+    // Equipe: o número cobra respostas. Circular não tem resposta e "famílias que ainda não abriram"
+    // não é pendência de quem publicou (isso fica no detalhe do comunicado).
+    if (c.tipo === "CIRCULAR") return false;
     const expirado = c.prazoResposta ? new Date(c.prazoResposta).getTime() < agora : false;
     if (expirado) return false;
     return typeof c.totalRespostas === "number" && typeof c.totalPublicoAlvo === "number" && c.totalRespostas < c.totalPublicoAlvo;

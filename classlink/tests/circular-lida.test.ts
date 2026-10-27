@@ -53,6 +53,17 @@ describe("circular: abrir conta como lida", () => {
     ];
     expect(countPendentes(lista, "GUARDIAN")).toBe(1);
   });
+
+  it("contador do menu da equipe não conta circular, só o que espera resposta", () => {
+    const aberta = { dataCriacao: iso(20), prazoResposta: null, totalRespostas: 1, totalPublicoAlvo: 5 };
+    const lista = [
+      { ...aberta, tipo: "CIRCULAR" },
+      { ...aberta, tipo: "CIRCULAR" },
+      { ...aberta, tipo: "AUTORIZACAO_PASSEIO" },
+    ];
+    expect(countPendentes(lista, "ADMIN")).toBe(1);
+    expect(countPendentes(lista, "STAFF")).toBe(1);
+  });
 });
 
 const base = {
