@@ -28,6 +28,7 @@ interface ComunicadoItem {
   totalPublicoAlvo?: number;
   minhasRespostas?: { alunoId: string; resposta: string }[];
   alunosAlvo?: number;
+  lidoEm?: string | null;
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -39,6 +40,7 @@ const TIPO_LABEL: Record<string, string> = {
 const SITUACAO: Record<SituacaoComunicado, { label: string; classe: string }> = {
   PENDENTE: { label: "Pendente", classe: "bg-amber-100 text-amber-900 ring-1 ring-amber-300" },
   RESPONDIDO: { label: "✓ Respondido", classe: "bg-emerald-100 text-emerald-900" },
+  LIDO: { label: "✓ Lido", classe: "bg-emerald-100 text-emerald-900" },
   ENCERRADO: { label: "Prazo encerrado", classe: "bg-slate-100 text-slate-600" },
 };
 
@@ -49,6 +51,8 @@ function publico(c: ComunicadoItem) {
 function ComunicadoCard({ c, situacao }: { c: ComunicadoItem; situacao?: SituacaoComunicado }) {
   const expirado = c.prazoResposta ? new Date(c.prazoResposta) < new Date() : false;
   const faltam = situacao === "PENDENTE" ? alunosSemResposta(c) : 0;
+  const circular = c.tipo === "CIRCULAR";
+  const rotulo = situacao === "PENDENTE" && circular ? "Não lido" : situacao ? SITUACAO[situacao].label : "";
   return (
     <Link
       href={`/dashboard/comunicados/${c.id}`}
@@ -68,12 +72,12 @@ function ComunicadoCard({ c, situacao }: { c: ComunicadoItem; situacao?: Situaca
         </div>
         {situacao && (
           <span className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${SITUACAO[situacao].classe}`}>
-            {SITUACAO[situacao].label}
+            {rotulo}
           </span>
         )}
         {typeof c.totalRespostas === "number" && (
           <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            {c.totalRespostas} de {c.totalPublicoAlvo} responderam
+            {c.totalRespostas} de {c.totalPublicoAlvo} {circular ? "abriram" : "responderam"}
           </span>
         )}
       </div>
@@ -121,11 +125,11 @@ export default function ComunicadosPage() {
       {responsavel && comunicados && comunicados.length > 0 && (
         <section aria-labelledby="titulo-pendentes" className="space-y-3">
           <h2 id="titulo-pendentes" className="font-semibold">
-            Aguardando sua resposta {pendentes.length > 0 && `(${pendentes.length})`}
+            Aguardando você {pendentes.length > 0 && `(${pendentes.length})`}
           </h2>
           {pendentes.length === 0 ? (
             <p className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
-              ✓ Você está em dia — nenhum comunicado esperando resposta.
+              ✓ Você está em dia — nenhum comunicado esperando resposta ou leitura.
             </p>
           ) : (
             pendentes.map((c) => <ComunicadoCard key={c.id} c={c} situacao="PENDENTE" />)
@@ -137,7 +141,7 @@ export default function ComunicadosPage() {
         <section aria-labelledby={responsavel ? "titulo-demais" : undefined} className="space-y-3">
           {responsavel && (
             <h2 id="titulo-demais" className="pt-2 font-semibold">
-              Respondidos e encerrados
+              Respondidos, lidos e encerrados
             </h2>
           )}
           {demais.map((c) => (

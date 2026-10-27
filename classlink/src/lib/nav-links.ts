@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { SessionUser } from "@/lib/types";
 import { apiJson } from "@/lib/api-client";
 import { situacaoDoComunicado } from "@/lib/comunicados-situacao";
@@ -145,16 +146,18 @@ export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao">): 
 }
 
 interface ComunicadoResumo {
+  tipo?: string;
   dataCriacao: string;
   prazoResposta: string | null;
   minhasRespostas?: { alunoId: string; resposta: string }[];
   alunosAlvo?: number;
+  lidoEm?: string | null;
   totalRespostas?: number;
   totalPublicoAlvo?: number;
 }
 
 /** Quantidade de comunicados que ainda precisam de ação do usuário atual (resposta pendente e não expirada). */
-function countPendentes(comunicados: ComunicadoResumo[], role: string): number {
+export function countPendentes(comunicados: ComunicadoResumo[], role: string): number {
   const agora = Date.now();
   return comunicados.filter((c) => {
     // Mesma regra dos cards da lista: conta só o que ainda espera resposta (irmãos incluídos).
@@ -168,12 +171,16 @@ function countPendentes(comunicados: ComunicadoResumo[], role: string): number {
 /** Contagem de comunicados pendentes de resposta, usada no badge do menu (mobile e desktop). */
 export function useComunicadosPendentes(role: string) {
   const [count, setCount] = useState(0);
+  // O menu fica montado entre as telas: recontar ao entrar/sair das telas de comunicados, senão o
+  // número continua o mesmo depois que a família abre ou responde um. Nas demais telas, não refaz.
+  const pathname = usePathname() ?? "";
+  const telaComunicados = pathname.startsWith("/dashboard/comunicados") ? pathname : "";
 
   useEffect(() => {
     apiJson<{ comunicados: ComunicadoResumo[] }>("/api/comunicados")
       .then((data) => setCount(countPendentes(data.comunicados, role)))
       .catch(() => setCount(0));
-  }, [role]);
+  }, [role, telaComunicados]);
 
   return count;
 }

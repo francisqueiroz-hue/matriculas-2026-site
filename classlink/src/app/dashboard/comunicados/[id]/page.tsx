@@ -212,7 +212,7 @@ export default function ComunicadoDetailPage() {
             <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <span className="text-sm font-medium">
                 {comunicado.tipo === "CIRCULAR"
-                  ? `${abertura?.abriram.length ?? 0} de ${stats.totalPublicoAlvo} famílias abriram`
+                  ? `${abertura?.abriram.length ?? 0} de ${abertura ? abertura.abriram.length + abertura.naoAbriram.length : stats.totalPublicoAlvo} famílias abriram`
                   : `${stats.totalRespostas} de ${stats.totalPublicoAlvo} responderam`}
               </span>
               <a
