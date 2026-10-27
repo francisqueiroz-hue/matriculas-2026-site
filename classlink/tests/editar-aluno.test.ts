@@ -1,10 +1,16 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const prismaMock = vi.hoisted(() => ({
-  student: { findFirst: vi.fn(), update: vi.fn() },
-  class: { findFirst: vi.fn() },
-}));
+const prismaMock = vi.hoisted(() => {
+  const m = {
+    student: { findFirst: vi.fn(), update: vi.fn() },
+    class: { findFirst: vi.fn() },
+    alteracaoCadastro: { createMany: vi.fn() },
+    $transaction: vi.fn(),
+  };
+  m.$transaction.mockImplementation(async (fn: (tx: typeof m) => unknown) => fn(m));
+  return m;
+});
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 const sessaoMock = vi.hoisted(() => ({ atual: { sub: "u1", role: "ADMIN", schoolId: "s1" } as { sub: string; role: string; schoolId: string } }));
 vi.mock("@/lib/session", () => ({
@@ -35,9 +41,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
   sessaoMock.atual = { sub: "u1", role: "ADMIN", schoolId: "s1" };
-  prismaMock.student.findFirst.mockResolvedValue({ id: "a1", name: "Sarah", schoolId: "s1" });
+  prismaMock.student.findFirst.mockResolvedValue({ id: "a1", name: "Sarah", schoolId: "s1", birthDate: null, class: { name: "Infantil 3" } });
   prismaMock.student.update.mockImplementation(async ({ data }) => ({ id: "a1", name: "Sarah", ...data }));
-  prismaMock.class.findFirst.mockResolvedValue({ id: "t2", schoolId: "s1" });
+  prismaMock.class.findFirst.mockResolvedValue({ id: "t2", schoolId: "s1", name: "Infantil 4" });
+  prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => unknown) => fn(prismaMock));
 });
 
 describe("editar nome do aluno", () => {
