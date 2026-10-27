@@ -11,8 +11,14 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
     const { id } = await ctx.params;
     const body = updateStudentSchema.parse(await request.json());
 
-    const existing = await prisma.student.findFirst({ where: { id, schoolId: session.schoolId } });
+    const existing = await prisma.student.findFirst({ where: { id, schoolId: session.schoolId, deletedAt: null } });
     if (!existing) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
+
+    // A turma precisa ser da mesma escola — o id vem do cliente.
+    if (body.classId) {
+      const cls = await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId } });
+      if (!cls) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
+    }
 
     const student = await prisma.student.update({
       where: { id },
