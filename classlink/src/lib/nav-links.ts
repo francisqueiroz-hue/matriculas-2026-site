@@ -152,26 +152,20 @@ interface ComunicadoResumo {
   minhasRespostas?: { alunoId: string; resposta: string }[];
   alunosAlvo?: number;
   lidoEm?: string | null;
-  totalRespostas?: number;
-  totalPublicoAlvo?: number;
 }
 
-/** Quantidade de comunicados que ainda precisam de ação do usuário atual (resposta pendente e não expirada). */
+/**
+ * Quantidade de comunicados que ainda precisam de ação do usuário atual. Só a família tem número
+ * no menu: para a equipe, quem abriu ou respondeu fica no detalhe de cada comunicado (comprovante
+ * de leitura), sem número no menu.
+ */
 export function countPendentes(comunicados: ComunicadoResumo[], role: string): number {
-  const agora = Date.now();
-  return comunicados.filter((c) => {
-    // Mesma regra dos cards da lista: conta só o que ainda espera resposta (irmãos incluídos).
-    if (role === "GUARDIAN") return situacaoDoComunicado(c) === "PENDENTE";
-    // Equipe: o número cobra respostas. Circular não tem resposta e "famílias que ainda não abriram"
-    // não é pendência de quem publicou (isso fica no detalhe do comunicado).
-    if (c.tipo === "CIRCULAR") return false;
-    const expirado = c.prazoResposta ? new Date(c.prazoResposta).getTime() < agora : false;
-    if (expirado) return false;
-    return typeof c.totalRespostas === "number" && typeof c.totalPublicoAlvo === "number" && c.totalRespostas < c.totalPublicoAlvo;
-  }).length;
+  if (role !== "GUARDIAN") return 0;
+  // Mesma regra dos cards da lista: conta só o que ainda espera resposta ou leitura (irmãos incluídos).
+  return comunicados.filter((c) => situacaoDoComunicado(c) === "PENDENTE").length;
 }
 
-/** Contagem de comunicados pendentes de resposta, usada no badge do menu (mobile e desktop). */
+/** Contagem de comunicados pendentes da família, usada no badge do menu (mobile e desktop). */
 export function useComunicadosPendentes(role: string) {
   const [count, setCount] = useState(0);
   // O menu fica montado entre as telas: recontar ao entrar/sair das telas de comunicados, senão o
@@ -180,6 +174,7 @@ export function useComunicadosPendentes(role: string) {
   const telaComunicados = pathname.startsWith("/dashboard/comunicados") ? pathname : "";
 
   useEffect(() => {
+    if (role !== "GUARDIAN") return; // equipe não tem número no menu: nem consulta
     apiJson<{ comunicados: ComunicadoResumo[] }>("/api/comunicados")
       .then((data) => setCount(countPendentes(data.comunicados, role)))
       .catch(() => setCount(0));
