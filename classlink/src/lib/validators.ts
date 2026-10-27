@@ -8,7 +8,8 @@ export const createClassSchema = z.object({
 export const updateClassSchema = createClassSchema.partial();
 
 export const createStudentSchema = z.object({
-  name: z.string().min(1).max(150),
+  // trim: um nome só de espaços não passa, e "Sara " não vira um aluno diferente de "Sara".
+  name: z.string().trim().min(1).max(150),
   classId: z.string().min(1),
   birthDate: z.string().datetime().optional(),
 });
