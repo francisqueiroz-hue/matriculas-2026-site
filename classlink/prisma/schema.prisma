@@ -548,6 +548,25 @@ model BoletoBaixaLog {
   @@index([schoolId, criadoEm])
 }
 
+/// Histórico de alterações de cadastro (por enquanto, o aluno): quem alterou, quando, qual
+/// campo e os valores anterior e novo. Somente inserção. Sem chave estrangeira de propósito:
+/// o registro sobrevive à exclusão de quem alterou, e a mesma tabela serve depois para
+/// outros cadastros (responsáveis, turmas). Nome de quem alterou fica copiado aqui.
+model AlteracaoCadastro {
+  id            String   @id @default(cuid())
+  schoolId      String
+  entidade      String // "ALUNO"
+  entidadeId    String
+  campo         String // "nome" | "turma" | "nascimento"
+  valorAnterior String?
+  valorNovo     String?
+  porUserId     String
+  porNome       String
+  criadoEm      DateTime @default(now())
+
+  @@index([schoolId, entidade, entidadeId, criadoEm])
+}
+
 // Disciplina lecionada na escola (ex.: "Matemática", "Português"). Escopo por escola,
 // não por turma — todas as turmas compartilham o mesmo catálogo de disciplinas.
 model Disciplina {

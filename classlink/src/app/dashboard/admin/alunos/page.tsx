@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiFetch, apiJson } from "@/lib/api-client";
+import { ROTULO_CAMPO } from "@/lib/historico-cadastro";
 
 interface ClassOption {
   id: string;
   name: string;
+}
+
+interface HistoricoItem {
+  id: string;
+  campo: string;
+  valorAnterior: string | null;
+  valorNovo: string | null;
+  porNome: string;
+  criadoEm: string;
 }
 
 interface StudentItem {
@@ -40,6 +50,12 @@ function AlunosContent() {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [editStudentName, setEditStudentName] = useState("");
   const [editStudentError, setEditStudentError] = useState<string | null>(null);
+  // Histórico de alterações aberto (um aluno por vez); null = carregando.
+  const [historicoAlunoId, setHistoricoAlunoId] = useState<string | null>(null);
+  const [historico, setHistorico] = useState<HistoricoItem[] | null>(null);
+  const [historicoErro, setHistoricoErro] = useState<string | null>(null);
+  // Aluno cuja resposta é esperada: resposta atrasada de outro aluno é descartada.
+  const historicoPedido = useRef<string | null>(null);
 
   function load() {
     apiJson<{ students: StudentItem[] }>("/api/admin/students").then((data) => setStudents(data.students));
@@ -224,9 +240,31 @@ function AlunosContent() {
       });
       setFeedback((prev) => ({ ...prev, [editingStudentId]: "Nome do aluno atualizado." }));
       setEditingStudentId(null);
+      if (historicoAlunoId === editingStudentId) {
+        historicoPedido.current = null;
+        setHistoricoAlunoId(null);
+      }
       load();
     } catch (err) {
       setEditStudentError(err instanceof Error ? err.message : "Erro ao salvar");
+    }
+  }
+
+  async function toggleHistorico(studentId: string) {
+    if (historicoAlunoId === studentId) {
+      historicoPedido.current = null;
+      setHistoricoAlunoId(null);
+      return;
+    }
+    historicoPedido.current = studentId;
+    setHistoricoAlunoId(studentId);
+    setHistorico(null);
+    setHistoricoErro(null);
+    try {
+      const data = await apiJson<{ historico: HistoricoItem[] }>(`/api/admin/students/${studentId}/historico`);
+      if (historicoPedido.current === studentId) setHistorico(data.historico);
+    } catch (err) {
+      if (historicoPedido.current === studentId) setHistoricoErro(err instanceof Error ? err.message : "Erro ao carregar o histórico");
     }
   }
 
@@ -337,6 +375,14 @@ function AlunosContent() {
                   <button type="button" onClick={() => startEditStudent(s)} className="text-xs text-indigo-600 hover:underline">
                     Editar nome
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleHistorico(s.id)}
+                    aria-expanded={historicoAlunoId === s.id}
+                    className="text-xs text-slate-600 hover:underline dark:text-slate-400"
+                  >
+                    Histórico
+                  </button>
                   <Link href={`/dashboard/fichas?aluno=${s.id}`} className="text-xs text-indigo-700 hover:underline">
                     Ficha da matrícula
                   </Link>
@@ -345,6 +391,30 @@ function AlunosContent() {
                   </button>
                 </span>
               </div>
+              )}
+
+              {historicoAlunoId === s.id && (
+                <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-700 dark:bg-slate-800">
+                  <p className="font-semibold text-slate-600 dark:text-slate-300">Histórico de alterações do cadastro</p>
+                  {historicoErro ? (
+                    <p className="mt-1 text-red-600">{historicoErro}</p>
+                  ) : historico === null ? (
+                    <p className="mt-1 text-slate-500">Carregando...</p>
+                  ) : historico.length === 0 ? (
+                    <p className="mt-1 text-slate-500">Nenhuma alteração registrada.</p>
+                  ) : (
+                    <ul className="mt-1 space-y-1">
+                      {historico.map((h) => (
+                        <li key={h.id} className="text-slate-600 dark:text-slate-300">
+                          <span className="text-slate-500">{new Date(h.criadoEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</span>
+                          {" · "}
+                          {h.porNome} alterou <strong>{ROTULO_CAMPO[h.campo] ?? h.campo}</strong>: &ldquo;{h.valorAnterior ?? "(vazio)"}&rdquo; →
+                          &ldquo;{h.valorNovo ?? "(vazio)"}&rdquo;
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
 
               <ul className="mt-2 space-y-1 text-sm">
