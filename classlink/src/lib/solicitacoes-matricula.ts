@@ -3,6 +3,7 @@ import type { SolicitacaoMatriculaStatus, SolicitacaoMatriculaTipo } from "@pris
 import { normalizePhoneBR } from "@/lib/whatsapp";
 import { ErroDeUsuario } from "@/lib/erros";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
+import { celulaCsv } from "@/lib/csv";
 
 /**
  * Pré-matrículas e rematrículas enviadas pelos formulários públicos. O endpoint público
@@ -79,11 +80,6 @@ export function getClientIp(request: Request): string | null {
   return request.headers.get("x-real-ip");
 }
 
-function csvEscape(value: string) {
-  if (/[",\n;]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
-
 export interface SolicitacaoCsv {
   createdAt: Date;
   tipo: SolicitacaoMatriculaTipo;
@@ -126,7 +122,7 @@ export function solicitacoesParaCsv(itens: SolicitacaoCsv[]): string {
       s.observacoes ?? "",
       s.observacoesInternas ?? "",
     ]
-      .map(csvEscape)
+      .map(celulaCsv)
       .join(","),
   );
   return "﻿" + [cabecalho.join(","), ...linhas].join("\n"); // BOM para acentuação correta no Excel

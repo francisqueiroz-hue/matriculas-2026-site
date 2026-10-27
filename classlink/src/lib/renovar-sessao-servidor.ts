@@ -25,6 +25,22 @@ export async function renovarSessao(refreshToken: string, agora = new Date()) {
   await prisma.refreshToken.create({
     data: { tokenHash: novo.tokenHash, userId: stored.user.id, expiresAt: novo.expiresAt },
   });
+
+  // Logout (ou troca de senha) no meio desta renovação: o token usado foi vencido depois que
+  // o lemos. Só quem encerra sessões encurta expiresAt; nesse caso a sessão nova não vale.
+  const conferido = await prisma.refreshToken.findUnique({
+    where: { id: stored.id },
+    select: { expiresAt: true, user: { select: { active: true, deletedAt: true } } },
+  });
+  if (
+    !conferido ||
+    conferido.expiresAt.getTime() < stored.expiresAt.getTime() ||
+    !conferido.user.active ||
+    conferido.user.deletedAt
+  ) {
+    await prisma.refreshToken.updateMany({ where: { tokenHash: novo.tokenHash }, data: { revokedAt: agora, expiresAt: agora } });
+    return null;
+  }
   const accessToken = await signAccessToken({
     sub: stored.user.id,
     role: stored.user.role,

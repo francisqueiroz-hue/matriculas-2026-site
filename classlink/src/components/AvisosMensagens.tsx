@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { apiFetch, apiJson } from "@/lib/api-client";
 import { requestPushToken } from "@/lib/firebase-client";
 import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
+import { registrarPush } from "@/lib/registro-push";
 
 interface UltimaMensagem {
   id: string;
@@ -222,7 +223,7 @@ export function ConviteAtivarAvisos() {
       tocarSom();
       // Com o Firebase configurado, registra também o push (avisa com o navegador fechado).
       const token = await requestPushToken(false);
-      if (token) await apiFetch("/api/push/register", { method: "POST", body: JSON.stringify({ token }) });
+      if (token) await registrarPush(() => apiFetch("/api/push/register", { method: "POST", body: JSON.stringify({ token }) }));
     } catch {
       // navegador sem suporte ou push indisponível: os avisos com a aba aberta seguem funcionando
     }

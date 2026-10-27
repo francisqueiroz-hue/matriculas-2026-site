@@ -5,12 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { detalhesLiberados, MINIMO_RESPOSTAS_ANONIMAS } from "@/lib/enquetes";
 import { carregarEnqueteVisivel } from "@/lib/enquetes-acesso";
-
-function csv(valor: string) {
-  // Evita que o Excel execute fórmula digitada por uma família (=, +, -, @) e escapa aspas/quebras.
-  const seguro = /^[=+\-@]/.test(valor) ? `'${valor}` : valor;
-  return /[",\n]/.test(seguro) ? `"${seguro.replace(/"/g, '""')}"` : seguro;
-}
+import { cabecalhosDownloadCsv, celulaCsv } from "@/lib/csv";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[id]/export">) {
   try {
@@ -41,12 +36,9 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[i
       ];
     });
 
-    const corpo = "﻿" + [cabecalho, ...linhas].map((l) => l.map(csv).join(",")).join("\n");
+    const corpo = "﻿" + [cabecalho, ...linhas].map((l) => l.map(celulaCsv).join(",")).join("\n");
     return new NextResponse(corpo, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="enquete-${id}.csv"`,
-      },
+      headers: cabecalhosDownloadCsv(`enquete-${id}.csv`),
     });
   } catch (error) {
     return handleApiError(error);
