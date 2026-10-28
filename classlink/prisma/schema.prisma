@@ -796,7 +796,10 @@ model ContratoArquivo {
   mimeType     String
   tamanhoBytes Int
   sha256       String // impressão digital do arquivo, calculada pelo servidor
-  conteudo     Bytes
+  // O PDF fica no banco (`conteudo`, até 4 MB) ou, quando a família envia um arquivo maior,
+  // no Vercel Blob privado (`blobPath`). Sempre um dos dois.
+  conteudo     Bytes?
+  blobPath     String?
 
   enviadoPor   User?    @relation("ContratoArquivoEnviadoPor", fields: [enviadoPorId], references: [id], onDelete: SetNull)
   enviadoPorId String?

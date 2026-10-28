@@ -7,7 +7,7 @@ import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
 import { MODELO_CONTRATO_2027 } from "@/lib/contrato-modelo/tipos";
 import { ContratoModeloPainel } from "./ContratoModeloPainel";
 import {
-  CONTRATO_MAX_BYTES,
+  CONTRATO_LIMITE_ENVIO_SERVIDOR,
   ContratoErro,
   LINK_VALIDAR_ITI,
   METODO_LABEL,
@@ -140,7 +140,7 @@ function NovoContrato({ ano, contratos, onCriado }: { ano: number; contratos: Co
     setErro(null);
     setArquivo(null);
     if (!file) return;
-    if (file.size > CONTRATO_MAX_BYTES) {
+    if (file.size > CONTRATO_LIMITE_ENVIO_SERVIDOR) {
       setErro("O PDF passa de 4 MB. Exporte o contrato novamente com tamanho menor.");
       return;
     }

@@ -6,10 +6,18 @@ export type ContratoMetodo = "GOVBR" | "MANUSCRITA";
 export type ContratoAcao = "PREENCHER_DADOS" | "ENVIAR_ASSINADO" | "APROVAR" | "DEVOLVER" | "ORIGINAL_RECEBIDO";
 
 /**
- * Limite de 4 MB por PDF: abaixo do teto de 4,5 MB por requisição das funções da Vercel
- * e mais que suficiente para um contrato assinado no gov.br (normalmente < 1 MB).
+ * Até 4 MB o PDF passa pela função do app (abaixo do teto de 4,5 MB por requisição das
+ * funções da Vercel) e fica no banco. Acima disso, o contrato assinado da família vai direto
+ * do navegador para o armazenamento privado (Vercel Blob), até CONTRATO_MAX_BYTES —
+ * contratos digitalizados à mão, com várias páginas, costumam passar de 4 MB.
  */
-export const CONTRATO_MAX_BYTES = 4 * 1024 * 1024;
+export const CONTRATO_LIMITE_ENVIO_SERVIDOR = 4 * 1024 * 1024;
+export const CONTRATO_MAX_BYTES = 20 * 1024 * 1024;
+
+/** "4 MB", "20 MB" — para as mensagens de limite. */
+export function megabytes(bytes: number): string {
+  return `${Math.round(bytes / 1024 / 1024)} MB`;
+}
 
 /** Assinador gratuito do governo federal (assinatura eletrônica avançada, Lei 14.063/2020). */
 export const LINK_ASSINADOR_GOVBR = "https://assinador.iti.br";
@@ -77,15 +85,27 @@ export function podeExcluirContrato(status: ContratoStatus, totalEnviosFamilia: 
  * Confere tamanho e assinatura de bytes do PDF ("%PDF-" nos primeiros 1024 bytes, como
  * permite a especificação). Não confia no tipo informado pelo navegador.
  */
-export function validarPdf(bytes: Uint8Array): void {
+export function validarPdf(bytes: Uint8Array, maxBytes = CONTRATO_MAX_BYTES): void {
   if (bytes.byteLength === 0) throw new ContratoErro("O arquivo está vazio.");
-  if (bytes.byteLength > CONTRATO_MAX_BYTES) {
-    throw new ContratoErro("O arquivo passa de 4 MB. Gere o PDF novamente ou digitalize em resolução menor.");
-  }
+  if (bytes.byteLength > maxBytes) throw new ContratoErro(mensagemArquivoGrande(maxBytes));
   const inicio = new TextDecoder("latin1").decode(bytes.subarray(0, 1024));
   if (!inicio.includes("%PDF-")) {
     throw new ContratoErro("O arquivo não é um PDF. Envie o contrato em PDF (fotos precisam ser convertidas em PDF).");
   }
+}
+
+export function mensagemArquivoGrande(maxBytes = CONTRATO_MAX_BYTES): string {
+  return `O arquivo passa de ${megabytes(maxBytes)}. Digitalize em resolução menor (150 dpi, preto e branco) ou gere o PDF novamente.`;
+}
+
+/**
+ * Caminho do contrato assinado enviado direto ao armazenamento:
+ * classlink/<escola>/contratos/<contrato>/<uuid>.pdf — o servidor só autoriza esse formato.
+ */
+export function caminhoContratoValido(caminho: string, escolaId: string, contratoId: string): boolean {
+  const limpo = (v: string) => v.replace(/[^A-Za-z0-9_-]/g, "");
+  if (!escolaId || !contratoId || limpo(escolaId) !== escolaId || limpo(contratoId) !== contratoId) return false;
+  return new RegExp(`^classlink/${escolaId}/contratos/${contratoId}/[0-9a-f-]{36}\\.pdf$`).test(caminho);
 }
 
 /** Nome de arquivo seguro para o cabeçalho Content-Disposition: sem caminho, aspas ou quebras de linha. */

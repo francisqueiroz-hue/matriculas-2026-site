@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { uploadPresigned } from "@vercel/blob/client";
 import { apiJson } from "@/lib/api-client";
+import { useCurrentUser } from "@/components/UserContext";
 import {
+  CONTRATO_LIMITE_ENVIO_SERVIDOR,
   CONTRATO_MAX_BYTES,
   ContratoErro,
   LINK_ASSINADOR_GOVBR,
   METODO_LABEL,
   STATUS_CONTRATO_LABEL,
   formatarDataHora,
+  megabytes,
+  mensagemArquivoGrande,
   podeEnviarAssinado,
   validarPdf,
   type ContratoMetodo,
@@ -62,7 +67,9 @@ function FormularioEnvio({ contrato, onEnviado }: { contrato: ContratoFamilia; o
   const [declaracao, setDeclaracao] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [progresso, setProgresso] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const user = useCurrentUser();
   const primeiroNome = contrato.student.name.split(" ")[0];
 
   async function escolherArquivo(file: File | null) {
@@ -70,7 +77,8 @@ function FormularioEnvio({ contrato, onEnviado }: { contrato: ContratoFamilia; o
     setArquivo(null);
     if (!file) return;
     if (file.size > CONTRATO_MAX_BYTES) {
-      setErro("O arquivo passa de 4 MB. Gere o PDF novamente ou digitalize em resolução menor.");
+      setErro(mensagemArquivoGrande());
+      if (inputRef.current) inputRef.current.value = "";
       return;
     }
     try {
@@ -89,16 +97,35 @@ function FormularioEnvio({ contrato, onEnviado }: { contrato: ContratoFamilia; o
     setEnviando(true);
     setErro(null);
     try {
-      const form = new FormData();
-      form.append("metodo", metodo);
-      form.append("declaracao", "true");
-      form.append("file", arquivo, arquivo.name);
-      await apiJson(`/api/contratos/${contrato.id}/assinado`, { method: "POST", body: form });
+      if (arquivo.size > CONTRATO_LIMITE_ENVIO_SERVIDOR) {
+        // A Vercel recusa corpos acima de ~4,5 MB nas funções: o PDF vai direto ao armazenamento
+        // privado, com link de envio autorizado pelo servidor, e depois o servidor confere.
+        const caminho = `classlink/${user.schoolId}/contratos/${contrato.id}/${crypto.randomUUID()}.pdf`;
+        setProgresso(0);
+        await uploadPresigned(caminho, arquivo, {
+          access: "private",
+          handleUploadUrl: `/api/contratos/${contrato.id}/assinado/envio`,
+          contentType: "application/pdf",
+          multipart: arquivo.size > 10 * 1024 * 1024,
+          onUploadProgress: (p) => setProgresso(Math.round(p.percentage)),
+        });
+        await apiJson(`/api/contratos/${contrato.id}/assinado`, {
+          method: "POST",
+          body: JSON.stringify({ metodo, declaracao: "true", path: caminho, nomeArquivo: arquivo.name }),
+        });
+      } else {
+        const form = new FormData();
+        form.append("metodo", metodo);
+        form.append("declaracao", "true");
+        form.append("file", arquivo, arquivo.name);
+        await apiJson(`/api/contratos/${contrato.id}/assinado`, { method: "POST", body: form });
+      }
       onEnviado();
     } catch (err) {
-      setErro(err instanceof Error ? err.message : "Não foi possível enviar. Tente de novo.");
+      setErro(err instanceof Error && err.message ? err.message : "Não foi possível enviar. Verifique a internet e tente de novo.");
     } finally {
       setEnviando(false);
+      setProgresso(null);
     }
   }
 
@@ -142,7 +169,7 @@ function FormularioEnvio({ contrato, onEnviado }: { contrato: ContratoFamilia; o
 
       <div>
         <label htmlFor={`arquivo-${contrato.id}`} className="mb-1 block text-sm font-medium text-slate-800">
-          PDF do contrato assinado <span className="font-normal text-slate-500">(até 4 MB)</span>
+          PDF do contrato assinado <span className="font-normal text-slate-500">(até {megabytes(CONTRATO_MAX_BYTES)})</span>
         </label>
         <input
           ref={inputRef}
@@ -173,7 +200,7 @@ function FormularioEnvio({ contrato, onEnviado }: { contrato: ContratoFamilia; o
       )}
 
       <button type="submit" disabled={!metodo || !arquivo || !declaracao || enviando} className={`${botaoPrimario} w-full sm:w-auto`}>
-        {enviando ? "Enviando…" : "Enviar contrato assinado"}
+        {enviando ? (progresso !== null && progresso < 100 ? `Enviando… ${progresso}%` : "Enviando…") : "Enviar contrato assinado"}
       </button>
     </form>
   );
