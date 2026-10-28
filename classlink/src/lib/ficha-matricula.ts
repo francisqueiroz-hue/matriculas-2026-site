@@ -1,4 +1,5 @@
 import { z } from "zod";
+import "@/lib/zod-sem-eval";
 
 /**
  * Ficha da matrícula: checklist de documentos (por ano letivo) e consentimentos LGPD.

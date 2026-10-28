@@ -1,4 +1,5 @@
 import { z } from "zod";
+import "@/lib/zod-sem-eval";
 import type { SolicitacaoMatriculaStatus, SolicitacaoMatriculaTipo } from "@prisma/client";
 import { normalizePhoneBR } from "@/lib/whatsapp";
 import { ErroDeUsuario } from "@/lib/erros";

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import "@/lib/zod-sem-eval";
 import { prisma } from "@/lib/prisma";
 import { notifyUsers } from "@/lib/push";
 
