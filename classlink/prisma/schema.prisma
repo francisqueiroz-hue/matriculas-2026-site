@@ -386,6 +386,14 @@ model Message {
   // deduplicar webhooks (evita gravar a mesma mensagem duas vezes em reentregas)
   // e para resolver a conversa de uma resposta via WhatsApp (context.id).
   externalId     String?        @unique
+  // Foto, documento, áudio etc. recebidos pelo WhatsApp. O arquivo fica no armazenamento
+  // privado (anexoCaminho) e só é lido por link assinado; sem caminho = não deu para baixar.
+  // anexoMediaId é o id da mídia na Meta (baixável por 7 dias), para nova tentativa.
+  anexoTipo      String? // "image" | "sticker" | "document" | "audio" | "video"
+  anexoMime      String?
+  anexoNome      String?
+  anexoCaminho   String?
+  anexoMediaId   String?
   createdAt      DateTime       @default(now())
   readAt         DateTime?
 

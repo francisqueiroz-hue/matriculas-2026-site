@@ -4,6 +4,7 @@ import { ErroDeUsuario } from "@/lib/erros";
 import { credenciaisDaConta, getFirebaseAdminApp } from "@/lib/firebase-admin";
 import { limparValorPublico } from "@/lib/firebase-config-publica";
 import { apagarDoBlob, isBlobConfigured, linkDoBlob, salvarNoBlob } from "@/lib/blob-storage";
+import { linkAssinado } from "@/lib/midia-assinada";
 
 export interface UploadResult {
   /** Caminho interno do objeto no bucket — não é uma URL pública (o bucket fica privado por padrão). */
@@ -117,7 +118,12 @@ export async function uploadMedia(
 
   const extension = mimeType.split("/")[1] ?? (kind === "image" ? "jpg" : "mp4");
   const path = `${folder}/${randomUUID()}.${extension}`;
+  await guardarArquivo(path, buffer, mimeType);
+  return { path, resourceType: kind };
+}
 
+/** Grava um arquivo já validado no armazenamento privado (Blob ou Firebase), no caminho dado. */
+export async function guardarArquivo(path: string, buffer: Buffer, mimeType: string): Promise<void> {
   if (provedorDeMidia() === "blob") {
     try {
       await salvarNoBlob(path, buffer, mimeType);
@@ -125,7 +131,7 @@ export async function uploadMedia(
       console.error("Vercel Blob: falha ao gravar", err);
       throw new ErroStorage(`Não foi possível guardar a imagem: ${(err as Error)?.message ?? String(err)}`);
     }
-    return { path, resourceType: kind };
+    return;
   }
 
   const file = (await getBucket()).file(path);
@@ -135,14 +141,25 @@ export async function uploadMedia(
     console.error("Firebase Storage: falha ao gravar", err);
     throw new ErroStorage(`Não foi possível guardar a imagem: ${explicarErroStorage(err)}`);
   }
-
-  return { path, resourceType: kind };
 }
 
 /** Gera uma URL assinada de leitura, válida por tempo limitado, para exibir a mídia no app. */
 export async function getSignedMediaUrl(path: string): Promise<string> {
   if (provedorDeMidia() === "blob") return linkDoBlob(path, SIGNED_URL_TTL_MS);
   const [url] = await (await getBucket()).file(path).getSignedUrl({ action: "read", expires: Date.now() + SIGNED_URL_TTL_MS });
+  return url;
+}
+
+const HORA_MS = 60 * 60 * 1000;
+
+/**
+ * Link curto (1 a 2 horas) e estável dentro da mesma hora: telas que consultam a cada poucos
+ * segundos (conversa) recebem o mesmo endereço e o navegador não baixa a imagem de novo.
+ */
+export async function getShortSignedMediaUrl(path: string, agora = Date.now()): Promise<string> {
+  const inicioDaHora = Math.floor(agora / HORA_MS) * HORA_MS;
+  if (provedorDeMidia() === "blob") return linkAssinado(path, 2 * HORA_MS, inicioDaHora);
+  const [url] = await (await getBucket()).file(path).getSignedUrl({ action: "read", expires: inicioDaHora + 2 * HORA_MS });
   return url;
 }
 

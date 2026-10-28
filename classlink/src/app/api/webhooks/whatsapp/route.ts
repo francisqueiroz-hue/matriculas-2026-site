@@ -9,6 +9,7 @@ import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "
 import { ehPedidoDeAcesso } from "@/lib/acesso";
 import { mensagemIgnoravel } from "@/lib/whatsapp-ignorar";
 import { responderNumeroNaoCadastrado, responderPedidoDeAcesso } from "@/lib/pedido-acesso";
+import { corpoDaMidia, guardarMidiaRecebida, midiaDaMensagem } from "@/lib/whatsapp-midia";
 
 /** Handshake de verificação exigido pela Meta ao cadastrar a URL do webhook no Meta Developer Console. */
 export async function GET(request: NextRequest) {
@@ -32,6 +33,8 @@ interface WhatsAppMessage {
   button?: { payload?: string; text?: string };
   interactive?: { button_reply?: { id?: string; title?: string } };
   context?: { id: string };
+  // Foto, figurinha, documento, áudio, vídeo: o conteúdo vem em msg[msg.type] (id da mídia, legenda...).
+  [tipo: string]: unknown;
 }
 
 /** Texto útil da mensagem: digitado, ou o botão tocado. */
@@ -40,6 +43,12 @@ function textoDaMensagem(msg: WhatsAppMessage): string {
   if (msg.type === "button") return msg.button?.payload || msg.button?.text || "";
   if (msg.type === "interactive") return msg.interactive?.button_reply?.title || msg.interactive?.button_reply?.id || "";
   return "";
+}
+
+/** Tipos que o ClassLink não mostra (localização, contato...): diz o que chegou e o que fazer. */
+function descricaoDeTipoSemSuporte(tipo: string): string {
+  const nomes: Record<string, string> = { location: "uma localização", contacts: "um contato" };
+  return `[A família enviou ${nomes[tipo] ?? `uma mensagem do tipo "${tipo}"`} pelo WhatsApp, que o ClassLink não consegue mostrar. Peça para escrever em texto.]`;
 }
 
 /** Guarda quando a pessoa escreveu: nas 24h seguintes a escola pode responder em texto livre. */
@@ -160,11 +169,27 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const corpo = textoRecebido || `[Mensagem do tipo "${msg.type}" recebida no WhatsApp — abra o WhatsApp da escola para ver o conteúdo]`;
-      if (!corpo) continue;
+      // Foto/documento/áudio/vídeo: baixa da Meta e guarda no armazenamento privado. Se não der,
+      // a mensagem entra assim mesmo e a tela mostra o aviso com o tipo e a legenda.
+      const midia = midiaDaMensagem(msg);
+      const anexo = midia ? await guardarMidiaRecebida(midia, guardian.schoolId) : null;
+      const corpo = midia ? corpoDaMidia(midia) : textoRecebido || descricaoDeTipoSemSuporte(msg.type);
 
       const recebida = await prisma.message.create({
-        data: { conversationId, senderId: guardian.id, body: corpo, channel: "WHATSAPP", externalId: msg.id },
+        data: {
+          conversationId,
+          senderId: guardian.id,
+          body: corpo,
+          channel: "WHATSAPP",
+          externalId: msg.id,
+          ...(midia && {
+            anexoTipo: midia.tipo,
+            anexoMime: anexo?.mime ?? midia.mime,
+            anexoNome: midia.nomeArquivo,
+            anexoCaminho: anexo?.caminho ?? null,
+            anexoMediaId: midia.mediaId,
+          }),
+        },
       });
 
       // "ACESSO"/"SENHA": responde na hora com link e senha provisória (janela de 24h aberta).
