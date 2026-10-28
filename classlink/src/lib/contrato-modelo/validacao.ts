@@ -1,4 +1,5 @@
 import { z } from "zod";
+import "@/lib/zod-sem-eval";
 import { cpfValido, dataNascimentoValida, LINHAS_ANEXO_IMAGEM } from "./tipos";
 
 const texto = (max = 200) => z.string().trim().max(max);
