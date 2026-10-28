@@ -36,7 +36,7 @@ describe("validarPdf", () => {
   it("rejeita arquivo acima do limite", () => {
     const grande = new Uint8Array(CONTRATO_MAX_BYTES + 1);
     grande.set(new TextEncoder().encode("%PDF-1.7"));
-    expect(() => validarPdf(grande)).toThrow(/4 MB/);
+    expect(() => validarPdf(grande)).toThrow(/20 MB/);
   });
 
   it("aceita exatamente o limite", () => {

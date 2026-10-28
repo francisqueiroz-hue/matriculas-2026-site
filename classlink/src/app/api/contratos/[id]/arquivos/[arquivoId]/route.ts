@@ -4,11 +4,13 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { nomeArquivoPdfSeguro } from "@/lib/contratos";
 import { carregarContratoComAcesso } from "@/lib/contratos-server";
+import { lerDoBlob } from "@/lib/blob-storage";
 
 /**
  * Entrega o PDF (modelo ou assinado) só para quem tem acesso ao contrato. Nunca há link
  * público: cada download passa por esta rota e confere sessão e vínculo na hora.
- * `?download=1` força o download; sem ele o PDF abre no navegador.
+ * `?download=1` força o download; sem ele o PDF abre no navegador. PDFs acima de 4 MB ficam
+ * no Blob privado e são repassados em fluxo (stream), sem carregar o arquivo inteiro na função.
  */
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/contratos/[id]/arquivos/[arquivoId]">) {
   try {
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/contrato
 
     const arquivo = await prisma.contratoArquivo.findFirst({
       where: { id: arquivoId, contratoId: id },
-      select: { nomeArquivo: true, conteudo: true },
+      select: { nomeArquivo: true, conteudo: true, blobPath: true },
     });
     if (!arquivo) return NextResponse.json({ error: "Arquivo não encontrado" }, { status: 404 });
 
@@ -29,14 +31,21 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/contrato
     const disposicao = request.nextUrl.searchParams.get("download") === "1" ? "attachment" : "inline";
     const nome = nomeArquivoPdfSeguro(arquivo.nomeArquivo);
 
-    return new NextResponse(new Blob([Uint8Array.from(arquivo.conteudo)]), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `${disposicao}; filename="${nome.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(nome)}`,
-        "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    const cabecalhos = {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `${disposicao}; filename="${nome.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(nome)}`,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    };
+
+    if (arquivo.blobPath) {
+      const blob = await lerDoBlob(arquivo.blobPath);
+      if (!blob || blob.statusCode !== 200) return NextResponse.json({ error: "Arquivo não encontrado" }, { status: 404 });
+      return new NextResponse(blob.stream, { headers: { ...cabecalhos, "Content-Length": String(blob.blob.size) } });
+    }
+    if (!arquivo.conteudo) return NextResponse.json({ error: "Arquivo não encontrado" }, { status: 404 });
+
+    return new NextResponse(new Blob([Uint8Array.from(arquivo.conteudo)]), { headers: cabecalhos });
   } catch (error) {
     return handleApiError(error);
   }

@@ -215,6 +215,12 @@ export const envioAssinadoSchema = z.object({
   declaracao: z.literal("true", { error: "Marque a declaração para enviar o contrato" }),
 });
 
+/** Envio de contrato acima de 4 MB: o PDF já está no armazenamento (enviado direto pelo navegador). */
+export const envioAssinadoDiretoSchema = envioAssinadoSchema.extend({
+  path: z.string().min(1).max(300),
+  nomeArquivo: z.string().max(300),
+});
+
 export const acaoContratoSchema = z.discriminatedUnion("acao", [
   z.object({ acao: z.literal("APROVAR") }),
   z.object({ acao: z.literal("ORIGINAL_RECEBIDO") }),

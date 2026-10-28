@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { novoContratoSchema } from "@/lib/validators";
-import { ContratoErro, nomeArquivoPdfSeguro, validarPdf } from "@/lib/contratos";
+import { CONTRATO_LIMITE_ENVIO_SERVIDOR, ContratoErro, nomeArquivoPdfSeguro, validarPdf } from "@/lib/contratos";
 import { responsaveisDoAluno, sha256Hex } from "@/lib/contratos-server";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!(arquivo instanceof File)) return NextResponse.json({ error: "Anexe o PDF do contrato" }, { status: 400 });
     const bytes = new Uint8Array(await arquivo.arrayBuffer());
     try {
-      validarPdf(bytes);
+      validarPdf(bytes, CONTRATO_LIMITE_ENVIO_SERVIDOR);
     } catch (e) {
       if (e instanceof ContratoErro) return NextResponse.json({ error: e.message }, { status: 400 });
       throw e;
