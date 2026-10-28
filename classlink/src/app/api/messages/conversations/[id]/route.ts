@@ -13,6 +13,32 @@ import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTemplateMessage, se
 import { isEmailConfigured, sendEmailMessage } from "@/lib/email";
 import { MENSAGEM_JANELA_FECHADA, janelaWhatsApp } from "@/lib/canal-envio";
 import { SELECT_PESSOA, nomeParaQuemVe, pessoaParaQuemVe } from "@/lib/nome-institucional";
+import { getShortSignedMediaUrl } from "@/lib/firebase-storage";
+
+type MensagemComAnexo = {
+  anexoTipo: string | null;
+  anexoMime: string | null;
+  anexoNome: string | null;
+  anexoCaminho: string | null;
+  anexoMediaId: string | null;
+};
+
+/**
+ * Anexo para a tela: link assinado e curto (só quem participa da conversa chega aqui). O
+ * caminho no armazenamento e o id da mídia na Meta não saem do servidor.
+ */
+async function comAnexo<T extends MensagemComAnexo>(m: T) {
+  const { anexoTipo, anexoMime, anexoNome, anexoCaminho, anexoMediaId: _mediaId, ...resto } = m;
+  void _mediaId;
+  if (!anexoTipo) return { ...resto, anexo: null };
+  const url = anexoCaminho
+    ? await getShortSignedMediaUrl(anexoCaminho).catch((err) => {
+        console.error("conversa: falha ao gerar link do anexo", err);
+        return null;
+      })
+    : null;
+  return { ...resto, anexo: { tipo: anexoTipo, mime: anexoMime, nome: anexoNome, url } };
+}
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
   try {
@@ -53,7 +79,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
         staff: pessoaParaQuemVe(conversation.staff, session.role),
         ...(souEquipe && { janelaWhatsApp: { ...janelaWhatsApp(whatsappUltimaMensagemEm), avisoPorModelo: isWhatsAppConfigured() } }),
       },
-      messages: messages.map((m) => ({ ...m, sender: pessoaParaQuemVe(m.sender, session.role) })),
+      messages: await Promise.all(messages.map(async (m) => ({ ...(await comAnexo(m)), sender: pessoaParaQuemVe(m.sender, session.role) }))),
     });
   } catch (error) {
     return handleApiError(error);
@@ -153,7 +179,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     });
 
     return NextResponse.json(
-      { message: { ...message, sender: pessoaParaQuemVe(message.sender, session.role) }, avisoPeloWhatsApp },
+      { message: { ...(await comAnexo(message)), sender: pessoaParaQuemVe(message.sender, session.role) }, avisoPeloWhatsApp },
       { status: 201 },
     );
   } catch (error) {

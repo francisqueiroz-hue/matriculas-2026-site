@@ -5,9 +5,18 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
+import { avisoAnexoIndisponivel, rotuloDoAnexo, semLegenda } from "@/lib/anexo-mensagem";
 import { ROTULO_ENVIO, explicacaoDoCanal, reciboPorCanal, whatsappDisponivel, type JanelaWhatsApp } from "@/lib/canal-envio";
 
 type Canal = "APP" | "WHATSAPP" | "EMAIL";
+
+/** Foto, documento, áudio ou vídeo recebido pelo WhatsApp. `url` nulo: não deu para baixar. */
+interface Anexo {
+  tipo: string;
+  mime: string | null;
+  nome: string | null;
+  url: string | null;
+}
 
 /** Mensagem já normalizada para exibição, venha ela de uma conversa com responsável (com canal) ou de equipe (sem canal). */
 interface DisplayMessage {
@@ -17,6 +26,7 @@ interface DisplayMessage {
   createdAt: string;
   /** Quando a outra pessoa abriu a mensagem (gravado pelo servidor). */
   readAt?: string | null;
+  anexo?: Anexo | null;
   sender: { id: string; name: string; role: string };
 }
 
@@ -27,7 +37,15 @@ interface GuardianConversationResponse {
     guardian: { id: string; name: string; phone: string | null; email: string | null };
     janelaWhatsApp?: { aberta: boolean; ate: string | null; avisoPorModelo?: boolean };
   };
-  messages: { id: string; body: string; channel: Canal; createdAt: string; readAt: string | null; sender: { id: string; name: string; role: string } }[];
+  messages: {
+    id: string;
+    body: string;
+    channel: Canal;
+    createdAt: string;
+    readAt: string | null;
+    anexo: Anexo | null;
+    sender: { id: string; name: string; role: string };
+  }[];
 }
 
 interface TeamConversationResponse {
@@ -278,7 +296,8 @@ function ConversationPageInner() {
                   mine ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800"
                 }`}
               >
-                <p className="whitespace-pre-wrap">{m.body}</p>
+                {m.anexo && <AnexoDaMensagem anexo={m.anexo} />}
+                {!(m.anexo && semLegenda(m.body, m.anexo.tipo)) && <p className="whitespace-pre-wrap">{m.body}</p>}
                 <p className={`mt-1 flex items-center gap-1 text-[10px] ${mine ? "text-indigo-100" : "text-slate-400"}`}>
                   {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                   {m.channel && m.channel !== "APP" && <span>· via {CANAL_LABEL[m.channel]}</span>}
@@ -353,5 +372,46 @@ function ReciboMensagem({ canal, readAt }: { canal: Canal | null; readAt?: strin
     <p className={`mt-0.5 text-[10px] ${recibo.lida ? "font-semibold text-emerald-200" : "text-indigo-200"}`}>
       <span aria-hidden="true">{recibo.marca}</span> {recibo.texto}
     </p>
+  );
+}
+
+/** Mostra o anexo: foto na conversa (toque abre em tamanho real), player de áudio/vídeo ou link do documento. */
+function AnexoDaMensagem({ anexo }: { anexo: Anexo }) {
+  if (!anexo.url) {
+    return (
+      <p role="note" className="mb-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
+        ⚠️ {avisoAnexoIndisponivel(anexo.tipo)}
+        {anexo.nome && <span className="block">Arquivo: {anexo.nome}</span>}
+      </p>
+    );
+  }
+  if (anexo.tipo === "image" || anexo.tipo === "sticker") {
+    return (
+      <a href={anexo.url} target="_blank" rel="noopener noreferrer" className="mb-1 block" title="Abrir em tamanho real">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={anexo.url}
+          alt={anexo.tipo === "sticker" ? "Figurinha enviada pelo WhatsApp" : "Foto enviada pelo WhatsApp"}
+          className={anexo.tipo === "sticker" ? "h-32 w-32 object-contain" : "max-h-72 w-auto max-w-full rounded-lg"}
+          loading="lazy"
+        />
+      </a>
+    );
+  }
+  if (anexo.tipo === "audio") {
+    return <audio controls preload="none" src={anexo.url} className="mb-1 max-w-full" aria-label="Áudio enviado pelo WhatsApp" />;
+  }
+  if (anexo.tipo === "video") {
+    return <video controls preload="metadata" src={anexo.url} className="mb-1 max-h-72 max-w-full rounded-lg" aria-label="Vídeo enviado pelo WhatsApp" />;
+  }
+  return (
+    <a
+      href={anexo.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mb-1 block rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-indigo-700 underline dark:border-slate-600 dark:bg-slate-900 dark:text-indigo-300"
+    >
+      {rotuloDoAnexo(anexo.tipo)}: abrir {anexo.nome ?? "arquivo"}
+    </a>
   );
 }
