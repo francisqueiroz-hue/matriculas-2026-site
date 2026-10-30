@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { DiagnosticoAvisos } from "@/components/DiagnosticoAvisos";
+import { EnviarGuiaFamilias } from "@/components/EnviarGuiaFamilias";
 import { SaudeSistema } from "@/components/SaudeSistema";
 import { apiJson } from "@/lib/api-client";
 
@@ -66,6 +67,8 @@ export default function AdminMetricsPage() {
     <AdminGuard>
       <div className="space-y-6">
         <h1 className="text-xl font-bold">Painel de engajamento</h1>
+
+        <EnviarGuiaFamilias />
 
         {metrics && (
           <>

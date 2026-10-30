@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { partesComLinks } from "@/lib/texto-links";
 import { formatarDataHora } from "@/lib/datas";
 
 interface Comunicado {
@@ -147,7 +148,9 @@ export default function ComunicadoDetailPage() {
           {formatarDataHora(comunicado.dataCriacao)}
           {comunicado.prazoResposta && <> · responder até {formatarDataHora(comunicado.prazoResposta)}</>}
         </p>
-        <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{comunicado.descricao}</p>
+        <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+          <TextoComLinks texto={comunicado.descricao} />
+        </p>
       </div>
 
       {user.role === "GUARDIAN" && alunos && (
@@ -288,5 +291,22 @@ export default function ComunicadoDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Texto do comunicado com os endereços https:// clicáveis (ex.: o link do Guia do app). */
+function TextoComLinks({ texto }: { texto: string }) {
+  return (
+    <>
+      {partesComLinks(texto).map((parte, i) =>
+        parte.link ? (
+          <a key={i} href={parte.texto} target="_blank" rel="noopener noreferrer" className="break-all font-medium text-indigo-700 underline dark:text-indigo-300">
+            {parte.texto}
+          </a>
+        ) : (
+          <span key={i}>{parte.texto}</span>
+        ),
+      )}
+    </>
   );
 }
