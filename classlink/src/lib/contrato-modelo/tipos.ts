@@ -9,6 +9,9 @@ export const MODELO_CONTRATO_2027 = "ESPACO_KIDS_2027";
 /** Vencimento das mensalidades: sempre dia 05 de cada mês (decisão da direção, out/2026). */
 export const DIA_VENCIMENTO_MENSALIDADE = 5;
 
+/** Primeira e última parcela do contrato 2027 (12 parcelas, janeiro a dezembro), definidas pela direção. */
+export const PRIMEIRO_ULTIMO_VENCIMENTO_2027 = "05/01/2027 a 05/12/2027";
+
 /** 5 → "05" */
 export function diaDoMes(dia: number): string {
   return String(dia).padStart(2, "0");
@@ -16,7 +19,8 @@ export function diaDoMes(dia: number): string {
 
 /**
  * Configuração com o vencimento fixo no dia 05, inclusive nas datas escritas em "Primeiro e
- * último vencimento" ("10/01/2027 a 10/12/2027" → "05/01/2027 a 05/12/2027").
+ * último vencimento" ("10/01/2027 a 10/12/2027" → "05/01/2027 a 05/12/2027"); em branco, sai
+ * "05/01/2027 a 05/12/2027".
  */
 export function comVencimentoFixo<T extends ConfigContrato>(c: T): T {
   const dia = diaDoMes(DIA_VENCIMENTO_MENSALIDADE);
@@ -25,7 +29,7 @@ export function comVencimentoFixo<T extends ConfigContrato>(c: T): T {
     parcelas: {
       ...c.parcelas,
       vencimentoDia: DIA_VENCIMENTO_MENSALIDADE,
-      primeiroUltimo: c.parcelas.primeiroUltimo.replace(/\b\d{1,2}(\/\d{1,2}\/\d{2,4})\b/g, `${dia}$1`),
+      primeiroUltimo: (c.parcelas.primeiroUltimo.trim() || PRIMEIRO_ULTIMO_VENCIMENTO_2027).replace(/\b\d{1,2}(\/\d{1,2}\/\d{2,4})\b/g, `${dia}$1`),
     },
   };
 }
@@ -193,7 +197,7 @@ export function configInicial(): ConfigContrato {
       redesSociais: "",
     },
     periodos: PERIODO_PADRAO.map((p) => ({ ...p })),
-    parcelas: { quantidade: 12, vencimentoDia: DIA_VENCIMENTO_MENSALIDADE, primeiroUltimo: "", periodoAnuidade: "" },
+    parcelas: { quantidade: 12, vencimentoDia: DIA_VENCIMENTO_MENSALIDADE, primeiroUltimo: PRIMEIRO_ULTIMO_VENCIMENTO_2027, periodoAnuidade: "" },
     horaExcedente: { valor: 0, unidade: "", fracionamento: "", tolerancia: "" },
   };
 }

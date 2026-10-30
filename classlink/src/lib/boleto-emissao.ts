@@ -59,8 +59,8 @@ export async function gerarBoletosDoMes(
       continue;
     }
 
-    const diaVencimento = aluno.diaVencimento ?? escola.diaVencimentoPadrao ?? DIA_VENCIMENTO_PADRAO;
-    const vencimento = calcularVencimento(diaVencimento, hoje);
+    // Vencimento sempre no dia 05, para todos os alunos (decisão da direção, out/2026).
+    const vencimento = calcularVencimento(DIA_VENCIMENTO_PADRAO, hoje);
 
     const boleto = await prisma.boleto.create({
       data: {

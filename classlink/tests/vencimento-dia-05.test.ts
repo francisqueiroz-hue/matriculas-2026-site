@@ -49,6 +49,7 @@ describe("vencimento sempre no dia 05", () => {
     expect(DIA_VENCIMENTO_MENSALIDADE).toBe(5);
     expect(DIA_VENCIMENTO_PADRAO).toBe(5);
     expect(configInicial().parcelas.vencimentoDia).toBe(5);
+    expect(configInicial().parcelas.primeiroUltimo).toBe("05/01/2027 a 05/12/2027");
     expect(diaDoMes(5)).toBe("05");
   });
 
@@ -108,5 +109,24 @@ describe("POST /api/admin/contratos/vencimento", () => {
     expect(await res.json()).toEqual({ corrigidos: [], total: 0 });
     expect(tx.contratoArquivo.create).not.toHaveBeenCalled();
     expect(notifyUsers).not.toHaveBeenCalled();
+  });
+});
+
+describe("boletos do mês", () => {
+  it("vencem no dia 05 mesmo para aluno ou escola com outro dia salvo", async () => {
+    vi.resetModules();
+    const criar = vi.fn(async ({ data }: { data: { vencimento: Date } }) => ({ id: "b1", ...data }));
+    vi.doMock("@/lib/prisma", () => ({
+      prisma: {
+        student: { findMany: vi.fn(async () => [{ id: "a1", name: "Ana", diaVencimento: 10, mensalidadeValor: 1000, guardians: [] }]) },
+        boleto: { findUnique: vi.fn(async () => null), create: criar },
+      },
+    }));
+    vi.doMock("@/lib/banco-inter", () => ({ isBancoInterConfigured: () => false, emitirCobranca: vi.fn(), consultarCobranca: vi.fn() }));
+    vi.doMock("@/lib/boleto-aviso", () => ({ avisarNovoBoleto: vi.fn() }));
+    const { gerarBoletosDoMes } = await import("@/lib/boleto-emissao");
+    await gerarBoletosDoMes({ id: "s1", diaVencimentoPadrao: 23 }, "2026-11", new Date(2026, 10, 1));
+    expect(criar.mock.calls[0][0].data.vencimento.getDate()).toBe(5);
+    expect(criar.mock.calls[0][0].data.vencimento.getMonth()).toBe(10);
   });
 });

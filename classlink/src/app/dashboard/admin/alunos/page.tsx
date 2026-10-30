@@ -289,7 +289,6 @@ function AlunosContent() {
         method: "PUT",
         body: JSON.stringify({
           mensalidadeValor: !form.bolsista && form.mensalidadeValor ? Number(form.mensalidadeValor) : null,
-          diaVencimento: form.diaVencimento ? Number(form.diaVencimento) : null,
           bolsista: form.bolsista,
         }),
       });
@@ -618,20 +617,7 @@ function AlunosContent() {
                     className="mt-1 block w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
                   />
                 </label>
-                <label className="text-xs text-slate-500">
-                  Dia de vencimento
-                  <input
-                    type="number"
-                    min={1}
-                    max={28}
-                    placeholder="padrão da escola"
-                    value={billingForm(s).diaVencimento}
-                    onChange={(e) =>
-                      setBillingForms((prev) => ({ ...prev, [s.id]: { ...billingForm(s), diaVencimento: e.target.value } }))
-                    }
-                    className="mt-1 block w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
-                  />
-                </label>
+                <p className="self-end pb-2 text-xs text-slate-500">Vencimento: dia 05</p>
                 <label className="flex min-h-9 items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                   <input
                     type="checkbox"
