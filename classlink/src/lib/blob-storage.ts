@@ -23,6 +23,6 @@ export async function lerDoBlob(caminho: string) {
   return get(caminho, { access: "private" });
 }
 
-export async function apagarDoBlob(caminho: string): Promise<void> {
+export async function apagarDoBlob(caminho: string | string[]): Promise<void> {
   await del(caminho);
 }

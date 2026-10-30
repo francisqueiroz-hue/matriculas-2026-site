@@ -1,5 +1,7 @@
+import { textoPadraoDoArquivo } from "@/lib/anexo-envio";
+
 /**
- * Rótulos dos anexos de mensagens (fotos, documentos... recebidos pelo WhatsApp). Sem
+ * Rótulos dos anexos de mensagens (fotos, documentos... recebidos pelo WhatsApp ou enviados pelo app). Sem
  * dependências de servidor: usado também na tela da conversa.
  */
 export type TipoAnexo = "image" | "sticker" | "document" | "audio" | "video";
@@ -29,9 +31,10 @@ export function textoPadraoDaMidia(tipo: string): string {
   return `${rotuloDoAnexo(tipo)} ${RECEBIDO[tipo as TipoAnexo] ?? "recebido"} pelo WhatsApp`;
 }
 
-/** O corpo da mensagem é só o texto padrão (a família não escreveu legenda)? */
+/** O corpo da mensagem é só o texto padrão (ninguém escreveu legenda)? */
 export function semLegenda(body: string, tipo: string): boolean {
-  return body.trim() === textoPadraoDaMidia(tipo);
+  const texto = body.trim();
+  return texto === textoPadraoDaMidia(tipo) || ((tipo === "document" || tipo === "image") && texto === textoPadraoDoArquivo(tipo));
 }
 
 /** Aviso para quando o arquivo não pôde ser baixado do WhatsApp. */

@@ -7,13 +7,44 @@ import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { assertConversationParticipant } from "@/lib/messaging";
 import { exigirPodeConversar, exigirPodeExcluirConversa } from "@/lib/permissoes-mensagens";
-import { sendMessageSchema } from "@/lib/validators";
+import { sendMessageComAnexoSchema } from "@/lib/validators";
+import { textoPadraoDoArquivo } from "@/lib/anexo-envio";
+import { conferirAnexoEnviadoDireto, guardarAnexoDoFormulario, type AnexoRecebido } from "@/lib/anexo-envio-server";
+import { apagarDoBlob } from "@/lib/blob-storage";
 import { notifyUsers } from "@/lib/push";
 import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTemplateMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { isEmailConfigured, sendEmailMessage } from "@/lib/email";
 import { MENSAGEM_JANELA_FECHADA, janelaWhatsApp } from "@/lib/canal-envio";
 import { SELECT_PESSOA, nomeParaQuemVe, pessoaParaQuemVe } from "@/lib/nome-institucional";
-import { getShortSignedMediaUrl } from "@/lib/firebase-storage";
+import { getShortSignedMediaUrl, provedorDeMidia } from "@/lib/firebase-storage";
+
+/**
+ * Lê o pedido de envio: JSON (texto e, opcionalmente, o caminho de um arquivo grande já enviado
+ * direto ao armazenamento) ou multipart (texto + arquivo até 4 MB, no campo "file").
+ */
+async function lerEnvio(request: NextRequest, escolaId: string, conversaId: string) {
+  if (request.headers.get("content-type")?.includes("multipart/form-data")) {
+    const form = await request.formData();
+    const { body, channel } = sendMessageComAnexoSchema.parse({
+      body: form.get("body") ?? undefined,
+      channel: form.get("channel") ?? undefined,
+    });
+    const arquivo = form.get("file");
+    const anexo = arquivo instanceof File ? await guardarAnexoDoFormulario(arquivo, escolaId, conversaId) : null;
+    return { body, channel, anexo };
+  }
+  const { body, channel, anexo } = sendMessageComAnexoSchema.parse(await request.json());
+  return {
+    body,
+    channel,
+    anexo: anexo ? await conferirAnexoEnviadoDireto(anexo.path, anexo.nome, escolaId, conversaId) : null,
+  };
+}
+
+/** Arquivo guardado mas mensagem não gravada: não deixa o arquivo solto no armazenamento. */
+async function descartarAnexo(anexo: AnexoRecebido | null) {
+  if (anexo && provedorDeMidia() === "blob") await apagarDoBlob(anexo.caminho).catch(() => undefined);
+}
 
 type MensagemComAnexo = {
   anexoTipo: string | null;
@@ -93,12 +124,17 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     const conversation = await assertConversationParticipant(id, session.sub);
     // Regra da escola: família ↔ direção/coordenação apenas (inclusive conversas antigas).
     await exigirPodeConversar(conversation.staffId, conversation.guardianId);
-    const { body, channel } = sendMessageSchema.parse(await request.json());
+    const envio = await lerEnvio(request, session.schoolId, id);
+    const { channel, anexo } = envio;
+    const body = envio.body.trim() || (anexo ? textoPadraoDoArquivo(anexo.tipo) : "");
+    if (!body) return NextResponse.json({ error: "Escreva a mensagem ou anexe um arquivo." }, { status: 400 });
 
     // WhatsApp/e-mail só fazem sentido enviados pela equipe ao responsável — o responsável
     // já está na conversa via app, e essas mensagens sempre partem de quem está na tela do ClassLink.
+    // Arquivos (declarações, documentos) ficam sempre no ClassLink: o armazenamento é privado e
+    // só quem participa da conversa abre (LGPD); a família recebe a notificação do app.
     let canalEfetivo: "APP" | "WHATSAPP" | "EMAIL" =
-      channel && channel !== "APP" && session.sub === conversation.staffId ? channel : "APP";
+      channel && channel !== "APP" && session.sub === conversation.staffId && !anexo ? channel : "APP";
 
     let externalId: string | undefined;
     let avisoPeloWhatsApp = false;
@@ -147,10 +183,22 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
       externalId = sent.externalId;
     }
 
-    const message = await prisma.message.create({
-      data: { conversationId: id, senderId: session.sub, body, channel: canalEfetivo, externalId },
-      include: { sender: { select: SELECT_PESSOA } },
-    });
+    const message = await prisma.message
+      .create({
+        data: {
+          conversationId: id,
+          senderId: session.sub,
+          body,
+          channel: canalEfetivo,
+          externalId,
+          ...(anexo && { anexoTipo: anexo.tipo, anexoMime: anexo.mime, anexoNome: anexo.nome, anexoCaminho: anexo.caminho }),
+        },
+        include: { sender: { select: SELECT_PESSOA } },
+      })
+      .catch(async (e) => {
+        await descartarAnexo(anexo);
+        throw e;
+      });
 
     const recipientId = conversation.staffId === session.sub ? conversation.guardianId : conversation.staffId;
     // Depois da resposta (after): na Vercel, trabalho solto com "void" pode ser cortado.
@@ -194,7 +242,18 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/mess
     const { id } = await ctx.params;
     await assertConversationParticipant(id, session.sub);
     await exigirPodeExcluirConversa(session.sub);
+    const comArquivo = await prisma.message.findMany({
+      where: { conversationId: id, anexoCaminho: { not: null } },
+      select: { anexoCaminho: true },
+    });
     await prisma.conversation.delete({ where: { id } });
+    // Conversa excluída: os arquivos dela (documentos da família) também saem do armazenamento.
+    if (provedorDeMidia() === "blob" && comArquivo.length > 0) {
+      after(async () => {
+        const caminhos = comArquivo.flatMap((m) => (m.anexoCaminho ? [m.anexoCaminho] : []));
+        await apagarDoBlob(caminhos).catch((err) => console.error("conversa: falha ao apagar arquivos", err));
+      });
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     return handleApiError(error);
