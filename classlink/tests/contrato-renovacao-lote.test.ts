@@ -38,8 +38,8 @@ beforeEach(() => {
   prismaMock.contratoConfig.findUnique.mockResolvedValue(null);
   prismaMock.contrato.findMany.mockResolvedValue([]);
   prismaMock.student.findMany.mockResolvedValue([
-    { id: "a1", name: "Lia", mensalidadeValor: "2500.00", class: { name: "Maternal" } },
-    { id: "a2", name: "Rui", mensalidadeValor: null, class: { name: "Maternal" } },
+    { id: "a1", name: "Lia", mensalidadeValor: "2500.00", bolsista: false, class: { name: "Maternal" } },
+    { id: "a2", name: "Rui", mensalidadeValor: null, bolsista: false, class: { name: "Maternal" } },
   ]);
   prismaMock.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx));
   tx.contrato.create.mockResolvedValue({ id: "c1" });
@@ -58,5 +58,14 @@ describe("envio da renovação com correção", () => {
     expect(condicoes.parcelaLiquida).toBe(2730);
     expect(condicoes.reajuste).toEqual({ valorAnterior: 2500, base: "BRUTA", percentual: 9.2 });
     expect(tx.contrato.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("bolsista não bloqueia: contrato sem parcelas e com a isenção", async () => {
+    prismaMock.student.findMany.mockResolvedValue([{ id: "a2", name: "Rui", mensalidadeValor: null, bolsista: true, class: { name: "Maternal" } }]);
+    const res = await POST(req({ ...corpo, itens: [{ studentId: "a2", etapa: "EI" }] }));
+    const json = await res.json();
+    expect(json.ignorados).toEqual([]);
+    const condicoes = tx.contrato.create.mock.calls[0][0].data.condicoes;
+    expect(condicoes).toMatchObject({ bolsista: true, parcelaBruta: 0, parcelaLiquida: 0, reajuste: null });
   });
 });

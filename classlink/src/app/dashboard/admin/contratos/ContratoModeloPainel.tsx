@@ -28,6 +28,8 @@ interface AlunoOpcao {
   class: { id: string; name: string };
   /** Mensalidade atual cadastrada no financeiro (Decimal chega como texto). */
   mensalidadeValor: string | number | null;
+  /** Isento de mensalidade: o contrato sai sem parcelas. */
+  bolsista?: boolean;
 }
 
 interface RespostaConfig {
@@ -349,6 +351,7 @@ function LinhaRenovacao({
   const atual = mensalidadeAtual(aluno);
   const novo = valores ? (base === "LIQUIDA" ? valores.parcelaLiquida : valores.parcelaBruta) : undefined;
   const [texto, setTexto] = useState("");
+  if (aluno.bolsista) return <span className="text-xs font-medium text-slate-700">Bolsista: contrato sem parcelas (isento)</span>;
   if (!(atual > 0)) {
     return <span className="text-xs font-medium text-red-700">Sem mensalidade no cadastro: preencha em Alunos antes de enviar</span>;
   }
@@ -432,7 +435,7 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
     return { ...valoresComReajuste(mensalidadeAtual(a), criterio), manual: false };
   }
   // Renovação exige a mensalidade no cadastro do aluno: sem ela o envio fica bloqueado.
-  const semMensalidade = comReajuste ? marcados.filter((a) => !(mensalidadeAtual(a) > 0)) : [];
+  const semMensalidade = comReajuste ? marcados.filter((a) => !a.bolsista && !(mensalidadeAtual(a) > 0)) : [];
 
   function marcarTurma(lista: AlunoOpcao[], valor: boolean) {
     setLinhas((l) => {
@@ -549,7 +552,7 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
                   <a href="/dashboard/admin/alunos" className="font-semibold underline">
                     Alunos
                   </a>{" "}
-                  (ou desmarque esses alunos) e volte para enviar.
+                  ou marque como isento (bolsista), ou desmarque esses alunos, e volte para enviar.
                 </p>
               </div>
             )}

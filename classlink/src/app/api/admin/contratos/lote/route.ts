@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const [alunos, existentes] = await Promise.all([
       prisma.student.findMany({
         where: { id: { in: ids }, schoolId: session.schoolId, deletedAt: null },
-        select: { id: true, name: true, mensalidadeValor: true, class: { select: { name: true } } },
+        select: { id: true, name: true, mensalidadeValor: true, bolsista: true, class: { select: { name: true } } },
       }),
       prisma.contrato.findMany({
         where: { schoolId: session.schoolId, anoLetivo: body.anoLetivo, modelo: MODELO_CONTRATO_2027, studentId: { in: ids } },
@@ -66,8 +66,9 @@ export async function POST(request: NextRequest) {
         ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: `Já tem contrato ${body.anoLetivo} do modelo do app` });
         continue;
       }
-      // Renovação com correção exige a mensalidade no cadastro: nada de valor da tabela no lugar.
-      if (body.reajuste && !(Number(aluno.mensalidadeValor ?? 0) > 0)) {
+      // Renovação com correção exige a mensalidade no cadastro (ou a isenção de bolsista):
+      // nada de valor da tabela no lugar.
+      if (body.reajuste && !aluno.bolsista && !(Number(aluno.mensalidadeValor ?? 0) > 0)) {
         ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: "Mensalidade não cadastrada — preencha no cadastro do aluno antes de enviar" });
         continue;
       }
@@ -78,7 +79,8 @@ export async function POST(request: NextRequest) {
       const corrigido = body.reajuste ? valoresComReajuste(valorAnterior, body.reajuste) : null;
       const parcelaBruta = item.parcelaBruta ?? corrigido?.parcelaBruta ?? periodo?.parcelaBruta ?? 0;
       const parcelaLiquida = item.parcelaLiquida ?? corrigido?.parcelaLiquida ?? periodo?.parcelaLiquida ?? 0;
-      const valoresOk = parcelaBruta > 0 && parcelaLiquida > 0 && parcelaLiquida <= parcelaBruta;
+      // Bolsista: contrato sem parcelas, com a isenção escrita no quadro de valores.
+      const valoresOk = !aluno.bolsista && parcelaBruta > 0 && parcelaLiquida > 0 && parcelaLiquida <= parcelaBruta;
       const reajuste: ReajusteContrato | null =
         valoresOk && body.reajuste && valorAnterior > 0 && (corrigido || item.parcelaBruta !== undefined)
           ? {
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest) {
         parcelaLiquida: valoresOk ? parcelaLiquida : 0,
         config,
         reajuste,
+        bolsista: aluno.bolsista,
       };
       const pdf = await gerarContrato2027({ condicoes, familia: null, aluno: { nome: aluno.name }, data: null });
       const sha256 = sha256Hex(pdf);
@@ -137,6 +140,7 @@ export async function POST(request: NextRequest) {
             detalhe: [
               "Modelo do app",
               periodo?.nome,
+              aluno.bolsista && "Bolsista (isento de mensalidade)",
               reajuste &&
                 `Renovação: R$ ${formatarDinheiro(reajuste.valorAnterior)} → R$ ${formatarDinheiro(reajuste.base === "LIQUIDA" ? parcelaLiquida : parcelaBruta)} (${reajuste.percentual.toLocaleString("pt-BR")}%)`,
             ]

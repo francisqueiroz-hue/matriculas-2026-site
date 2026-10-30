@@ -27,6 +27,8 @@ interface StudentItem {
   guardians: { guardian: { id: string; name: string; email: string | null; phone: string | null } }[];
   mensalidadeValor: string | null;
   diaVencimento: number | null;
+  /** Isento de mensalidade (bolsa integral). */
+  bolsista: boolean;
 }
 
 function AlunosContent() {
@@ -42,7 +44,8 @@ function AlunosContent() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [semelhantes, setSemelhantes] = useState<Record<string, Semelhante[]>>({});
   // Link wa.me com a mensagem de acesso, para a escola enviar do próprio WhatsApp.
-  const [billingForms, setBillingForms] = useState<Record<string, { mensalidadeValor: string; diaVencimento: string }>>({});
+  const [billingForms, setBillingForms] = useState<Record<string, { mensalidadeValor: string; diaVencimento: string; bolsista: boolean }>>({});
+  const [marcandoBolsistas, setMarcandoBolsistas] = useState(false);
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
   const [editGuardianName, setEditGuardianName] = useState("");
   const [editGuardianPhone, setEditGuardianPhone] = useState("");
@@ -273,6 +276,7 @@ function AlunosContent() {
       billingForms[student.id] ?? {
         mensalidadeValor: student.mensalidadeValor ?? "",
         diaVencimento: student.diaVencimento ? String(student.diaVencimento) : "",
+        bolsista: student.bolsista,
       }
     );
   }
@@ -284,14 +288,41 @@ function AlunosContent() {
       await apiJson(`/api/admin/students/${studentId}/billing`, {
         method: "PUT",
         body: JSON.stringify({
-          mensalidadeValor: form.mensalidadeValor ? Number(form.mensalidadeValor) : null,
+          mensalidadeValor: !form.bolsista && form.mensalidadeValor ? Number(form.mensalidadeValor) : null,
           diaVencimento: form.diaVencimento ? Number(form.diaVencimento) : null,
+          bolsista: form.bolsista,
         }),
       });
-      setFeedback((prev) => ({ ...prev, [studentId]: "Mensalidade atualizada." }));
+      setBillingForms((prev) => {
+        const resto = { ...prev };
+        delete resto[studentId];
+        return resto;
+      });
+      setFeedback((prev) => ({ ...prev, [studentId]: form.bolsista ? "Marcado como isento (bolsista)." : "Mensalidade atualizada." }));
       load();
     } catch (err) {
       setFeedback((prev) => ({ ...prev, [studentId]: err instanceof Error ? err.message : "Erro ao salvar mensalidade" }));
+    }
+  }
+
+  // Alunos sem mensalidade lançada e ainda não marcados como isentos.
+  const semMensalidade = (students ?? []).filter((s) => !s.bolsista && !s.mensalidadeValor);
+
+  async function marcarSemMensalidadeComoBolsistas() {
+    if (semMensalidade.length === 0) return;
+    if (!confirm(`Marcar ${semMensalidade.length} aluno(s) sem mensalidade como isentos (bolsistas)? Eles deixam de gerar boleto e o contrato de renovação sai sem parcelas. Fica registrado no histórico de cada aluno.`)) return;
+    setMarcandoBolsistas(true);
+    try {
+      const r = await apiJson<{ marcados: number; ignorados: number }>("/api/admin/students/bolsistas", {
+        method: "POST",
+        body: JSON.stringify({ studentIds: semMensalidade.map((s) => s.id) }),
+      });
+      setAviso(`${r.marcados} aluno(s) marcado(s) como isentos (bolsistas).${r.ignorados ? ` ${r.ignorados} não marcado(s): já tinham mensalidade ou isenção.` : ""}`);
+      load();
+    } catch (err) {
+      setAviso(err instanceof Error ? err.message : "Erro ao marcar bolsistas");
+    } finally {
+      setMarcandoBolsistas(false);
     }
   }
 
@@ -337,6 +368,22 @@ function AlunosContent() {
         <p className="rounded-md bg-slate-100 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200" role="status">
           {aviso}
         </p>
+      )}
+
+      {semMensalidade.length > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          <p className="font-semibold">{semMensalidade.length} aluno(s) sem mensalidade lançada</p>
+          <p className="mt-1">{semMensalidade.map((s) => s.name).join(", ")}</p>
+          <p className="mt-1">Lance a mensalidade de cada um abaixo ou, se forem bolsistas, marque todos como isentos de uma vez.</p>
+          <button
+            type="button"
+            disabled={marcandoBolsistas}
+            onClick={marcarSemMensalidadeComoBolsistas}
+            className="mt-2 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold hover:bg-amber-100 disabled:opacity-60 dark:border-amber-700 dark:bg-slate-900"
+          >
+            {marcandoBolsistas ? "Marcando…" : `Marcar os ${semMensalidade.length} como isentos (bolsistas)`}
+          </button>
+        </div>
       )}
 
       <ul className="space-y-3">
@@ -563,7 +610,8 @@ function AlunosContent() {
                     type="number"
                     min={0}
                     step="0.01"
-                    value={billingForm(s).mensalidadeValor}
+                    disabled={billingForm(s).bolsista}
+                    value={billingForm(s).bolsista ? "" : billingForm(s).mensalidadeValor}
                     onChange={(e) =>
                       setBillingForms((prev) => ({ ...prev, [s.id]: { ...billingForm(s), mensalidadeValor: e.target.value } }))
                     }
@@ -583,6 +631,15 @@ function AlunosContent() {
                     }
                     className="mt-1 block w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
                   />
+                </label>
+                <label className="flex min-h-9 items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={billingForm(s).bolsista}
+                    onChange={(e) => setBillingForms((prev) => ({ ...prev, [s.id]: { ...billingForm(s), bolsista: e.target.checked } }))}
+                    className="h-4 w-4"
+                  />
+                  Isento de mensalidade (bolsista)
                 </label>
                 <button type="submit" className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">
                   Salvar mensalidade

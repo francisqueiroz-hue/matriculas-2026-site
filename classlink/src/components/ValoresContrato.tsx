@@ -8,6 +8,14 @@ const brl = (v: number) => `R$ ${formatarDinheiro(v)}`;
  * a família vê apenas os valores do novo contrato.
  */
 export function ValoresContrato({ valores, ano, mostrarCorrecao = false }: { valores: Valores; ano: number; mostrarCorrecao?: boolean }) {
+  if (valores.bolsista) {
+    return (
+      <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+        <p className="font-semibold text-slate-900">Valores {ano}</p>
+        <p className="mt-1">Bolsa integral: isento(a) de mensalidade em {ano}.</p>
+      </div>
+    );
+  }
   const r = mostrarCorrecao ? valores.reajuste : null;
   const novo = r ? (r.base === "LIQUIDA" ? valores.parcelaLiquida : valores.parcelaBruta) : 0;
   const temDesconto = valores.parcelaLiquida < valores.parcelaBruta;

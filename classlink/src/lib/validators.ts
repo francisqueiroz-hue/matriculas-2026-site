@@ -152,6 +152,13 @@ export const responderComunicadoSchema = z.object({
 export const setMensalidadeSchema = z.object({
   mensalidadeValor: z.number().min(0).max(1_000_000).nullable(),
   diaVencimento: z.number().int().min(1).max(28).nullable().optional(),
+  // Isento (bolsista): a mensalidade é apagada. Ausente = não muda.
+  bolsista: z.boolean().optional(),
+});
+
+/** Marca como isentos (bolsistas) os alunos escolhidos que ainda não têm mensalidade lançada. */
+export const marcarBolsistasSchema = z.object({
+  studentIds: z.array(z.string().min(1)).min(1, "Escolha pelo menos um aluno").max(500),
 });
 
 export const setBillingInfoSchema = z.object({

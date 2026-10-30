@@ -54,6 +54,8 @@ export interface CondicoesContrato {
   config: ConfigContrato;
   /** Valor da renovação calculado a partir da mensalidade atual do aluno; ausente = tabela do período. */
   reajuste?: ReajusteContrato | null;
+  /** Aluno isento de mensalidade (bolsa integral): o contrato sai sem parcelas, com a isenção escrita. */
+  bolsista?: boolean;
 }
 
 /** A mensalidade cadastrada do aluno é a parcela paga até o vencimento ou a parcela cheia. */
@@ -275,12 +277,18 @@ export interface ValoresContrato {
   parcelaLiquida: number;
   anuidade: number;
   reajuste: ReajusteContrato | null;
+  bolsista: boolean;
 }
 
-/** Lê as condições guardadas no contrato; null quando o contrato saiu sem valores. */
+/** Lê as condições guardadas no contrato; null quando o contrato saiu sem valores (nem isenção). */
 export function valoresDoContrato(condicoes: unknown): ValoresContrato | null {
   const c = condicoes as Partial<CondicoesContrato> | null;
-  if (!c || !(Number(c.parcelaBruta) > 0) || !c.config?.parcelas) return null;
+  if (!c || !c.config?.parcelas) return null;
+  if (c.bolsista) {
+    const { quantidade, vencimentoDia } = c.config.parcelas;
+    return { parcelas: quantidade, vencimentoDia, parcelaBruta: 0, parcelaLiquida: 0, anuidade: 0, reajuste: null, bolsista: true };
+  }
+  if (!(Number(c.parcelaBruta) > 0)) return null;
   const quantidade = c.config.parcelas.quantidade;
   const r = c.reajuste;
   return {
@@ -290,5 +298,6 @@ export function valoresDoContrato(condicoes: unknown): ValoresContrato | null {
     parcelaLiquida: Number(c.parcelaLiquida),
     anuidade: calcularValores({ parcelaBruta: Number(c.parcelaBruta), parcelaLiquida: Number(c.parcelaLiquida), quantidade }).anuidade,
     reajuste: r && r.valorAnterior > 0 ? { valorAnterior: r.valorAnterior, percentual: r.percentual, base: r.base } : null,
+    bolsista: false,
   };
 }

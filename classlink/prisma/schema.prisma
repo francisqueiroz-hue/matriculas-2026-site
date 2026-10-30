@@ -291,6 +291,9 @@ model Student {
   // Módulo financeiro simplificado (Módulo Boleto — Banco Inter)
   mensalidadeValor Decimal? @db.Decimal(10, 2)
   diaVencimento    Int? // sobrepõe School.diaVencimentoPadrao quando definido
+  // Isento de mensalidade (bolsa integral): sem boleto e contrato de renovação sem parcelas.
+  // Marcado só pela Administração; a mudança fica no histórico de cadastro.
+  bolsista         Boolean  @default(false)
 
   guardians              GuardianStudent[]
   attendances            Attendance[]

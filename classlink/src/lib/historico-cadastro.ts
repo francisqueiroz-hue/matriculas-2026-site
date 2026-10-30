@@ -16,6 +16,8 @@ export const ROTULO_CAMPO: Record<string, string> = {
   nome: "Nome",
   turma: "Turma",
   nascimento: "Data de nascimento",
+  mensalidade: "Mensalidade (R$)",
+  bolsista: "Isento de mensalidade (bolsista)",
 };
 
 /**
@@ -40,5 +42,25 @@ export function alteracoesAluno(antes: DadosAluno, depois: DadosAluno): Alteraca
   }
   const [nascAntes, nascDepois] = [dataIso(antes.nascimento), dataIso(depois.nascimento)];
   if (nascAntes !== nascDepois) alteracoes.push({ campo: "nascimento", valorAnterior: nascAntes, valorNovo: nascDepois });
+  return alteracoes;
+}
+
+/** Dados financeiros do aluno guardados no histórico (mensalidade em "1234.56"; bolsista "Sim"/"Não"). */
+export interface FinanceiroAluno {
+  mensalidade: number | null;
+  bolsista: boolean;
+}
+
+const valorTexto = (v: number | null) => (v === null ? null : v.toFixed(2));
+const simNao = (b: boolean) => (b ? "Sim" : "Não");
+
+export function alteracoesFinanceiro(antes: FinanceiroAluno, depois: FinanceiroAluno): AlteracaoCampo[] {
+  const alteracoes: AlteracaoCampo[] = [];
+  if (valorTexto(antes.mensalidade) !== valorTexto(depois.mensalidade)) {
+    alteracoes.push({ campo: "mensalidade", valorAnterior: valorTexto(antes.mensalidade), valorNovo: valorTexto(depois.mensalidade) });
+  }
+  if (antes.bolsista !== depois.bolsista) {
+    alteracoes.push({ campo: "bolsista", valorAnterior: simNao(antes.bolsista), valorNovo: simNao(depois.bolsista) });
+  }
   return alteracoes;
 }

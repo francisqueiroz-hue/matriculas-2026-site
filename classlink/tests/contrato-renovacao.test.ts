@@ -83,8 +83,14 @@ describe("valor da renovação com correção", () => {
       parcelaLiquida: 2730,
       anuidade: 32760,
       reajuste: { valorAnterior: 2500, percentual: 9.2, base: "BRUTA" },
+      bolsista: false,
     });
     expect(valoresDoContrato({ ...condicoes, parcelaBruta: 0 })).toBeNull();
+    expect(valoresDoContrato({ ...condicoes, parcelaBruta: 0, parcelaLiquida: 0, reajuste: null, bolsista: true })).toMatchObject({
+      bolsista: true,
+      anuidade: 0,
+      reajuste: null,
+    });
     expect(valoresDoContrato(null)).toBeNull();
   });
 
@@ -108,5 +114,25 @@ describe("valor da renovação com correção", () => {
     });
     const doc = await PDFDocument.load(pdf);
     expect(doc.getPageCount()).toBeGreaterThan(1);
+  });
+
+  it("gera o PDF de bolsista sem erro", async () => {
+    const pdf = await gerarContrato2027({
+      condicoes: {
+        modelo: MODELO_CONTRATO_2027,
+        anoLetivo: 2027,
+        etapa: "EI",
+        turma: "Maternal",
+        periodo: null,
+        parcelaBruta: 0,
+        parcelaLiquida: 0,
+        config: configInicial(),
+        bolsista: true,
+      },
+      familia: null,
+      aluno: { nome: "Aluno Bolsista" },
+      data: null,
+    });
+    expect((await PDFDocument.load(pdf)).getPageCount()).toBeGreaterThan(1);
   });
 });
