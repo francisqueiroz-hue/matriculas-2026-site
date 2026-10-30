@@ -66,6 +66,11 @@ export async function POST(request: NextRequest) {
         ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: `Já tem contrato ${body.anoLetivo} do modelo do app` });
         continue;
       }
+      // Renovação com correção exige a mensalidade no cadastro: nada de valor da tabela no lugar.
+      if (body.reajuste && !(Number(aluno.mensalidadeValor ?? 0) > 0)) {
+        ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: "Mensalidade não cadastrada — preencha no cadastro do aluno antes de enviar" });
+        continue;
+      }
       // Ordem: ajuste individual > mensalidade atual corrigida > tabela do período. Valores só
       // entram se fizerem sentido; senão saem em branco para preencher à mão.
       const periodo = item.periodo ? config.periodos.find((p) => p.chave === item.periodo) : undefined;
