@@ -30,7 +30,7 @@ function configCompleta(): ConfigContrato {
     redesSociais: "@exemplo",
   };
   c.periodos = c.periodos.map((p, i) => ({ ...p, parcelaBruta: 3000 - i * 500, parcelaLiquida: 2800 - i * 500 }));
-  c.parcelas = { quantidade: 12, vencimentoDia: 10, primeiroUltimo: "10/01/2027 a 10/12/2027", periodoAnuidade: "janeiro a dezembro de 2027" };
+  c.parcelas = { quantidade: 12, vencimentoDia: 5, primeiroUltimo: "05/01/2027 a 05/12/2027", periodoAnuidade: "janeiro a dezembro de 2027" };
   c.horaExcedente = { valor: 50, unidade: "hora", fracionamento: "frações de 30 minutos", tolerancia: "15 minutos" };
   return c;
 }

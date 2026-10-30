@@ -165,7 +165,7 @@ async function main() {
   await prisma.student.update({ where: { id: aluno.id }, data: { mensalidadeValor: 450 } });
   await prisma.school.update({
     where: { id: school.id },
-    data: { diaVencimentoPadrao: 10, diaEmissaoBoletos: 1 },
+    data: { diaVencimentoPadrao: 5, diaEmissaoBoletos: 1 },
   });
 
   console.log("Seed concluído.");

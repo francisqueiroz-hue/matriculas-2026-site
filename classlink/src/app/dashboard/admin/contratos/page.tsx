@@ -32,7 +32,7 @@ interface Arquivo {
 
 interface Evento {
   id: string;
-  tipo: "CRIADO" | "DADOS_PREENCHIDOS" | "ASSINADO_ENVIADO" | "DEVOLVIDO" | "CONFERIDO" | "ORIGINAL_RECEBIDO";
+  tipo: "CRIADO" | "DADOS_PREENCHIDOS" | "CONDICOES_ATUALIZADAS" | "ASSINADO_ENVIADO" | "DEVOLVIDO" | "CONFERIDO" | "ORIGINAL_RECEBIDO";
   ipOrigem: string | null;
   arquivoSha256: string | null;
   detalhe: string | null;
@@ -88,6 +88,7 @@ const PRIORIDADE: Record<ContratoStatus, number> = {
 const EVENTO_LABEL: Record<Evento["tipo"], string> = {
   CRIADO: "Contrato enviado à família",
   DADOS_PREENCHIDOS: "Família preencheu os dados no app (contrato gerado preenchido)",
+  CONDICOES_ATUALIZADAS: "Escola corrigiu as condições (contrato gerado novamente)",
   ASSINADO_ENVIADO: "Família enviou o contrato assinado",
   DEVOLVIDO: "Devolvido para correção",
   CONFERIDO: "Conferido e aprovado",

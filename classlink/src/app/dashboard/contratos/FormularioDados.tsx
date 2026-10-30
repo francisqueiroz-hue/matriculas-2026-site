@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiJson } from "@/lib/api-client";
 import { dadosFamiliaSchema } from "@/lib/contrato-modelo/validacao";
-import { formatarDinheiro, LINHAS_ANEXO_IMAGEM, type DadosFamilia, type EscolhaImagem, type Pessoa } from "@/lib/contrato-modelo/tipos";
+import { diaDoMes, formatarDinheiro, LINHAS_ANEXO_IMAGEM, type DadosFamilia, type EscolhaImagem, type Pessoa } from "@/lib/contrato-modelo/tipos";
 
 interface Resumo {
   aluno: string;
@@ -239,7 +239,7 @@ export function FormularioDados({ contratoId, onGerado, onCancelar }: { contrato
               <dd>
                 R$ {formatarDinheiro(resumo.anuidade)} em {resumo.parcelas} parcelas de R$ {formatarDinheiro(resumo.parcelaBruta)}
               </dd>
-              <dt className="text-slate-500">Até o dia {resumo.vencimentoDia}</dt>
+              <dt className="text-slate-500">Até o dia {diaDoMes(resumo.vencimentoDia)}</dt>
               <dd>
                 R$ {formatarDinheiro(resumo.parcelaLiquida)} por parcela (desconto de R$ {formatarDinheiro(resumo.descontoValor)})
               </dd>

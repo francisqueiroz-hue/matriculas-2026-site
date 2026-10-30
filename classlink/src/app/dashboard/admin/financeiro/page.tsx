@@ -62,7 +62,6 @@ function FinanceiroContent() {
   const [cobrancas, setCobrancas] = useState<Cobranca[] | null>(null);
   const [erroCobrancas, setErroCobrancas] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [diaVencimento, setDiaVencimento] = useState("");
   const [diaEmissao, setDiaEmissao] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -79,7 +78,6 @@ function FinanceiroContent() {
       .catch(() => setErroCobrancas(true));
     apiJson<Summary>("/api/admin/billing/summary").then(setSummary);
     apiJson<Config>("/api/admin/billing/config").then((data) => {
-      setDiaVencimento(data.diaVencimentoPadrao ? String(data.diaVencimentoPadrao) : "");
       setDiaEmissao(data.diaEmissaoBoletos ? String(data.diaEmissaoBoletos) : "");
     });
   }
@@ -126,7 +124,6 @@ function FinanceiroContent() {
       await apiJson("/api/admin/billing/config", {
         method: "PUT",
         body: JSON.stringify({
-          diaVencimentoPadrao: diaVencimento ? Number(diaVencimento) : undefined,
           diaEmissaoBoletos: diaEmissao ? Number(diaEmissao) : undefined,
         }),
       });
@@ -144,17 +141,10 @@ function FinanceiroContent() {
       <form onSubmit={salvarConfig} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-500">Configuração de cobrança</h2>
         <div className="flex flex-wrap gap-4">
-          <label className="text-sm">
-            Dia de vencimento padrão
-            <input
-              type="number"
-              min={1}
-              max={28}
-              value={diaVencimento}
-              onChange={(e) => setDiaVencimento(e.target.value)}
-              className="mt-1 block w-24 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
-            />
-          </label>
+          <p className="text-sm">
+            Dia de vencimento
+            <span className="mt-1 block py-2 font-medium">Dia 05 (fixo para todos os alunos)</span>
+          </p>
           <label className="text-sm">
             Dia de emissão dos boletos
             <input

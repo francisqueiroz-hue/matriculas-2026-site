@@ -4,9 +4,10 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { setMensalidadeSchema } from "@/lib/validators";
 import { alteracoesFinanceiro } from "@/lib/historico-cadastro";
+import { DIA_VENCIMENTO_PADRAO } from "@/lib/billing";
 
 /**
- * Configura o valor de mensalidade (e opcionalmente o dia de vencimento) de um aluno específico,
+ * Configura o valor de mensalidade de um aluno específico (o vencimento é sempre dia 05),
  * ou marca o aluno como isento (bolsista), o que apaga a mensalidade. Mudanças de mensalidade e
  * de isenção ficam no histórico de cadastro.
  */
@@ -36,7 +37,7 @@ export async function PUT(request: NextRequest, ctx: RouteContext<"/api/admin/st
         data: {
           mensalidadeValor,
           bolsista,
-          ...(body.diaVencimento !== undefined ? { diaVencimento: body.diaVencimento } : {}),
+          diaVencimento: DIA_VENCIMENTO_PADRAO,
         },
         select: { id: true, mensalidadeValor: true, diaVencimento: true, bolsista: true },
       });

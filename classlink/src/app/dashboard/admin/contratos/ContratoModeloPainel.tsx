@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiJson } from "@/lib/api-client";
 import {
+  DIA_VENCIMENTO_MENSALIDADE,
   calcularValores,
+  diaDoMes,
   etapaPelaTurma,
   formatarDinheiro,
   valoresComReajuste,
@@ -185,15 +187,10 @@ function Configuracao({ ano }: { ano: number }) {
           <label htmlFor="parc-dia" className={rotulo}>
             Dia do vencimento
           </label>
-          <input
-            id="parc-dia"
-            type="number"
-            min={1}
-            max={31}
-            value={cfg.parcelas.vencimentoDia}
-            onChange={(e) => setCfg({ ...cfg, parcelas: { ...cfg.parcelas, vencimentoDia: Number(e.target.value) } })}
-            className={campo}
-          />
+          <input id="parc-dia" value={`Dia ${diaDoMes(DIA_VENCIMENTO_MENSALIDADE)} de cada mês`} readOnly aria-describedby="parc-dia-dica" className={`${campo} bg-slate-50 text-slate-700`} />
+          <p id="parc-dia-dica" className="mt-1 text-xs text-slate-500">
+            Fixo: as mensalidades vencem sempre no dia {diaDoMes(DIA_VENCIMENTO_MENSALIDADE)}.
+          </p>
         </div>
         <div>
           <label htmlFor="parc-pu" className={rotulo}>
@@ -201,7 +198,7 @@ function Configuracao({ ano }: { ano: number }) {
           </label>
           <input
             id="parc-pu"
-            placeholder="10/01/2027 a 10/12/2027"
+            placeholder="05/01/2027 a 05/12/2027"
             value={cfg.parcelas.primeiroUltimo}
             onChange={(e) => setCfg({ ...cfg, parcelas: { ...cfg.parcelas, primeiroUltimo: e.target.value } })}
             className={campo}
@@ -666,6 +663,51 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
 }
 
 /**
+ * Contratos já enviados com outro dia de vencimento: corrige para o dia 05 os que a família
+ * ainda não assinou (gera o PDF de novo e avisa a família). Os já assinados não mudam.
+ */
+function CorrigirVencimento({ onCorrigido }: { onCorrigido: () => void }) {
+  const [rodando, setRodando] = useState(false);
+  const [msg, setMsg] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
+  const dia = diaDoMes(DIA_VENCIMENTO_MENSALIDADE);
+
+  async function corrigir() {
+    if (!window.confirm(`Atualizar para o vencimento dia ${dia} os contratos ainda não assinados? As famílias recebem um aviso para assinar a versão nova.`)) return;
+    setRodando(true);
+    setMsg(null);
+    try {
+      const r = await apiJson<{ corrigidos: { id: string; nome: string }[]; total: number }>("/api/admin/contratos/vencimento", { method: "POST" });
+      setMsg({
+        tipo: "ok",
+        texto: r.total > 0 ? `${r.total} contrato(s) atualizado(s): ${r.corrigidos.map((c) => c.nome).join(", ")}.` : `Nenhum contrato pendente com outro dia de vencimento.`,
+      });
+      if (r.total > 0) onCorrigido();
+    } catch (err) {
+      setMsg({ tipo: "erro", texto: err instanceof Error ? err.message : "Erro ao atualizar os contratos" });
+    } finally {
+      setRodando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700">
+      <p>
+        As mensalidades vencem sempre no <strong>dia {dia}</strong>. Contratos enviados antes com outro dia e ainda não assinados podem ser
+        atualizados aqui; os já assinados não mudam.
+      </p>
+      <button type="button" onClick={corrigir} disabled={rodando} className={btnSecundario}>
+        {rodando ? "Atualizando…" : `Atualizar contratos pendentes para o dia ${dia}`}
+      </button>
+      {msg && (
+        <p role={msg.tipo === "erro" ? "alert" : "status"} className={msg.tipo === "erro" ? "text-red-700" : "font-medium text-emerald-800"}>
+          {msg.texto}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
  * Contrato guardado no app: a escola envia pronto para assinar (nome e turma do aluno já no
  * PDF). A família assina pelo gov.br ou à mão; se quiser, preenche os dados no app antes.
  */
@@ -705,7 +747,10 @@ export function ContratoModeloPainel({ ano, jaTemModelo, onEnviado }: { ano: num
       {aba === "config" && ano === 2027 ? (
         <Configuracao ano={ano} />
       ) : (
-        <EnvioLote key={ano} ano={ano} jaTemModelo={jaTemModelo} onEnviado={onEnviado} />
+        <>
+          {ano === 2027 && <CorrigirVencimento onCorrigido={onEnviado} />}
+          <EnvioLote key={ano} ano={ano} jaTemModelo={jaTemModelo} onEnviado={onEnviado} />
+        </>
       )}
     </section>
   );

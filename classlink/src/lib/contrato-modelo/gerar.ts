@@ -5,6 +5,7 @@ import { LOGO_ESPACO_KIDS_PNG, LOGO_INSTITUTO_FOKUS_PNG } from "./logos";
 import {
   LINHAS_ANEXO_IMAGEM,
   calcularValores,
+  diaDoMes,
   formatarCpf,
   formatarDinheiro,
   type CondicoesContrato,
@@ -378,7 +379,7 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
       temValores
         ? `Desconto de pontualidade: ${v.descontoPct.toLocaleString("pt-BR")}% ou R$ ${formatarDinheiro(v.descontoValor)} | Valor líquido: ${dinheiro(c.parcelaLiquida)}`
         : `Desconto de pontualidade: ______% ou ${dinheiro(0)} | Valor líquido: ${dinheiro(0)}`,
-      `Vencimento: dia ${cfg.parcelas.vencimentoDia} de cada mês | Primeiro/último vencimento: ${ou(cfg.parcelas.primeiroUltimo, 24)}`,
+      `Vencimento: dia ${diaDoMes(cfg.parcelas.vencimentoDia)} de cada mês | Primeiro/último vencimento: ${ou(cfg.parcelas.primeiroUltimo, 24)}`,
       ];
   linhasValores.forEach((l, i) => doc.textoAjustado(l, X0, doc.y + 3 + i * 11, X1 - X0, f.helv, 9));
   doc.y += 3 + linhasValores.length * 11 + 6;
