@@ -1,4 +1,5 @@
-export const DIA_VENCIMENTO_PADRAO = 10;
+/** Vencimento das mensalidades: dia 05 de cada mês (o mesmo do contrato). */
+export const DIA_VENCIMENTO_PADRAO = 5;
 
 const FUSO_ESCOLA = "America/Sao_Paulo";
 

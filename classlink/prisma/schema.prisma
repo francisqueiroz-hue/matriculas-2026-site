@@ -743,6 +743,7 @@ enum ContratoArquivoTipo {
 enum ContratoEventoTipo {
   CRIADO
   DADOS_PREENCHIDOS // família conferiu os dados e o app gerou o PDF do contrato
+  CONDICOES_ATUALIZADAS // escola corrigiu as condições antes da assinatura e o app gerou o PDF de novo
   ASSINADO_ENVIADO
   DEVOLVIDO
   CONFERIDO

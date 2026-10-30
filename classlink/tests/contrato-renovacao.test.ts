@@ -78,7 +78,7 @@ describe("valor da renovação com correção", () => {
     };
     expect(valoresDoContrato(condicoes)).toEqual({
       parcelas: 12,
-      vencimentoDia: 10,
+      vencimentoDia: 5,
       parcelaBruta: 2730,
       parcelaLiquida: 2730,
       anuidade: 32760,

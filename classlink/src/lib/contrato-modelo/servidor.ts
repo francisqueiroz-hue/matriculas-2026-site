@@ -1,13 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { configContratoSchema } from "./validacao";
-import { configInicial, type ConfigContrato, type DadosFamilia, type Pessoa } from "./tipos";
+import { comVencimentoFixo, configInicial, type ConfigContrato, type DadosFamilia, type Pessoa } from "./tipos";
 
-/** Configuração salva do ano (ou o ponto de partida com horários/contatos do contrato original). */
+/**
+ * Configuração salva do ano (ou o ponto de partida com horários/contatos do contrato original).
+ * O vencimento sai sempre no dia 05, mesmo que a configuração tenha sido salva com outro dia.
+ */
 export async function carregarConfig(schoolId: string, anoLetivo: number): Promise<{ config: ConfigContrato; salva: boolean; atualizadaEm: Date | null }> {
   const registro = await prisma.contratoConfig.findUnique({ where: { schoolId_anoLetivo: { schoolId, anoLetivo } } });
   if (!registro) return { config: configInicial(), salva: false, atualizadaEm: null };
   const lido = configContratoSchema.safeParse(registro.dados);
-  return { config: lido.success ? lido.data : configInicial(), salva: true, atualizadaEm: registro.updatedAt };
+  return { config: lido.success ? comVencimentoFixo(lido.data) : configInicial(), salva: true, atualizadaEm: registro.updatedAt };
 }
 
 /** Resolve quem é o responsável legal (pela guarda) a partir da escolha feita no formulário. */

@@ -1,4 +1,4 @@
-import { formatarDinheiro, type ValoresContrato as Valores } from "@/lib/contrato-modelo/tipos";
+import { diaDoMes, formatarDinheiro, type ValoresContrato as Valores } from "@/lib/contrato-modelo/tipos";
 
 const brl = (v: number) => `R$ ${formatarDinheiro(v)}`;
 
@@ -41,7 +41,7 @@ export function ValoresContrato({ valores, ano, mostrarCorrecao = false }: { val
         )}
         {temDesconto && (
           <>
-            <dt className="text-slate-500">Até o dia {valores.vencimentoDia}</dt>
+            <dt className="text-slate-500">Até o dia {diaDoMes(valores.vencimentoDia)}</dt>
             <dd>{brl(valores.parcelaLiquida)} por parcela (pagamento em dia)</dd>
           </>
         )}

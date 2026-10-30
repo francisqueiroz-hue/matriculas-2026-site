@@ -5,7 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
 import { carregarConfig } from "@/lib/contrato-modelo/servidor";
 import { configContratoSchema } from "@/lib/contrato-modelo/validacao";
-import { pendenciasConfig } from "@/lib/contrato-modelo/tipos";
+import { comVencimentoFixo, pendenciasConfig } from "@/lib/contrato-modelo/tipos";
 
 function anoDa(request: NextRequest) {
   const ano = Number(request.nextUrl.searchParams.get("ano"));
@@ -29,7 +29,8 @@ export async function PUT(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN");
     const anoLetivo = anoDa(request);
-    const config = configContratoSchema.parse(await request.json());
+    // O dia do vencimento não é escolhido no painel: é sempre 05.
+    const config = comVencimentoFixo(configContratoSchema.parse(await request.json()));
     await prisma.contratoConfig.upsert({
       where: { schoolId_anoLetivo: { schoolId: session.schoolId, anoLetivo } },
       create: { schoolId: session.schoolId, anoLetivo, dados: config, editadoPorId: session.sub },
