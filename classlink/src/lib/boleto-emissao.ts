@@ -40,7 +40,7 @@ export async function gerarBoletosDoMes(
   const avisos: Array<() => Promise<unknown>> = [];
 
   const alunos = await prisma.student.findMany({
-    where: { schoolId: escola.id, deletedAt: null, mensalidadeValor: { not: null } },
+    where: { schoolId: escola.id, deletedAt: null, bolsista: false, mensalidadeValor: { not: null } },
     include: {
       guardians: {
         orderBy: { createdAt: "asc" },

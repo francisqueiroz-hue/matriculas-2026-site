@@ -129,6 +129,13 @@ export const dadosFamiliaSchema = z
 
 export type DadosFamiliaEntrada = z.input<typeof dadosFamiliaSchema>;
 
+export const criterioReajusteSchema = z.object({
+  percentual: z.coerce.number().min(-50, "Correção abaixo de -50% — confira").max(100, "Correção acima de 100% — confira"),
+  base: z.enum(["LIQUIDA", "BRUTA"]),
+  descontoPct: z.coerce.number().min(0).max(90, "Desconto de pontualidade acima de 90% — confira"),
+  arredondamento: z.enum(["CENTAVOS", "REAIS"]).default("CENTAVOS"),
+});
+
 export const envioLoteSchema = z.object({
   anoLetivo: z.coerce.number().int().min(2020).max(2100),
   titulo: z.string().trim().min(3).max(150),
@@ -146,4 +153,6 @@ export const envioLoteSchema = z.object({
     )
     .min(1, "Escolha pelo menos um aluno")
     .max(300),
+  // Renovação: valor de cada contrato = mensalidade atual do aluno corrigida. Ausente = tabela.
+  reajuste: criterioReajusteSchema.nullish(),
 });

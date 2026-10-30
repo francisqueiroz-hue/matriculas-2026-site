@@ -366,15 +366,20 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
   doc.textoAjustado(`Etapa/turma: ${c.turma} | Período contratado: ${textoPeriodo}`, X0, doc.y + 14, X1 - X0, f.helv, 9);
   doc.y += 27;
   doc.faixa(`VALORES - ${c.anoLetivo}`);
-  const linhasValores = [
-    `Valor total do contrato/anuidade: ${temValores ? dinheiro(v.anuidade) : dinheiro(0)} | Período: ${ou(cfg.parcelas.periodoAnuidade, 24)}`,
-    `Número de parcelas: ${cfg.parcelas.quantidade} | Valor bruto da parcela: ${dinheiro(c.parcelaBruta)}`,
-    `Matrícula/primeira parcela, incluída na anuidade: ${dinheiro(v.primeiraParcela)}`,
-    temValores
-      ? `Desconto de pontualidade: ${v.descontoPct.toLocaleString("pt-BR")}% ou ${dinheiro(v.descontoValor)} | Valor líquido: ${dinheiro(c.parcelaLiquida)}`
-      : `Desconto de pontualidade: ______% ou ${dinheiro(0)} | Valor líquido: ${dinheiro(0)}`,
-    `Vencimento: dia ${cfg.parcelas.vencimentoDia} de cada mês | Primeiro/último vencimento: ${ou(cfg.parcelas.primeiroUltimo, 24)}`,
-  ];
+  const linhasValores = c.bolsista
+    ? [
+        `Bolsa integral: o(a) aluno(a) é isento(a) de mensalidade no ano letivo de ${c.anoLetivo}.`,
+        `Valor total do contrato/anuidade: R$ 0,00 | Número de parcelas: nenhuma (isenção) | Período: ${ou(cfg.parcelas.periodoAnuidade, 24)}`,
+      ]
+    : [
+      `Valor total do contrato/anuidade: ${temValores ? dinheiro(v.anuidade) : dinheiro(0)} | Período: ${ou(cfg.parcelas.periodoAnuidade, 24)}`,
+      `Número de parcelas: ${cfg.parcelas.quantidade} | Valor bruto da parcela: ${dinheiro(c.parcelaBruta)}`,
+      `Matrícula/primeira parcela, incluída na anuidade: ${dinheiro(v.primeiraParcela)}`,
+      temValores
+        ? `Desconto de pontualidade: ${v.descontoPct.toLocaleString("pt-BR")}% ou R$ ${formatarDinheiro(v.descontoValor)} | Valor líquido: ${dinheiro(c.parcelaLiquida)}`
+        : `Desconto de pontualidade: ______% ou ${dinheiro(0)} | Valor líquido: ${dinheiro(0)}`,
+      `Vencimento: dia ${cfg.parcelas.vencimentoDia} de cada mês | Primeiro/último vencimento: ${ou(cfg.parcelas.primeiroUltimo, 24)}`,
+      ];
   linhasValores.forEach((l, i) => doc.textoAjustado(l, X0, doc.y + 3 + i * 11, X1 - X0, f.helv, 9));
   doc.y += 3 + linhasValores.length * 11 + 6;
 

@@ -6,7 +6,11 @@ import {
   calcularValores,
   etapaPelaTurma,
   formatarDinheiro,
+  valoresComReajuste,
+  type Arredondamento,
+  type BaseReajuste,
   type ConfigContrato,
+  type CriterioReajuste,
   type Etapa,
   type PeriodoChave,
 } from "@/lib/contrato-modelo/tipos";
@@ -22,6 +26,10 @@ interface AlunoOpcao {
   id: string;
   name: string;
   class: { id: string; name: string };
+  /** Mensalidade atual cadastrada no financeiro (Decimal chega como texto). */
+  mensalidadeValor: string | number | null;
+  /** Isento de mensalidade: o contrato sai sem parcelas. */
+  bolsista?: boolean;
 }
 
 interface RespostaConfig {
@@ -302,7 +310,19 @@ interface Linha {
   /** "" = não informar: a família marca o período no contrato. */
   periodo: PeriodoChave | "";
   etapa: Etapa;
+  /** Renovação: nova mensalidade digitada à mão (substitui o cálculo); null = calculada. */
+  novoValor: number | null;
 }
+
+/** "6,5" / "6.5" / "-2" → número; vazio ou inválido → null. */
+function percentual(v: string): number | null {
+  const t = v.trim().replace("%", "").replace(",", ".");
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+const mensalidadeAtual = (a: AlunoOpcao) => Number(a.mensalidadeValor ?? 0) || 0;
 
 function OpcoesPeriodo() {
   return (
@@ -316,10 +336,63 @@ function OpcoesPeriodo() {
   );
 }
 
+/** Mensalidade atual → nova, com campo para ajustar à mão. */
+function LinhaRenovacao({
+  aluno,
+  base,
+  valores,
+  onNovoValor,
+}: {
+  aluno: AlunoOpcao;
+  base: BaseReajuste;
+  valores: { parcelaBruta?: number; parcelaLiquida?: number; manual: boolean } | null;
+  onNovoValor: (n: number | null) => void;
+}) {
+  const atual = mensalidadeAtual(aluno);
+  const novo = valores ? (base === "LIQUIDA" ? valores.parcelaLiquida : valores.parcelaBruta) : undefined;
+  const [texto, setTexto] = useState("");
+  if (aluno.bolsista) return <span className="text-xs font-medium text-slate-700">Bolsista: contrato sem parcelas (isento)</span>;
+  if (!(atual > 0)) {
+    return <span className="text-xs font-medium text-red-700">Sem mensalidade no cadastro: preencha em Alunos antes de enviar</span>;
+  }
+  return (
+    <div className="flex w-full flex-wrap items-center gap-2 text-xs text-slate-600 sm:w-auto">
+      <span>Hoje R$ {formatarDinheiro(atual)} →</span>
+      <label className="sr-only" htmlFor={`novo-${aluno.id}`}>
+        Nova mensalidade de {aluno.name}
+      </label>
+      <div className="flex items-center rounded-md border border-slate-300 bg-white focus-within:ring-2 focus-within:ring-indigo-500">
+        <span className="pl-2 text-slate-500">R$</span>
+        <input
+          id={`novo-${aluno.id}`}
+          inputMode="decimal"
+          value={valores?.manual ? texto : novo ? formatarDinheiro(novo) : ""}
+          onChange={(e) => {
+            setTexto(e.target.value);
+            const n = numero(e.target.value);
+            onNovoValor(e.target.value.trim() && n > 0 ? n : null);
+          }}
+          className="min-h-11 w-28 rounded-md px-2 text-sm outline-none"
+        />
+      </div>
+      {valores?.parcelaBruta && valores.parcelaLiquida !== undefined && valores.parcelaLiquida < valores.parcelaBruta && (
+        <span>
+          {base === "LIQUIDA" ? `cheia R$ ${formatarDinheiro(valores.parcelaBruta)}` : `até o venc. R$ ${formatarDinheiro(valores.parcelaLiquida)}`}
+        </span>
+      )}
+      {valores?.manual && <span className="font-medium text-amber-800">ajustado à mão</span>}
+    </div>
+  );
+}
+
 function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: Set<string>; onEnviado: () => void }) {
   const [alunos, setAlunos] = useState<AlunoOpcao[]>([]);
   const [linhas, setLinhas] = useState<Record<string, Linha>>({});
   const [periodoPadrao, setPeriodoPadrao] = useState<PeriodoChave | "">("");
+  // Renovação: valor de cada contrato = mensalidade atual corrigida pelo critério da direção.
+  const [comReajuste, setComReajuste] = useState(false);
+  const [pctTexto, setPctTexto] = useState("9,2"); // correção definida pela direção para 2027
+  const [arredondamento, setArredondamento] = useState<Arredondamento>("CENTAVOS");
   const [titulo, setTitulo] = useState(`Contrato de prestação de serviços educacionais ${ano}`);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<{ criados: { nome: string }[]; ignorados: { nome: string; motivo: string }[] } | null>(null);
@@ -332,7 +405,7 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
   }, []);
 
   const linha = useCallback(
-    (a: AlunoOpcao): Linha => linhas[a.id] ?? { marcado: false, periodo: periodoPadrao, etapa: etapaPelaTurma(a.class.name) },
+    (a: AlunoOpcao): Linha => linhas[a.id] ?? { marcado: false, periodo: periodoPadrao, etapa: etapaPelaTurma(a.class.name), novoValor: null },
     [linhas, periodoPadrao],
   );
   const atualizar = (a: AlunoOpcao, patch: Partial<Linha>) => setLinhas((l) => ({ ...l, [a.id]: { ...linha(a), ...patch } }));
@@ -346,6 +419,24 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
   const disponiveis = alunos.filter((a) => !jaTemModelo.has(a.id));
   const marcados = disponiveis.filter((a) => linha(a).marcado);
 
+  const pct = percentual(pctTexto);
+  const criterio: CriterioReajuste | null =
+    // A escola não tem desconto de pontualidade: a parcela corrigida é a parcela do contrato.
+    comReajuste && pct !== null && pct >= -50 && pct <= 100
+      ? { percentual: pct, base: "BRUTA", descontoPct: 0, arredondamento }
+      : null;
+  const reajusteIncompleto = comReajuste && !criterio;
+
+  /** Valores da renovação de um aluno: digitados à mão, ou a mensalidade atual corrigida. */
+  function valoresRenovacao(a: AlunoOpcao) {
+    if (!criterio) return null;
+    const l = linha(a);
+    if (l.novoValor !== null) return { ...valoresComReajuste(l.novoValor, { ...criterio, percentual: 0, arredondamento: "CENTAVOS" }), manual: true };
+    return { ...valoresComReajuste(mensalidadeAtual(a), criterio), manual: false };
+  }
+  // Renovação exige a mensalidade no cadastro do aluno: sem ela o envio fica bloqueado.
+  const semMensalidade = comReajuste ? marcados.filter((a) => !a.bolsista && !(mensalidadeAtual(a) > 0)) : [];
+
   function marcarTurma(lista: AlunoOpcao[], valor: boolean) {
     setLinhas((l) => {
       const novo = { ...l };
@@ -355,8 +446,11 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
   }
 
   async function enviar() {
-    if (marcados.length === 0) return;
-    if (!confirm(`Enviar o contrato ${ano} para assinatura de ${marcados.length} aluno(s)? As famílias recebem aviso no app.`)) return;
+    if (marcados.length === 0 || semMensalidade.length > 0) return;
+    const aviso = criterio
+      ? `\n\nValor de cada contrato: mensalidade atual com correção de ${criterio.percentual.toLocaleString("pt-BR")}%.`
+      : "";
+    if (!confirm(`Enviar o contrato ${ano} para assinatura de ${marcados.length} aluno(s)? As famílias recebem aviso no app.${aviso}`)) return;
     setEnviando(true);
     setErro(null);
     setResultado(null);
@@ -366,7 +460,12 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
         body: JSON.stringify({
           anoLetivo: ano,
           titulo,
-          itens: marcados.map((a) => ({ studentId: a.id, periodo: linha(a).periodo || null, etapa: linha(a).etapa })),
+          itens: marcados.map((a) => {
+            const v = valoresRenovacao(a);
+            const manual = v?.manual && v.parcelaBruta ? { parcelaBruta: v.parcelaBruta, parcelaLiquida: v.parcelaLiquida } : {};
+            return { studentId: a.id, periodo: linha(a).periodo || null, etapa: linha(a).etapa, ...manual };
+          }),
+          reajuste: criterio,
         }),
       });
       setResultado(r);
@@ -399,6 +498,67 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
           </select>
         </div>
       </div>
+
+      <fieldset className="space-y-3 rounded-lg border border-slate-200 p-3">
+        <legend className="px-1 text-sm font-semibold text-slate-900">Valor de cada contrato</legend>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <label className="flex min-h-11 items-center gap-2">
+            <input type="radio" name="modo-valor" checked={!comReajuste} onChange={() => setComReajuste(false)} className="h-5 w-5" />
+            Tabela do período (ajustes do contrato)
+          </label>
+          <label className="flex min-h-11 items-center gap-2">
+            <input type="radio" name="modo-valor" checked={comReajuste} onChange={() => setComReajuste(true)} className="h-5 w-5" />
+            Renovação: mensalidade atual do aluno com correção
+          </label>
+        </div>
+        {comReajuste && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="reaj-pct" className={rotulo}>
+                  Correção (%)
+                </label>
+                <input id="reaj-pct" inputMode="decimal" placeholder="ex.: 6,5" value={pctTexto} onChange={(e) => setPctTexto(e.target.value)} className={campo} />
+              </div>
+              <div>
+                <label htmlFor="reaj-arred" className={rotulo}>
+                  Arredondar
+                </label>
+                <select id="reaj-arred" value={arredondamento} onChange={(e) => setArredondamento(e.target.value as Arredondamento)} className={campo}>
+                  <option value="CENTAVOS">nos centavos</option>
+                  <option value="REAIS">para reais inteiros</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600">
+              A mensalidade atual vem do cadastro financeiro de cada aluno. O novo valor aparece ao lado de cada aluno marcado e pode ser
+              ajustado à mão (bolsa, acordo). Sem desconto de pontualidade. Cada parcela é arredondada antes; o total do contrato é a parcela vezes o número
+              de parcelas, então a soma sempre fecha. O percentual não aparece para a família: ela vê só o total e as parcelas. Lei 9.870/1999: a base é a última parcela do ano anterior; acréscimo acima dela
+              precisa de planilha de custo, e a proposta com o valor deve ser divulgada ao menos 45 dias antes do fim do prazo de matrícula.
+            </p>
+            {reajusteIncompleto && (
+              <p role="alert" className="text-sm text-amber-800">
+                Informe a correção (entre -50% e 100%) para ver e enviar os valores.
+              </p>
+            )}
+            {semMensalidade.length > 0 && (
+              <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                <p className="font-semibold">
+                  Envio bloqueado: {semMensalidade.length} aluno(s) marcado(s) sem mensalidade no cadastro.
+                </p>
+                <p className="mt-1">{semMensalidade.map((a) => a.name).join(", ")}</p>
+                <p className="mt-1">
+                  Preencha a mensalidade em{" "}
+                  <a href="/dashboard/admin/alunos" className="font-semibold underline">
+                    Alunos
+                  </a>{" "}
+                  ou marque como isento (bolsista), ou desmarque esses alunos, e volte para enviar.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </fieldset>
 
       {alunos.length === 0 && <p className="text-sm text-slate-500">Carregando alunos…</p>}
       <div className="space-y-3">
@@ -459,6 +619,14 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
                             <option value="EI">Ed. Infantil</option>
                             <option value="EF1">Fundamental I</option>
                           </select>
+                          {criterio && (
+                            <LinhaRenovacao
+                              aluno={a}
+                              base={criterio.base}
+                              valores={valoresRenovacao(a)}
+                              onNovoValor={(n) => atualizar(a, { novoValor: n })}
+                            />
+                          )}
                         </>
                       )}
                     </li>
@@ -485,7 +653,12 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
           )}
         </div>
       )}
-      <button type="button" disabled={enviando || marcados.length === 0 || titulo.trim().length < 3} onClick={enviar} className={btnPrimario}>
+      <button
+        type="button"
+        disabled={enviando || marcados.length === 0 || titulo.trim().length < 3 || reajusteIncompleto || semMensalidade.length > 0}
+        onClick={enviar}
+        className={btnPrimario}
+      >
         {enviando ? "Gerando e enviando…" : `Enviar para assinatura (${marcados.length})`}
       </button>
     </div>

@@ -52,6 +52,55 @@ export interface CondicoesContrato {
   parcelaBruta: number;
   parcelaLiquida: number;
   config: ConfigContrato;
+  /** Valor da renovação calculado a partir da mensalidade atual do aluno; ausente = tabela do período. */
+  reajuste?: ReajusteContrato | null;
+  /** Aluno isento de mensalidade (bolsa integral): o contrato sai sem parcelas, com a isenção escrita. */
+  bolsista?: boolean;
+}
+
+/** A mensalidade cadastrada do aluno é a parcela paga até o vencimento ou a parcela cheia. */
+export type BaseReajuste = "LIQUIDA" | "BRUTA";
+export type Arredondamento = "CENTAVOS" | "REAIS";
+
+/** Critério de correção escolhido pela direção no envio (nada é presumido pelo app). */
+export interface CriterioReajuste {
+  /** Percentual de correção sobre a mensalidade atual, ex.: 6.5 = 6,5%. */
+  percentual: number;
+  base: BaseReajuste;
+  /** Desconto de pontualidade do novo contrato, ex.: 10 = 10%. 0 = sem desconto. */
+  descontoPct: number;
+  arredondamento: Arredondamento;
+}
+
+/** Registro guardado no contrato: de onde saiu o valor da renovação. */
+export interface ReajusteContrato {
+  valorAnterior: number;
+  percentual: number;
+  base: BaseReajuste;
+}
+
+const centavos = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * Valor corrigido da renovação a partir da mensalidade atual (Lei 9.870/1999, art. 1º, § 1º:
+ * a base é a última parcela do ano anterior). O percentual corrige a parcela informada como
+ * base; a outra parcela sai do desconto de pontualidade. Arredondar para reais muda a parcela
+ * corrigida em no máximo R$ 0,50.
+ */
+export function valoresComReajuste(valorAtual: number, c: CriterioReajuste): { parcelaBruta: number; parcelaLiquida: number } | null {
+  if (!(valorAtual > 0) || !Number.isFinite(c.percentual) || !(c.descontoPct >= 0 && c.descontoPct < 100)) return null;
+  const corrigido = valorAtual * (1 + c.percentual / 100);
+  const base = c.arredondamento === "REAIS" ? Math.round(corrigido) : centavos(corrigido);
+  if (!(base > 0)) return null;
+  const fator = 1 - c.descontoPct / 100;
+  return c.base === "LIQUIDA"
+    ? { parcelaLiquida: base, parcelaBruta: centavos(base / fator) }
+    : { parcelaBruta: base, parcelaLiquida: centavos(base * fator) };
+}
+
+/** Percentual efetivo entre o valor anterior e o novo, para mostrar à família (ex.: 6.5). */
+export function percentualEfetivo(anterior: number, novo: number): number {
+  return anterior > 0 ? Math.round((novo / anterior - 1) * 10000) / 100 : 0;
 }
 
 export interface Pessoa {
@@ -219,3 +268,36 @@ export const LINHAS_ANEXO_IMAGEM = [
   "Imagem em materiais impressos institucionais destinados à comunidade escolar e famílias interessadas.",
   "Reprodução de trabalho artístico/literário do aluno nos canais autorizados acima, com licença não exclusiva, sem cessão de direitos autorais.",
 ] as const;
+
+/** Valores do contrato para mostrar nas listas (sem expor o resto das condições). */
+export interface ValoresContrato {
+  parcelas: number;
+  vencimentoDia: number;
+  parcelaBruta: number;
+  parcelaLiquida: number;
+  anuidade: number;
+  reajuste: ReajusteContrato | null;
+  bolsista: boolean;
+}
+
+/** Lê as condições guardadas no contrato; null quando o contrato saiu sem valores (nem isenção). */
+export function valoresDoContrato(condicoes: unknown): ValoresContrato | null {
+  const c = condicoes as Partial<CondicoesContrato> | null;
+  if (!c || !c.config?.parcelas) return null;
+  if (c.bolsista) {
+    const { quantidade, vencimentoDia } = c.config.parcelas;
+    return { parcelas: quantidade, vencimentoDia, parcelaBruta: 0, parcelaLiquida: 0, anuidade: 0, reajuste: null, bolsista: true };
+  }
+  if (!(Number(c.parcelaBruta) > 0)) return null;
+  const quantidade = c.config.parcelas.quantidade;
+  const r = c.reajuste;
+  return {
+    parcelas: quantidade,
+    vencimentoDia: c.config.parcelas.vencimentoDia,
+    parcelaBruta: Number(c.parcelaBruta),
+    parcelaLiquida: Number(c.parcelaLiquida),
+    anuidade: calcularValores({ parcelaBruta: Number(c.parcelaBruta), parcelaLiquida: Number(c.parcelaLiquida), quantidade }).anuidade,
+    reajuste: r && r.valorAnterior > 0 ? { valorAnterior: r.valorAnterior, percentual: r.percentual, base: r.base } : null,
+    bolsista: false,
+  };
+}
