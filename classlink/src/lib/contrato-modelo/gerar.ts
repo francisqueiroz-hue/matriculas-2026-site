@@ -371,7 +371,7 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
     `Número de parcelas: ${cfg.parcelas.quantidade} | Valor bruto da parcela: ${dinheiro(c.parcelaBruta)}`,
     `Matrícula/primeira parcela, incluída na anuidade: ${dinheiro(v.primeiraParcela)}`,
     temValores
-      ? `Desconto de pontualidade: ${v.descontoPct.toLocaleString("pt-BR")}% ou ${dinheiro(v.descontoValor)} | Valor líquido: ${dinheiro(c.parcelaLiquida)}`
+      ? `Desconto de pontualidade: ${v.descontoPct.toLocaleString("pt-BR")}% ou R$ ${formatarDinheiro(v.descontoValor)} | Valor líquido: ${dinheiro(c.parcelaLiquida)}`
       : `Desconto de pontualidade: ______% ou ${dinheiro(0)} | Valor líquido: ${dinheiro(0)}`,
     `Vencimento: dia ${cfg.parcelas.vencimentoDia} de cada mês | Primeiro/último vencimento: ${ou(cfg.parcelas.primeiroUltimo, 24)}`,
   ];

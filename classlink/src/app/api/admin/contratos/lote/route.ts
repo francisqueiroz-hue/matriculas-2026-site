@@ -8,7 +8,14 @@ import { responsaveisDoAluno, sha256Hex } from "@/lib/contratos-server";
 import { carregarConfig } from "@/lib/contrato-modelo/servidor";
 import { gerarContrato2027 } from "@/lib/contrato-modelo/gerar";
 import { envioLoteSchema } from "@/lib/contrato-modelo/validacao";
-import { MODELO_CONTRATO_2027, type CondicoesContrato } from "@/lib/contrato-modelo/tipos";
+import {
+  MODELO_CONTRATO_2027,
+  formatarDinheiro,
+  percentualEfetivo,
+  valoresComReajuste,
+  type CondicoesContrato,
+  type ReajusteContrato,
+} from "@/lib/contrato-modelo/tipos";
 
 // Um PDF por aluno (~0,3 s cada): folga para a turma inteira de uma vez.
 export const maxDuration = 60;
@@ -19,6 +26,8 @@ export const maxDuration = 60;
  * escola não os configurou) fica em branco para preencher à mão. Se quiser, a família
  * preenche os dados no app e recebe o contrato já preenchido.
  * Cada contrato guarda uma cópia das condições do momento do envio.
+ * Na renovação, o valor de cada contrato pode sair da mensalidade atual do aluno corrigida
+ * pelo critério que a direção informou (calculado aqui, com o valor do banco).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +42,7 @@ export async function POST(request: NextRequest) {
     const [alunos, existentes] = await Promise.all([
       prisma.student.findMany({
         where: { id: { in: ids }, schoolId: session.schoolId, deletedAt: null },
-        select: { id: true, name: true, class: { select: { name: true } } },
+        select: { id: true, name: true, mensalidadeValor: true, class: { select: { name: true } } },
       }),
       prisma.contrato.findMany({
         where: { schoolId: session.schoolId, anoLetivo: body.anoLetivo, modelo: MODELO_CONTRATO_2027, studentId: { in: ids } },
@@ -57,11 +66,22 @@ export async function POST(request: NextRequest) {
         ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: `Já tem contrato ${body.anoLetivo} do modelo do app` });
         continue;
       }
-      // Valores só entram se a escola os configurou para o período escolhido; senão saem em branco.
+      // Ordem: ajuste individual > mensalidade atual corrigida > tabela do período. Valores só
+      // entram se fizerem sentido; senão saem em branco para preencher à mão.
       const periodo = item.periodo ? config.periodos.find((p) => p.chave === item.periodo) : undefined;
-      const parcelaBruta = item.parcelaBruta ?? periodo?.parcelaBruta ?? 0;
-      const parcelaLiquida = item.parcelaLiquida ?? periodo?.parcelaLiquida ?? 0;
+      const valorAnterior = aluno.mensalidadeValor ? Number(aluno.mensalidadeValor) : 0;
+      const corrigido = body.reajuste ? valoresComReajuste(valorAnterior, body.reajuste) : null;
+      const parcelaBruta = item.parcelaBruta ?? corrigido?.parcelaBruta ?? periodo?.parcelaBruta ?? 0;
+      const parcelaLiquida = item.parcelaLiquida ?? corrigido?.parcelaLiquida ?? periodo?.parcelaLiquida ?? 0;
       const valoresOk = parcelaBruta > 0 && parcelaLiquida > 0 && parcelaLiquida <= parcelaBruta;
+      const reajuste: ReajusteContrato | null =
+        valoresOk && body.reajuste && valorAnterior > 0 && (corrigido || item.parcelaBruta !== undefined)
+          ? {
+              valorAnterior,
+              base: body.reajuste.base,
+              percentual: percentualEfetivo(valorAnterior, body.reajuste.base === "LIQUIDA" ? parcelaLiquida : parcelaBruta),
+            }
+          : null;
       const condicoes: CondicoesContrato = {
         modelo: MODELO_CONTRATO_2027,
         anoLetivo: body.anoLetivo,
@@ -71,6 +91,7 @@ export async function POST(request: NextRequest) {
         parcelaBruta: valoresOk ? parcelaBruta : 0,
         parcelaLiquida: valoresOk ? parcelaLiquida : 0,
         config,
+        reajuste,
       };
       const pdf = await gerarContrato2027({ condicoes, familia: null, aluno: { nome: aluno.name }, data: null });
       const sha256 = sha256Hex(pdf);
@@ -108,7 +129,14 @@ export async function POST(request: NextRequest) {
             usuarioId: session.sub,
             ipOrigem,
             arquivoSha256: sha256,
-            detalhe: `Modelo do app${periodo ? ` · ${periodo.nome}` : ""}`,
+            detalhe: [
+              "Modelo do app",
+              periodo?.nome,
+              reajuste &&
+                `Renovação: R$ ${formatarDinheiro(reajuste.valorAnterior)} → R$ ${formatarDinheiro(reajuste.base === "LIQUIDA" ? parcelaLiquida : parcelaBruta)} (${reajuste.percentual.toLocaleString("pt-BR")}%)`,
+            ]
+              .filter(Boolean)
+              .join(" · "),
           },
         });
         return c;

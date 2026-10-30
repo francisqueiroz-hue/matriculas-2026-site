@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiJson } from "@/lib/api-client";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
-import { MODELO_CONTRATO_2027 } from "@/lib/contrato-modelo/tipos";
+import { MODELO_CONTRATO_2027, type ValoresContrato as Valores } from "@/lib/contrato-modelo/tipos";
+import { ValoresContrato } from "@/components/ValoresContrato";
 import { ContratoModeloPainel } from "./ContratoModeloPainel";
 import {
   CONTRATO_LIMITE_ENVIO_SERVIDOR,
@@ -49,6 +50,7 @@ interface Contrato {
   motivoDevolucao: string | null;
   modelo: string | null;
   dadosPreenchidos: boolean;
+  valores: Valores | null;
   createdAt: string;
   student: {
     id: string;
@@ -370,6 +372,12 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
 
       {c.status === "DEVOLVIDO" && c.motivoDevolucao && (
         <p className="mt-2 rounded-md bg-red-50 p-2 text-red-900">Motivo da devolução: {c.motivoDevolucao}</p>
+      )}
+
+      {c.valores && (
+        <div className="mt-2">
+          <ValoresContrato valores={c.valores} ano={c.anoLetivo} mostrarCorrecao />
+        </div>
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import type { ContratoStatus } from "@/lib/contratos";
+import { valoresDoContrato } from "@/lib/contrato-modelo/tipos";
 
 const STATUS_VALIDOS: ContratoStatus[] = ["AGUARDANDO_ASSINATURA", "EM_CONFERENCIA", "AGUARDANDO_ORIGINAL", "COMPLETO", "DEVOLVIDO"];
 
@@ -22,9 +23,12 @@ const arquivoSelect = {
  * Lista contratos. Responsável: só os dos alunos vinculados a ele (sem dados de auditoria
  * da equipe). Direção: todos da escola, com filtros por ano/situação, arquivos e histórico.
  */
-/** A lista só precisa saber se a família já preencheu os dados no app (não os dados em si). */
-function semDadosFamilia<T extends { dadosFamilia: unknown }>({ dadosFamilia, ...resto }: T) {
-  return { ...resto, dadosPreenchidos: dadosFamilia !== null };
+/**
+ * A lista só precisa saber se a família já preencheu os dados no app (não os dados em si) e
+ * os valores do contrato (não o resto das condições).
+ */
+function semDadosFamilia<T extends { dadosFamilia: unknown; condicoes: unknown }>({ dadosFamilia, condicoes, ...resto }: T) {
+  return { ...resto, dadosPreenchidos: dadosFamilia !== null, valores: valoresDoContrato(condicoes) };
 }
 
 export async function GET(request: NextRequest) {
@@ -47,13 +51,17 @@ export async function GET(request: NextRequest) {
           motivoDevolucao: true,
           modelo: true,
           dadosFamilia: true,
+          condicoes: true,
           createdAt: true,
           student: { select: { id: true, name: true, class: { select: { name: true } } } },
           arquivos: { select: { id: true, tipo: true, nomeArquivo: true, createdAt: true }, orderBy: { createdAt: "desc" } },
         },
         orderBy: [{ anoLetivo: "desc" }, { createdAt: "desc" }],
       });
-      return NextResponse.json({ contratos: contratos.map(semDadosFamilia) });
+      // A família vê só o total e as parcelas do novo contrato; o percentual de correção fica com a escola.
+      return NextResponse.json({
+        contratos: contratos.map(semDadosFamilia).map((c) => ({ ...c, valores: c.valores && { ...c.valores, reajuste: null } })),
+      });
     }
 
     const params = request.nextUrl.searchParams;
@@ -76,6 +84,7 @@ export async function GET(request: NextRequest) {
           motivoDevolucao: true,
           modelo: true,
           dadosFamilia: true,
+          condicoes: true,
           createdAt: true,
           student: {
             select: {

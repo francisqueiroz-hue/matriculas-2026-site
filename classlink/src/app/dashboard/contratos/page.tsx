@@ -19,7 +19,8 @@ import {
   type ContratoMetodo,
   type ContratoStatus,
 } from "@/lib/contratos";
-import { MODELO_CONTRATO_2027 } from "@/lib/contrato-modelo/tipos";
+import { MODELO_CONTRATO_2027, type ValoresContrato as Valores } from "@/lib/contrato-modelo/tipos";
+import { ValoresContrato } from "@/components/ValoresContrato";
 import { FormularioDados } from "./FormularioDados";
 
 interface ArquivoResumo {
@@ -39,6 +40,7 @@ interface ContratoFamilia {
   motivoDevolucao: string | null;
   modelo: string | null;
   dadosPreenchidos: boolean;
+  valores: Valores | null;
   createdAt: string;
   student: { id: string; name: string; class: { name: string } };
   arquivos: ArquivoResumo[];
@@ -228,6 +230,12 @@ function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; on
           {STATUS_CONTRATO_LABEL[contrato.status]}
         </span>
       </div>
+
+      {contrato.valores && !corrigindo && (
+        <div className="mb-3">
+          <ValoresContrato valores={contrato.valores} ano={contrato.anoLetivo} />
+        </div>
+      )}
 
       {enviadoAgora && (
         <p role="status" className="mb-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">
