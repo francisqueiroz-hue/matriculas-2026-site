@@ -111,6 +111,7 @@ const GRUPO_POR_HREF: Record<string, string> = {
   "/dashboard/contratos": "Meu(s) filho(s)",
   "/dashboard/notas": "Pedagógico",
   "/dashboard/fichas": "Secretaria",
+  "/guia": "Ajuda",
 };
 
 export interface GrupoNav {
@@ -136,13 +137,20 @@ const fichasLink: NavLink = {
   icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2 M9 5a2 2 0 012-2h2a2 2 0 012 2v0a2 2 0 01-2 2h-2a2 2 0 01-2-2z M9 12h6 M9 16h4",
 };
 
+/** Guia do app (instalação e uso), para todos: é também o link que a escola manda às famílias. */
+const guiaLink: NavLink = {
+  href: "/guia",
+  label: "Guia do app",
+  icon: "M12 21a9 9 0 100-18 9 9 0 000 18z M9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4 M12 17h.01",
+};
+
 /** Notas fica visível só para direção (ADMIN) e coordenação (STAFF com isCoordenacao). */
 export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao">): NavLink[] {
-  if (user.role === "ADMIN") return [...baseLinks, notasLink, ...adminLinks, fichasLink];
-  if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks];
-  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, fichasLink];
-  if (user.role === "STAFF") return [...baseLinks, fichasLink];
-  return baseLinks;
+  if (user.role === "ADMIN") return [...baseLinks, notasLink, ...adminLinks, fichasLink, guiaLink];
+  if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks, guiaLink];
+  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, fichasLink, guiaLink];
+  if (user.role === "STAFF") return [...baseLinks, fichasLink, guiaLink];
+  return [...baseLinks, guiaLink];
 }
 
 interface ComunicadoResumo {
