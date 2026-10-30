@@ -108,6 +108,17 @@ export const sendMessageSchema = z.object({
   channel: z.enum(["APP", "WHATSAPP", "EMAIL"]).optional(),
 });
 
+/**
+ * Mensagem para a família/direção que pode levar um arquivo (declaração, documento, foto). Com
+ * arquivo, o texto é opcional. `anexo` é o arquivo grande que o navegador já enviou direto ao
+ * armazenamento privado; arquivos até 4 MB vêm em multipart, no campo "file".
+ */
+export const sendMessageComAnexoSchema = z.object({
+  body: z.string().max(4000).optional().default(""),
+  channel: z.enum(["APP", "WHATSAPP", "EMAIL"]).optional(),
+  anexo: z.object({ path: z.string().min(1).max(300), nome: z.string().max(255).optional() }).optional(),
+});
+
 export const createComunicadoSchema = z.object({
   tipo: z.enum(["AUTORIZACAO_PASSEIO", "CONFIRMACAO_REUNIAO", "CIRCULAR"]),
   titulo: z.string().min(1).max(200),

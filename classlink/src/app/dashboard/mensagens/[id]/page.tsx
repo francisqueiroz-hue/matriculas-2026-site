@@ -6,11 +6,13 @@ import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
 import { avisoAnexoIndisponivel, rotuloDoAnexo, semLegenda } from "@/lib/anexo-mensagem";
+import { ACCEPT_ANEXO, problemaNoAnexo, tamanhoLegivel } from "@/lib/anexo-envio";
+import { enviarMensagemComArquivo } from "@/lib/anexo-envio-client";
 import { ROTULO_ENVIO, explicacaoDoCanal, reciboPorCanal, whatsappDisponivel, type JanelaWhatsApp } from "@/lib/canal-envio";
 
 type Canal = "APP" | "WHATSAPP" | "EMAIL";
 
-/** Foto, documento, áudio ou vídeo recebido pelo WhatsApp. `url` nulo: não deu para baixar. */
+/** Foto, documento, áudio ou vídeo (recebido pelo WhatsApp ou enviado pelo app). `url` nulo: não deu para baixar. */
 interface Anexo {
   tipo: string;
   mime: string | null;
@@ -102,6 +104,10 @@ function ConversationPageInner() {
   const [showRequisicao, setShowRequisicao] = useState(false);
   const [itensSelecionados, setItensSelecionados] = useState<string[]>([]);
   const [itemOutro, setItemOutro] = useState("");
+  // Arquivo escolhido para ir com a próxima mensagem (declaração, documento, foto).
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [progresso, setProgresso] = useState<number | null>(null);
+  const arquivoRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   // Última mensagem vista: diz à consulta adaptativa se chegou algo novo.
   const ultimaVistaRef = useRef<string | null>(null);
@@ -171,17 +177,24 @@ function ConversationPageInner() {
     return canalEnvio === "WHATSAPP" && !whatsappDisponivel(data?.janelaWhatsApp) ? "APP" : canalEnvio;
   }
 
-  async function enviarMensagem(body: string, channel: Canal = "APP") {
+  async function enviarMensagem(body: string, channel: Canal = "APP", anexo: File | null = null) {
     setSending(true);
     setSendError(null);
     setEnvioInfo(null);
     try {
+      type Resposta = { message: DisplayMessage; avisoPeloWhatsApp?: boolean };
       const path = isEquipe ? `/api/team-messages/conversations/${id}` : `/api/messages/conversations/${id}`;
       const payload = isEquipe ? { body } : { body, channel };
-      const res = await apiJson<{ message: DisplayMessage; avisoPeloWhatsApp?: boolean }>(path, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const res =
+        anexo && !isEquipe
+          ? await enviarMensagemComArquivo<Resposta>({
+              conversaId: id,
+              escolaId: user.schoolId,
+              texto: body,
+              arquivo: anexo,
+              aoProgredir: setProgresso,
+            })
+          : await apiJson<Resposta>(path, { method: "POST", body: JSON.stringify(payload) });
       const message: DisplayMessage = isEquipe ? { ...res.message, channel: null } : res.message;
       setData((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev));
       reiniciarConsulta(); // conversa ativa: volta a consultar no ritmo rápido
@@ -194,13 +207,35 @@ function ConversationPageInner() {
       return false;
     } finally {
       setSending(false);
+      setProgresso(null);
     }
   }
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim()) return;
-    if (await enviarMensagem(text, canalValido())) setText("");
+    if (!text.trim() && !arquivo) return;
+    if (await enviarMensagem(text, arquivo ? "APP" : canalValido(), arquivo)) {
+      setText("");
+      tirarArquivo();
+    }
+  }
+
+  function escolherArquivo(e: React.ChangeEvent<HTMLInputElement>) {
+    const escolhido = e.target.files?.[0] ?? null;
+    if (!escolhido) return;
+    const problema = problemaNoAnexo(escolhido);
+    if (problema) {
+      setSendError(problema);
+      e.target.value = "";
+      return;
+    }
+    setSendError(null);
+    setArquivo(escolhido);
+  }
+
+  function tirarArquivo() {
+    setArquivo(null);
+    if (arquivoRef.current) arquivoRef.current.value = "";
   }
 
   function toggleItem(item: string) {
@@ -224,7 +259,9 @@ function ConversationPageInner() {
   const podeUsarFuncoesDeResponsavel = !isEquipe && data.souStaffNaConversa;
   const guardianTemTelefone = Boolean(data.guardianPhone);
   const guardianTemEmail = Boolean(data.guardianEmail);
-  const canalAtual = podeUsarFuncoesDeResponsavel ? canalValido() : "APP";
+  // Arquivo vai sempre pelo ClassLink (armazenamento privado; só quem está na conversa abre).
+  const canalAtual = podeUsarFuncoesDeResponsavel && !arquivo ? canalValido() : "APP";
+  const podeAnexar = !isEquipe;
 
   return (
     <div className="flex h-[calc(100vh-140px)] flex-col">
@@ -317,18 +354,64 @@ function ConversationPageInner() {
         </p>
       )}
 
+      {arquivo && (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm dark:border-indigo-900 dark:bg-indigo-950/40">
+          <span className="min-w-0 truncate">
+            {arquivo.type === "application/pdf" || arquivo.name.toLowerCase().endsWith(".pdf") ? "📄" : "📷"} {arquivo.name}{" "}
+            <span className="text-xs text-slate-500">({tamanhoLegivel(arquivo.size)})</span>
+          </span>
+          {progresso !== null ? (
+            <span role="status" className="shrink-0 text-xs text-slate-600 dark:text-slate-300">
+              Enviando… {progresso}%
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={tirarArquivo}
+              disabled={sending}
+              aria-label="Remover arquivo"
+              className="shrink-0 rounded-md px-2 py-0.5 text-indigo-700 hover:bg-indigo-100 dark:text-indigo-300 dark:hover:bg-indigo-900"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
+
       <form onSubmit={handleSend} className="mt-3 flex flex-wrap gap-2">
+        {podeAnexar && (
+          <>
+            <input
+              ref={arquivoRef}
+              id="anexo-mensagem"
+              type="file"
+              accept={ACCEPT_ANEXO}
+              onChange={escolherArquivo}
+              className="sr-only"
+              aria-label="Anexar arquivo (PDF ou foto)"
+            />
+            <label
+              htmlFor="anexo-mensagem"
+              title="Anexar arquivo (PDF ou foto, até 20 MB)"
+              className="flex cursor-pointer items-center rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+            >
+              <span aria-hidden="true">📎</span>
+              <span className="sr-only">Anexar arquivo</span>
+            </label>
+          </>
+        )}
         <input
           aria-label="Mensagem"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Escreva uma mensagem..."
+          placeholder={arquivo ? "Escreva algo sobre o arquivo (opcional)" : "Escreva uma mensagem..."}
           className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
         />
         {podeUsarFuncoesDeResponsavel && (
           <select
             aria-label="Enviar por"
-            value={canalEnvio}
+            value={arquivo ? "APP" : canalEnvio}
+            disabled={Boolean(arquivo)}
             onChange={(e) => setCanalEnvio(e.target.value as Canal)}
             className="rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
           >
@@ -358,7 +441,14 @@ function ConversationPageInner() {
       </form>
       {podeUsarFuncoesDeResponsavel && (
         <p aria-live="polite" className="mt-1 text-xs text-slate-500">
-          {explicacaoDoCanal(canalAtual, data.janelaWhatsApp)}
+          {arquivo
+            ? "Arquivos vão sempre pelo ClassLink: só a família e a escola abrem. A família recebe a notificação do app."
+            : explicacaoDoCanal(canalAtual, data.janelaWhatsApp)}
+        </p>
+      )}
+      {podeAnexar && !podeUsarFuncoesDeResponsavel && (
+        <p className="mt-1 text-xs text-slate-500">
+          📎 Para pedir uma declaração ou mandar um documento, toque no clipe e escolha um PDF ou uma foto (até 20 MB).
         </p>
       )}
     </div>
@@ -391,7 +481,7 @@ function AnexoDaMensagem({ anexo }: { anexo: Anexo }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={anexo.url}
-          alt={anexo.tipo === "sticker" ? "Figurinha enviada pelo WhatsApp" : "Foto enviada pelo WhatsApp"}
+          alt={anexo.tipo === "sticker" ? "Figurinha enviada pelo WhatsApp" : anexo.nome ? `Foto: ${anexo.nome}` : "Foto enviada na conversa"}
           className={anexo.tipo === "sticker" ? "h-32 w-32 object-contain" : "max-h-72 w-auto max-w-full rounded-lg"}
           loading="lazy"
         />
