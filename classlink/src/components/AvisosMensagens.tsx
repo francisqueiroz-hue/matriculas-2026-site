@@ -3,8 +3,17 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { apiFetch, apiJson } from "@/lib/api-client";
-import { requestPushToken } from "@/lib/firebase-client";
+import { apiJson } from "@/lib/api-client";
+import { useCurrentUser } from "@/components/UserContext";
+import {
+  DISPENSOU_AVISOS_KEY,
+  PEDIDO_AUTOMATICO_KEY,
+  gravarMarca,
+  lerMarca,
+  modoConvite,
+  pedirPermissaoEInscrever,
+  permissaoAtual,
+} from "@/lib/convite-avisos";
 import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
 
 interface UltimaMensagem {
@@ -32,7 +41,6 @@ export function useMensagensNaoLidas() {
 // Contador do menu: 20 s com a aba visível, espaçando até 60 s sem novidade; em segundo plano,
 // a cada 60 s (o aviso na área de trabalho depende disso quando não há notificação push).
 const CONSULTA_CONTADOR = { baseMs: 20_000, maxMs: 60_000, ocultoMs: 60_000 };
-const DISPENSOU_AVISOS_KEY = "classlink-avisos-mensagens-dispensado";
 
 /** Bip curto gerado no navegador (sem arquivo de áudio). Falha em silêncio se o navegador bloquear. */
 function tocarSom() {
@@ -193,48 +201,87 @@ export function AvisosMensagensProvider({ children }: { children: React.ReactNod
   );
 }
 
+type EstadoConvite = "oculto" | "convite" | "sem-janela" | "bloqueado";
+
 /**
- * Convite para ativar as notificações do navegador (precisa de um clique da pessoa). Some
- * se ela já decidiu ou tocou em "Agora não". Sem permissão, o contador do menu, o número no
- * título da aba e o aviso na tela continuam funcionando.
+ * Convite para ativar as notificações do navegador. Aparece uma única vez por aparelho:
+ * qualquer resposta (Ativar, Agora não, janela fechada) fica guardada e ele não volta.
+ * Para a Administração não há convite: o pedido do navegador abre sozinho no primeiro clique
+ * dentro do app (o navegador exige um gesto da pessoa e a escolha final é dela). Com a
+ * permissão já dada, o PushRegister inscreve o aparelho a cada entrada, sem perguntar nada.
+ * Sem permissão, o contador do menu, o número no título da aba e o aviso na tela continuam.
  */
 export function ConviteAtivarAvisos() {
-  const [visivel, setVisivel] = useState(false);
+  const { role } = useCurrentUser();
+  const admin = role === "ADMIN";
+  const [estado, setEstado] = useState<EstadoConvite>("oculto");
 
-  useEffect(() => {
-    if (typeof Notification === "undefined" || Notification.permission !== "default") return;
-    try {
-      if (localStorage.getItem(DISPENSOU_AVISOS_KEY)) return;
-    } catch {
-      // segue e mostra o convite
+  const responder = useCallback(async () => {
+    const resultado = await pedirPermissaoEInscrever().catch(() => "denied" as const);
+    if (resultado === "granted") {
+      tocarSom();
+      setEstado("oculto");
+    } else {
+      // Mostra uma vez como ativar depois; a marca já gravada impede que o convite volte.
+      setEstado(resultado === "denied" ? "bloqueado" : "sem-janela");
     }
-    const t = setTimeout(() => setVisivel(true), 0);
-    return () => clearTimeout(t);
   }, []);
 
-  if (!visivel) return null;
-
-  async function ativar() {
-    setVisivel(false);
-    try {
-      const resultado = await Notification.requestPermission();
-      if (resultado !== "granted") return;
-      tocarSom();
-      // Com o Firebase configurado, registra também o push (avisa com o navegador fechado).
-      const token = await requestPushToken(false);
-      if (token) await apiFetch("/api/push/register", { method: "POST", body: JSON.stringify({ token }) });
-    } catch {
-      // navegador sem suporte ou push indisponível: os avisos com a aba aberta seguem funcionando
+  useEffect(() => {
+    const modo = modoConvite({
+      permissao: permissaoAtual(),
+      admin,
+      dispensou: lerMarca(DISPENSOU_AVISOS_KEY),
+      pedidoAutomaticoFeito: lerMarca(PEDIDO_AUTOMATICO_KEY),
+    });
+    if (modo === "convite") {
+      const t = setTimeout(() => setEstado("convite"), 0);
+      return () => clearTimeout(t);
     }
+    if (modo !== "pedir-no-primeiro-toque") return;
+    // O clique é o gesto que o navegador exige para abrir o pedido de permissão.
+    const aoTocar = () => {
+      gravarMarca(PEDIDO_AUTOMATICO_KEY);
+      gravarMarca(DISPENSOU_AVISOS_KEY);
+      void responder();
+    };
+    document.addEventListener("click", aoTocar, { once: true, capture: true });
+    return () => document.removeEventListener("click", aoTocar, { capture: true });
+  }, [admin, responder]);
+
+  if (estado === "oculto") return null;
+
+  function ativar() {
+    gravarMarca(DISPENSOU_AVISOS_KEY);
+    setEstado("oculto");
+    void responder();
   }
 
   function dispensar() {
-    setVisivel(false);
-    try {
-      localStorage.setItem(DISPENSOU_AVISOS_KEY, "1");
-    } catch {
-      // ignora
-    }
+    gravarMarca(DISPENSOU_AVISOS_KEY);
+    setEstado("oculto");
+  }
+
+  if (estado !== "convite") {
+    return (
+      <div role="status" className="mb-4 flex items-start justify-between gap-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+        <p>
+          {estado === "bloqueado" ? (
+            <>🔕 As notificações estão bloqueadas neste navegador. Para liberar, clique no cadeado ao lado do endereço do site e permita as notificações.</>
+          ) : (
+            <>🔔 O navegador não confirmou as notificações. Se apareceu um sino na barra de endereço, clique nele e escolha <strong>Permitir</strong>.</>
+          )}{" "}
+          Este aviso não volta a aparecer; dá para ativar a qualquer momento em{" "}
+          <Link href="/dashboard/conta" className="font-semibold underline">
+            Minha conta
+          </Link>
+          .
+        </p>
+        <button type="button" onClick={() => setEstado("oculto")} aria-label="Fechar aviso" className="shrink-0 text-indigo-400 hover:text-indigo-700">
+          ✕
+        </button>
+      </div>
+    );
   }
 
   return (
