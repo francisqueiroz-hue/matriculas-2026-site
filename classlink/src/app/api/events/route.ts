@@ -4,6 +4,7 @@ import { requireRole, requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { createEventSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
+import { turmasQueAcompanha } from "@/lib/escopo-acesso";
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,20 +12,7 @@ export async function GET(request: NextRequest) {
     const from = request.nextUrl.searchParams.get("from");
     const to = request.nextUrl.searchParams.get("to");
 
-    let visibleClassIds: string[] | null = null;
-    if (session.role === "GUARDIAN") {
-      const links = await prisma.guardianStudent.findMany({
-        where: { guardianId: session.sub, student: { deletedAt: null } },
-        select: { student: { select: { classId: true } } },
-      });
-      visibleClassIds = [...new Set(links.map((l) => l.student.classId))];
-    } else if (session.role === "STAFF") {
-      const teaching = await prisma.classTeacher.findMany({
-        where: { teacherId: session.sub },
-        select: { classId: true },
-      });
-      visibleClassIds = [...new Set(teaching.map((t) => t.classId))];
-    }
+    const visibleClassIds = await turmasQueAcompanha(session);
 
     const events = await prisma.event.findMany({
       where: {
