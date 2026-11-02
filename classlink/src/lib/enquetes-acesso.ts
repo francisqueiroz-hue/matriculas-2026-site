@@ -1,29 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import type { AccessTokenPayload } from "@/lib/auth";
+import { visibilidadePorPublico } from "@/lib/escopo-acesso";
 
 /** Filtro de visibilidade das enquetes, igual ao dos comunicados (escola, turma, aluno individual). */
 export async function filtroDeVisibilidadeEnquetes(session: Pick<AccessTokenPayload, "sub" | "role" | "schoolId">) {
-  if (session.role === "ADMIN") return undefined;
-  if (session.role === "GUARDIAN") {
-    const links = await prisma.guardianStudent.findMany({
-      where: { guardianId: session.sub, student: { deletedAt: null } },
-      select: { studentId: true, student: { select: { classId: true } } },
-    });
-    const classIds = [...new Set(links.map((l) => l.student.classId))];
-    const studentIds = links.map((l) => l.studentId);
-    return [
-      { audience: "SCHOOL" as const },
-      { audience: "CLASS" as const, classId: { in: classIds } },
-      { audience: "STUDENT" as const, alunoId: { in: studentIds } },
-    ];
-  }
-  const teaching = await prisma.classTeacher.findMany({ where: { teacherId: session.sub }, select: { classId: true } });
-  const classIds = [...new Set(teaching.map((t) => t.classId))];
-  return [
-    { audience: "SCHOOL" as const },
-    { audience: "CLASS" as const, classId: { in: classIds } },
-    { audience: "STUDENT" as const, classId: { in: classIds } },
-  ];
+  return (await visibilidadePorPublico(session)).condicoes;
 }
 
 /** Responsáveis (sem repetir) que compõem o público da enquete. */
