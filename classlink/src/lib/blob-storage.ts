@@ -26,3 +26,34 @@ export async function lerDoBlob(caminho: string) {
 export async function apagarDoBlob(caminho: string | string[]): Promise<void> {
   await del(caminho);
 }
+
+/** Junta os pedaços lidos de um fluxo num único Uint8Array. */
+export function juntarPartes(partes: Uint8Array[], total = partes.reduce((s, p) => s + p.length, 0)): Uint8Array<ArrayBuffer> {
+  const junto = new Uint8Array(total);
+  let pos = 0;
+  for (const p of partes) {
+    junto.set(p, pos);
+    pos += p.length;
+  }
+  return junto;
+}
+
+/**
+ * Primeiros `bytes` de um arquivo do Blob e o tamanho total, sem baixar o arquivo inteiro
+ * (para conferir o tipo real pelo conteúdo). Null quando o arquivo não existe.
+ */
+export async function inicioDoBlob(caminho: string, bytes = 64): Promise<{ inicio: Uint8Array; tamanho: number } | null> {
+  const arquivo = await lerDoBlob(caminho);
+  if (!arquivo || arquivo.statusCode !== 200) return null;
+  const leitor = arquivo.stream.getReader();
+  const partes: Uint8Array[] = [];
+  let total = 0;
+  while (total < bytes) {
+    const { value, done } = await leitor.read();
+    if (done || !value) break;
+    partes.push(value);
+    total += value.length;
+  }
+  await leitor.cancel().catch(() => undefined);
+  return { inicio: juntarPartes(partes, total).slice(0, bytes), tamanho: arquivo.blob.size };
+}

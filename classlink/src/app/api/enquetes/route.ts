@@ -7,6 +7,7 @@ import { notifyUsers } from "@/lib/push";
 import { ErroDeUsuario } from "@/lib/erros";
 import { enqueteAberta, normalizarOpcoesPergunta } from "@/lib/enquetes";
 import { filtroDeVisibilidadeEnquetes, publicoDaEnquete } from "@/lib/enquetes-acesso";
+import { exigirAlunoPublicavel, exigirTurmaPublicavel } from "@/lib/turmas-acesso";
 
 export async function GET() {
   try {
@@ -68,26 +69,13 @@ export async function POST(request: NextRequest) {
 
     if (body.audience === "CLASS") {
       if (!body.classId) throw new ErroDeUsuario("Escolha a turma.");
-      const cls = await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId } });
-      if (!cls) throw new ErroDeUsuario("Turma não encontrada.", 404);
-      if (session.role === "STAFF") {
-        const leciona = await prisma.classTeacher.findFirst({ where: { classId: body.classId, teacherId: session.sub } });
-        if (!leciona) throw new ErroDeUsuario("Você não leciona nesta turma.", 403);
-      }
+      await exigirTurmaPublicavel(session, body.classId);
       classId = body.classId;
     }
 
     if (body.audience === "STUDENT") {
       if (!body.alunoId) throw new ErroDeUsuario("Escolha o aluno.");
-      const aluno = await prisma.student.findFirst({
-        where: { id: body.alunoId, schoolId: session.schoolId, deletedAt: null },
-        select: { id: true, classId: true },
-      });
-      if (!aluno) throw new ErroDeUsuario("Aluno não encontrado.", 404);
-      if (session.role === "STAFF") {
-        const leciona = await prisma.classTeacher.findFirst({ where: { classId: aluno.classId, teacherId: session.sub } });
-        if (!leciona) throw new ErroDeUsuario("Você não leciona na turma deste aluno.", 403);
-      }
+      const aluno = await exigirAlunoPublicavel(session, body.alunoId);
       alunoId = aluno.id;
       classId = aluno.classId;
       // Enquete direcionada a uma única família não pode ser anônima: a escola já sabe quem é.

@@ -4,6 +4,7 @@ import { requireRole, requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { createEventSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
+import { exigirTurmaPublicavel, turmasQueLeciona } from "@/lib/turmas-acesso";
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,11 +20,7 @@ export async function GET(request: NextRequest) {
       });
       visibleClassIds = [...new Set(links.map((l) => l.student.classId))];
     } else if (session.role === "STAFF") {
-      const teaching = await prisma.classTeacher.findMany({
-        where: { teacherId: session.sub },
-        select: { classId: true },
-      });
-      visibleClassIds = [...new Set(teaching.map((t) => t.classId))];
+      visibleClassIds = await turmasQueLeciona(session.sub);
     }
 
     const events = await prisma.event.findMany({
@@ -50,14 +47,7 @@ export async function POST(request: NextRequest) {
     const body = createEventSchema.parse(await request.json());
 
     if (body.classId) {
-      const cls = await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId } });
-      if (!cls) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
-      if (session.role === "STAFF") {
-        const teaches = await prisma.classTeacher.findFirst({
-          where: { classId: body.classId, teacherId: session.sub },
-        });
-        if (!teaches) return NextResponse.json({ error: "Você não leciona nesta turma" }, { status: 403 });
-      }
+      await exigirTurmaPublicavel(session, body.classId);
     } else if (session.role !== "ADMIN") {
       return NextResponse.json({ error: "Apenas administradores criam eventos para toda a escola" }, { status: 403 });
     }

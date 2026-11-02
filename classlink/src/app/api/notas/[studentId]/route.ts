@@ -1,29 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession, requireCoordenacaoOuAdmin, AuthError } from "@/lib/session";
+import { requireSession, requireCoordenacaoOuAdmin } from "@/lib/session";
+import { exigirPodeVerAluno } from "@/lib/turmas-acesso";
 import { handleApiError } from "@/lib/http";
 import { setNotaSchema } from "@/lib/validators";
 import { TRIMESTRES, calcMediaTrimestre, calcMediaFinal, calcSituacao } from "@/lib/notas";
-
-/** Confere se o usuário logado pode VER o boletim deste aluno (leitura). Lançar notas exige requireCoordenacaoOuAdmin à parte. */
-async function verificarAcessoLeitura(studentId: string, schoolId: string, session: Awaited<ReturnType<typeof requireSession>>) {
-  if (session.role === "ADMIN") return;
-  if (session.role === "STAFF") {
-    const teaches = await prisma.classTeacher.findFirst({
-      where: { teacherId: session.sub, class: { students: { some: { id: studentId } } } },
-    });
-    if (teaches) return;
-    const user = await prisma.user.findUnique({ where: { id: session.sub }, select: { isCoordenacao: true } });
-    if (user?.isCoordenacao) return;
-    throw new AuthError("Você não tem acesso ao boletim deste aluno", 403);
-  }
-  if (session.role === "GUARDIAN") {
-    const link = await prisma.guardianStudent.findFirst({ where: { guardianId: session.sub, studentId } });
-    if (link) return;
-    throw new AuthError("Você não tem acesso ao boletim deste aluno", 403);
-  }
-  throw new AuthError("Acesso negado", 403);
-}
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/notas/[studentId]">) {
   try {
@@ -36,7 +17,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/notas/[
     });
     if (!student) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
 
-    await verificarAcessoLeitura(studentId, session.schoolId, session);
+    await exigirPodeVerAluno(session, studentId, "ao boletim");
 
     const [disciplinas, notas] = await Promise.all([
       prisma.disciplina.findMany({ where: { schoolId: session.schoolId }, orderBy: { nome: "asc" } }),
