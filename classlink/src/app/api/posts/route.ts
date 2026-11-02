@@ -7,6 +7,7 @@ import { notifyUsers } from "@/lib/push";
 import { getSignedMediaUrl } from "@/lib/firebase-storage";
 import { filtroDeVisibilidade, turmasVisiveisNoMural } from "@/lib/visibilidade-posts";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
+import { exigirTurmaPublicavel } from "@/lib/turmas-acesso";
 
 /** Troca o caminho interno do arquivo por uma URL assinada de leitura (temporária). */
 async function withSignedMedia<T extends { mediaUrl: string | null }>(post: T): Promise<T> {
@@ -70,14 +71,7 @@ export async function POST(request: NextRequest) {
     let classId: string | null = null;
     if (body.audience === "CLASS") {
       if (!body.classId) return NextResponse.json({ error: "classId obrigatório" }, { status: 400 });
-      const cls = await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId } });
-      if (!cls) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
-      if (session.role === "STAFF") {
-        const teaches = await prisma.classTeacher.findFirst({
-          where: { classId: body.classId, teacherId: session.sub },
-        });
-        if (!teaches) return NextResponse.json({ error: "Você não leciona nesta turma" }, { status: 403 });
-      }
+      await exigirTurmaPublicavel(session, body.classId);
       classId = body.classId;
     }
 

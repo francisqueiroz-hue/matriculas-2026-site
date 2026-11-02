@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ErroDeUsuario } from "@/lib/erros";
-import { apagarDoBlob, lerDoBlob } from "@/lib/blob-storage";
+import { apagarDoBlob, inicioDoBlob } from "@/lib/blob-storage";
 import { guardarArquivo } from "@/lib/firebase-storage";
 import {
   ANEXO_LIMITE_ENVIO_SERVIDOR,
@@ -35,29 +35,6 @@ export async function guardarAnexoDoFormulario(arquivo: File, escolaId: string, 
   const caminho = `classlink/${escolaId}/mensagens/${conversaId}/${randomUUID()}.${real.extensao}`;
   await guardarArquivo(caminho, bytes, real.mime);
   return { tipo: real.tipo, mime: real.mime, nome: nomeAnexoSeguro(arquivo.name, real.extensao), caminho };
-}
-
-/** Primeiros bytes e tamanho de um arquivo do Blob, sem baixar tudo. */
-async function inicioDoBlob(caminho: string, bytes = 64): Promise<{ inicio: Uint8Array; tamanho: number } | null> {
-  const arquivo = await lerDoBlob(caminho);
-  if (!arquivo || arquivo.statusCode !== 200) return null;
-  const leitor = arquivo.stream.getReader();
-  const partes: Uint8Array[] = [];
-  let total = 0;
-  while (total < bytes) {
-    const { value, done } = await leitor.read();
-    if (done || !value) break;
-    partes.push(value);
-    total += value.length;
-  }
-  await leitor.cancel().catch(() => undefined);
-  const junto = new Uint8Array(total);
-  let pos = 0;
-  for (const p of partes) {
-    junto.set(p, pos);
-    pos += p.length;
-  }
-  return { inicio: junto.slice(0, bytes), tamanho: arquivo.blob.size };
 }
 
 /**

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { AccessTokenPayload } from "@/lib/auth";
-import { lerDoBlob } from "@/lib/blob-storage";
+import { juntarPartes, lerDoBlob } from "@/lib/blob-storage";
 import { ContratoErro, mensagemArquivoGrande } from "@/lib/contratos";
 
 /** Impressão digital SHA-256 (hex) do arquivo — comprova que o PDF guardado é o mesmo que foi enviado. */
@@ -64,11 +64,5 @@ export async function lerPdfDoBlob(caminho: string, maxBytes: number): Promise<U
     }
     partes.push(value);
   }
-  const junto = new Uint8Array(total);
-  let pos = 0;
-  for (const p of partes) {
-    junto.set(p, pos);
-    pos += p.length;
-  }
-  return junto;
+  return juntarPartes(partes, total);
 }

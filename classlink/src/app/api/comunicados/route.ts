@@ -7,6 +7,7 @@ import { notifyUsers } from "@/lib/push";
 import { getPublicoAlvo } from "@/lib/comunicados";
 import { separarAbertura } from "@/lib/comunicado-leitura";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
+import { exigirAlunoPublicavel, exigirTurmaPublicavel, turmasQueLeciona } from "@/lib/turmas-acesso";
 
 export async function GET() {
   try {
@@ -31,11 +32,7 @@ export async function GET() {
         { audience: "STUDENT", alunoId: { in: studentIds } },
       ];
     } else if (session.role === "STAFF") {
-      const teaching = await prisma.classTeacher.findMany({
-        where: { teacherId: session.sub },
-        select: { classId: true },
-      });
-      const classIds = [...new Set(teaching.map((t) => t.classId))];
+      const classIds = await turmasQueLeciona(session.sub);
       visibilidadeOR = [
         { audience: "SCHOOL" },
         { audience: "CLASS", classId: { in: classIds } },
@@ -113,30 +110,13 @@ export async function POST(request: NextRequest) {
 
     if (body.audience === "CLASS") {
       if (!body.classId) return NextResponse.json({ error: "classId obrigatório" }, { status: 400 });
-      const cls = await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId } });
-      if (!cls) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
-      if (session.role === "STAFF") {
-        const teaches = await prisma.classTeacher.findFirst({
-          where: { classId: body.classId, teacherId: session.sub },
-        });
-        if (!teaches) return NextResponse.json({ error: "Você não leciona nesta turma" }, { status: 403 });
-      }
+      await exigirTurmaPublicavel(session, body.classId);
       classId = body.classId;
     }
 
     if (body.audience === "STUDENT") {
       if (!body.alunoId) return NextResponse.json({ error: "alunoId obrigatório" }, { status: 400 });
-      const aluno = await prisma.student.findFirst({
-        where: { id: body.alunoId, schoolId: session.schoolId, deletedAt: null },
-        select: { id: true, classId: true },
-      });
-      if (!aluno) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
-      if (session.role === "STAFF") {
-        const teaches = await prisma.classTeacher.findFirst({
-          where: { classId: aluno.classId, teacherId: session.sub },
-        });
-        if (!teaches) return NextResponse.json({ error: "Você não leciona na turma deste aluno" }, { status: 403 });
-      }
+      const aluno = await exigirAlunoPublicavel(session, body.alunoId);
       alunoId = aluno.id;
       classId = aluno.classId; // mantém a mesma filtragem de visibilidade por turma usada nos demais casos
     }

@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole, AuthError } from "@/lib/session";
+import { requireRole } from "@/lib/session";
+import { exigirLecionaNaTurma } from "@/lib/turmas-acesso";
 import { handleApiError } from "@/lib/http";
 import { markAttendanceSchema } from "@/lib/validators";
 import { dataParaMeiaNoiteUtc } from "@/lib/attendance";
-
-/** Confere se o usuário logado pode marcar/consultar frequência desta turma. Turma já confirmada como existente/da escola. */
-async function verificarAcessoTurma(classId: string, session: Awaited<ReturnType<typeof requireRole>>) {
-  if (session.role === "ADMIN") return;
-  const leciona = await prisma.classTeacher.findFirst({ where: { classId, teacherId: session.sub } });
-  if (!leciona) throw new AuthError("Você não leciona nesta turma", 403);
-}
 
 /** Roster da turma numa data (para a tela de marcação): alunos + status já lançado, quando houver. */
 export async function GET(request: NextRequest) {
@@ -25,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const turma = await prisma.class.findFirst({ where: { id: classId, schoolId: session.schoolId } });
     if (!turma) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
-    await verificarAcessoTurma(classId, session);
+    await exigirLecionaNaTurma(session, classId);
 
     const [students, records] = await Promise.all([
       prisma.student.findMany({
@@ -54,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const turma = await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId } });
     if (!turma) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
-    await verificarAcessoTurma(body.classId, session);
+    await exigirLecionaNaTurma(session, body.classId);
 
     const studentIds = body.marks.map((m) => m.studentId);
     const alunosDaTurma = await prisma.student.findMany({
