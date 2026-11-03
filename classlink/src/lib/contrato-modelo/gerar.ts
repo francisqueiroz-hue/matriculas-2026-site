@@ -5,6 +5,7 @@ import { LOGO_ESPACO_KIDS_PNG, LOGO_INSTITUTO_FOKUS_PNG } from "./logos";
 import {
   LINHAS_ANEXO_IMAGEM,
   calcularValores,
+  cronogramaParcelas,
   diaDoMes,
   formatarCpf,
   formatarDinheiro,
@@ -403,7 +404,18 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
       // Cláusula 7ª: quadros de horários e de valores por período
       doc.y += 6;
       doc.tabela(["PERÍODOS", `HORÁRIOS - ${c.anoLetivo}`], cfg.periodos.map((p) => [p.nome, ou(p.horario, 30)]));
-      doc.tabela(["PERÍODO", `VALOR ATÉ O VENCIMENTO - ${c.anoLetivo}`], cfg.periodos.map((p) => [p.nome, dinheiro(p.parcelaLiquida)]));
+      if (c.bolsista) {
+        doc.tabela(["CONTRATO DESTE ALUNO", `VALORES - ${c.anoLetivo}`], [["Bolsa integral", "Isento de mensalidade"]]);
+      } else if (temValores) {
+        // Valor deste contrato (ex.: renovação com a mensalidade corrigida): as parcelas mês a mês,
+        // em vez da tabela geral por período, que pode estar em branco ou ter outro valor.
+        doc.tabela(
+          ["PARCELA E VENCIMENTO", `VALOR DA PARCELA - ${c.anoLetivo}`],
+          [...cronogramaParcelas(cfg.parcelas, c.parcelaBruta).map((p): [string, string] => [p.rotulo, dinheiro(p.valor)]), ["Total do contrato", dinheiro(v.anuidade)]],
+        );
+      } else {
+        doc.tabela(["PERÍODO", `VALOR ATÉ O VENCIMENTO - ${c.anoLetivo}`], cfg.periodos.map((p) => [p.nome, dinheiro(p.parcelaLiquida)]));
+      }
     }
   });
 

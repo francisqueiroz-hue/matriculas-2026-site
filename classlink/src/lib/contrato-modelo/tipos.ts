@@ -6,6 +6,9 @@ export type Etapa = "EI" | "EF1";
 
 export const MODELO_CONTRATO_2027 = "ESPACO_KIDS_2027";
 
+/** Correção da renovação 2027 sobre a mensalidade cadastrada (decisão da direção, out/2026). */
+export const REAJUSTE_RENOVACAO_2027 = 9.2;
+
 /** Vencimento das mensalidades: sempre dia 05 de cada mês (decisão da direção, out/2026). */
 export const DIA_VENCIMENTO_MENSALIDADE = 5;
 
@@ -328,4 +331,23 @@ export function valoresDoContrato(condicoes: unknown): ValoresContrato | null {
     reajuste: r && r.valorAnterior > 0 ? { valorAnterior: r.valorAnterior, percentual: r.percentual, base: r.base } : null,
     bolsista: false,
   };
+}
+
+const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/**
+ * As parcelas do contrato, mês a mês, para o quadro da Cláusula 7ª: a primeira data sai de
+ * "Primeiro/último vencimento" (ex.: "05/01/2027 a 05/12/2027"); sem data legível, as parcelas
+ * saem numeradas ("Parcela 1/12"). Todas com o mesmo valor (Lei 9.870/1999, art. 1º, § 5º).
+ */
+export function cronogramaParcelas(parcelas: ConfigContrato["parcelas"], valor: number): { rotulo: string; valor: number }[] {
+  const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(parcelas.primeiroUltimo);
+  const dia = diaDoMes(parcelas.vencimentoDia);
+  return Array.from({ length: parcelas.quantidade }, (_, i) => {
+    if (!m) return { rotulo: `Parcela ${i + 1}/${parcelas.quantidade}`, valor };
+    const mes0 = Number(m[2]) - 1 + i;
+    const ano = Number(m[3]) + Math.floor(mes0 / 12);
+    const mes = mes0 % 12;
+    return { rotulo: `${i + 1}ª parcela - ${dia}/${String(mes + 1).padStart(2, "0")}/${ano} (${MESES_CURTOS[mes]})`, valor };
+  });
 }

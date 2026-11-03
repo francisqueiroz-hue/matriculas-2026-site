@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiJson } from "@/lib/api-client";
 import {
   DIA_VENCIMENTO_MENSALIDADE,
+  REAJUSTE_RENOVACAO_2027,
   calcularValores,
   diaDoMes,
   etapaPelaTurma,
@@ -387,8 +388,9 @@ function EnvioLote({ ano, jaTemModelo, onEnviado }: { ano: number; jaTemModelo: 
   const [linhas, setLinhas] = useState<Record<string, Linha>>({});
   const [periodoPadrao, setPeriodoPadrao] = useState<PeriodoChave | "">("");
   // Renovação: valor de cada contrato = mensalidade atual corrigida pelo critério da direção.
-  const [comReajuste, setComReajuste] = useState(false);
-  const [pctTexto, setPctTexto] = useState("9,2"); // correção definida pela direção para 2027
+  // Campanha 2027: o padrão é a renovação com a mensalidade corrigida (decisão da direção).
+  const [comReajuste, setComReajuste] = useState(true);
+  const [pctTexto, setPctTexto] = useState(REAJUSTE_RENOVACAO_2027.toLocaleString("pt-BR")); // correção definida pela direção para 2027
   const [arredondamento, setArredondamento] = useState<Arredondamento>("CENTAVOS");
   const [titulo, setTitulo] = useState(`Contrato de prestação de serviços educacionais ${ano}`);
   const [enviando, setEnviando] = useState(false);
@@ -707,6 +709,159 @@ function CorrigirVencimento({ onCorrigido }: { onCorrigido: () => void }) {
   );
 }
 
+interface LinhaConferencia {
+  id: string;
+  aluno: string;
+  turma: string;
+  enviadoEm: string;
+  assinado: boolean;
+  dadosPreenchidos: boolean;
+  situacao: "OK" | "SEM_VALOR" | "VALOR_DIFERENTE" | "AJUSTADO" | "SEM_MENSALIDADE";
+  rotulo: string;
+  valorContrato: number;
+  valorEsperado: number | null;
+  atualizavel: boolean;
+}
+
+const COR_SITUACAO: Record<LinhaConferencia["situacao"], string> = {
+  OK: "text-emerald-800",
+  AJUSTADO: "text-slate-700",
+  SEM_VALOR: "text-red-700",
+  VALOR_DIFERENTE: "text-red-700",
+  SEM_MENSALIDADE: "text-amber-800",
+};
+
+const reais = (v: number | null) => (v === null ? "—" : v > 0 ? `R$ ${formatarDinheiro(v)}` : "em branco");
+
+/**
+ * Conferência dos contratos 2027 já enviados: mostra quais saíram sem o valor corrigido (em
+ * branco ou com outro valor), se a família já assinou, e atualiza os ainda não assinados.
+ */
+function ConferenciaValores({ onAtualizado }: { onAtualizado: () => void }) {
+  const [linhas, setLinhas] = useState<LinhaConferencia[] | null>(null);
+  const [aberto, setAberto] = useState(false);
+  const [rodando, setRodando] = useState(false);
+  const [msg, setMsg] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
+
+  const carregar = useCallback(() => {
+    apiJson<{ linhas: LinhaConferencia[] }>("/api/admin/contratos/valores")
+      .then((r) => setLinhas(r.linhas))
+      .catch((e) => setMsg({ tipo: "erro", texto: e instanceof Error ? e.message : "Erro ao conferir os valores" }));
+  }, []);
+
+  useEffect(() => {
+    if (aberto) carregar();
+  }, [aberto, carregar]);
+
+  const problemas = (linhas ?? []).filter((l) => l.situacao !== "OK" && l.situacao !== "AJUSTADO");
+  const atualizaveis = (linhas ?? []).filter((l) => l.atualizavel);
+  const assinadosComProblema = problemas.filter((l) => l.assinado && l.situacao !== "SEM_MENSALIDADE");
+
+  function baixarCsv() {
+    if (!linhas) return;
+    const cab = ["Aluno", "Turma", "Enviado em", "Situação", "Parcela no contrato", "Parcela corrigida", "Família já assinou"];
+    const corpo = linhas.map((l) => [
+      l.aluno,
+      l.turma,
+      new Date(l.enviadoEm).toLocaleDateString("pt-BR"),
+      l.rotulo,
+      reais(l.valorContrato),
+      reais(l.valorEsperado),
+      l.assinado ? "Sim" : "Não",
+    ]);
+    const csv = [cab, ...corpo].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "conferencia-valores-contratos-2027.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function atualizar() {
+    if (!window.confirm(`Atualizar ${atualizaveis.length} contrato(s) ainda não assinado(s) para o valor corrigido? Cada família recebe um aviso no app para assinar a versão nova.`)) return;
+    setRodando(true);
+    setMsg(null);
+    try {
+      const r = await apiJson<{ atualizados: { nome: string }[]; total: number }>("/api/admin/contratos/valores", { method: "POST" });
+      setMsg({ tipo: "ok", texto: r.total > 0 ? `${r.total} contrato(s) atualizado(s): ${r.atualizados.map((a) => a.nome).join(", ")}.` : "Nenhum contrato precisou de atualização." });
+      carregar();
+      if (r.total > 0) onAtualizado();
+    } catch (err) {
+      setMsg({ tipo: "erro", texto: err instanceof Error ? err.message : "Erro ao atualizar os contratos" });
+    } finally {
+      setRodando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+      <button type="button" onClick={() => setAberto((v) => !v)} aria-expanded={aberto} className={btnSecundario}>
+        {aberto ? "Fechar conferência" : "Conferir valores dos contratos já enviados"}
+      </button>
+      {aberto && !linhas && !msg && <p className="text-slate-500">Conferindo…</p>}
+      {aberto && linhas && (
+        <>
+          <p>
+            {linhas.length} contrato(s) enviado(s). <strong>{problemas.length}</strong> sem o valor corrigido
+            {problemas.length > 0 && <> ({atualizaveis.length} ainda não assinado(s), que podem ser atualizados aqui)</>}.
+          </p>
+          {assinadosComProblema.length > 0 && (
+            <p className="rounded-md bg-amber-50 p-2 text-amber-900">
+              {assinadosComProblema.length} contrato(s) já assinado(s) sem o valor corrigido não mudam por aqui: o que foi assinado vale como
+              assinado. Para esses, a escola precisa combinar com a família (ex.: termo aditivo).
+            </p>
+          )}
+          <div className="max-h-96 overflow-auto rounded-md border border-slate-200">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-slate-50">
+                <tr>
+                  <th className="p-2">Aluno</th>
+                  <th className="p-2">Enviado em</th>
+                  <th className="p-2">No contrato</th>
+                  <th className="p-2">Corrigido</th>
+                  <th className="p-2">Situação</th>
+                  <th className="p-2">Assinado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {linhas.map((l) => (
+                  <tr key={l.id}>
+                    <td className="p-2">
+                      {l.aluno}
+                      <span className="block text-slate-500">{l.turma}</span>
+                    </td>
+                    <td className="p-2">{new Date(l.enviadoEm).toLocaleDateString("pt-BR")}</td>
+                    <td className="p-2">{reais(l.valorContrato)}</td>
+                    <td className="p-2">{l.situacao === "OK" && l.valorEsperado === 0 ? "isento" : reais(l.valorEsperado)}</td>
+                    <td className={`p-2 font-medium ${COR_SITUACAO[l.situacao]}`}>{l.rotulo}</td>
+                    <td className="p-2">{l.assinado ? "Sim" : "Não"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={baixarCsv} className={btnSecundario}>
+              Baixar planilha (CSV)
+            </button>
+            {atualizaveis.length > 0 && (
+              <button type="button" onClick={atualizar} disabled={rodando} className={btnPrimario}>
+                {rodando ? "Atualizando…" : `Atualizar ${atualizaveis.length} contrato(s) não assinado(s) para o valor corrigido`}
+              </button>
+            )}
+          </div>
+        </>
+      )}
+      {msg && (
+        <p role={msg.tipo === "erro" ? "alert" : "status"} className={msg.tipo === "erro" ? "text-red-700" : "font-medium text-emerald-800"}>
+          {msg.texto}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Contrato guardado no app: a escola envia pronto para assinar (nome e turma do aluno já no
  * PDF). A família assina pelo gov.br ou à mão; se quiser, preenche os dados no app antes.
@@ -749,6 +904,7 @@ export function ContratoModeloPainel({ ano, jaTemModelo, onEnviado }: { ano: num
       ) : (
         <>
           {ano === 2027 && <CorrigirVencimento onCorrigido={onEnviado} />}
+          {ano === 2027 && <ConferenciaValores onAtualizado={onEnviado} />}
           <EnvioLote key={ano} ano={ano} jaTemModelo={jaTemModelo} onEnviado={onEnviado} />
         </>
       )}
