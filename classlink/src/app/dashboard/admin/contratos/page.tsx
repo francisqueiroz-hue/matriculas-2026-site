@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiJson } from "@/lib/api-client";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
-import { MODELO_CONTRATO_2027, type ValoresContrato as Valores } from "@/lib/contrato-modelo/tipos";
+import { MODELO_CONTRATO_2027, formatarDinheiro, type ValoresContrato as Valores } from "@/lib/contrato-modelo/tipos";
+import type { SituacaoValor } from "@/lib/contrato-modelo/conferencia";
 import { ValoresContrato } from "@/components/ValoresContrato";
 import { ContratoModeloPainel } from "./ContratoModeloPainel";
 import {
@@ -51,6 +52,15 @@ interface Contrato {
   modelo: string | null;
   dadosPreenchidos: boolean;
   valores: Valores | null;
+  /** Só contratos do app 2027: valor do contrato x mensalidade cadastrada corrigida. */
+  conferencia: {
+    situacao: SituacaoValor;
+    rotulo: string;
+    valorContrato: number;
+    valorEsperado: number | null;
+    assinado: boolean;
+    atualizavel: boolean;
+  } | null;
   createdAt: string;
   student: {
     id: string;
@@ -305,6 +315,23 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
     }
   }
 
+  async function atualizarValor() {
+    const v = c.conferencia?.valorEsperado;
+    const texto = v ? `12 parcelas de R$ ${formatarDinheiro(v)} (total R$ ${formatarDinheiro(v * 12)})` : "isento (bolsista)";
+    if (!confirm(`Atualizar o contrato de ${c.student.name} para ${texto}?\n\nO app gera o contrato novo e avisa a família para assinar esta versão.`)) return;
+    setSalvando(true);
+    setErro(null);
+    try {
+      const r = await apiJson<{ total: number }>("/api/admin/contratos/valores", { method: "POST", body: JSON.stringify({ ids: [c.id] }) });
+      if (r.total === 0) setErro("Não foi possível atualizar: a família pode ter assinado nesse meio-tempo. Recarregue a página.");
+      onMudou();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro ao atualizar o valor");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   async function excluir() {
     if (!confirm(`Excluir o contrato de ${c.student.name}? Use só se foi enviado por engano.`)) return;
     try {
@@ -373,6 +400,34 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
 
       {c.status === "DEVOLVIDO" && c.motivoDevolucao && (
         <p className="mt-2 rounded-md bg-red-50 p-2 text-red-900">Motivo da devolução: {c.motivoDevolucao}</p>
+      )}
+
+      {c.conferencia && c.conferencia.situacao !== "OK" && c.conferencia.situacao !== "AJUSTADO" && (
+        <div role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-semibold">
+            {c.conferencia.situacao === "SEM_VALOR"
+              ? "Este contrato foi enviado sem os valores de 2027."
+              : c.conferencia.situacao === "VALOR_DIFERENTE"
+                ? `Este contrato saiu com R$ ${formatarDinheiro(c.conferencia.valorContrato)} por parcela, diferente do valor corrigido.`
+                : "Aluno sem mensalidade cadastrada: não há como calcular o valor 2027."}
+          </p>
+          {c.conferencia.situacao === "SEM_MENSALIDADE" ? (
+            <p className="mt-1">Preencha a mensalidade no cadastro do aluno (ou marque como bolsista) e volte aqui para atualizar o contrato.</p>
+          ) : (
+            <p className="mt-1">
+              Valor corrigido:{" "}
+              {c.conferencia.valorEsperado
+                ? `12 parcelas de R$ ${formatarDinheiro(c.conferencia.valorEsperado)} (total R$ ${formatarDinheiro(c.conferencia.valorEsperado * 12)}).`
+                : "isento de mensalidade (bolsista)."}
+              {c.conferencia.assinado && " A família já assinou esta versão: a correção precisa de aditivo."}
+            </p>
+          )}
+          {c.conferencia.atualizavel && (
+            <button type="button" disabled={salvando} onClick={atualizarValor} className={`${btnPrimario} mt-2`}>
+              Atualizar este contrato com o valor corrigido
+            </button>
+          )}
+        </div>
       )}
 
       {c.valores && (
@@ -505,6 +560,8 @@ function ContratosContent() {
   ];
 
   const visiveis = (dados?.contratos ?? []).filter((c) => !status || c.status === status);
+  const semValor = (dados?.contratos ?? []).filter((c) => c.conferencia && c.conferencia.situacao !== "OK" && c.conferencia.situacao !== "AJUSTADO");
+  const semValorAtualizaveis = semValor.filter((c) => c.conferencia?.atualizavel).length;
   const ordenados = [...visiveis].sort(
     (a, b) => PRIORIDADE[a.status] - PRIORIDADE[b.status] || a.student.name.localeCompare(b.student.name, "pt-BR"),
   );
@@ -580,6 +637,14 @@ function ContratosContent() {
       {erro && (
         <p role="alert" className="text-sm text-red-600">
           {erro}
+        </p>
+      )}
+      {semValor.length > 0 && (
+        <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <strong>{semValor.length} contrato(s) 2027 sem o valor corrigido.</strong> Eles aparecem com um aviso amarelo na lista abaixo;{" "}
+          {semValorAtualizaveis > 0
+            ? `${semValorAtualizaveis} ainda não foram assinados e podem ser atualizados no próprio cartão (ou todos de uma vez em "Conferir valores dos contratos já enviados", acima).`
+            : "os que já foram assinados precisam de aditivo."}
         </p>
       )}
       {dados === null && !erro && <p className="text-sm text-slate-500">Carregando…</p>}

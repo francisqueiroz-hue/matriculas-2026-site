@@ -88,7 +88,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN");
-    const contratos = await contratosDoAno(session.schoolId);
+    // Corpo opcional { ids }: atualiza só esses contratos (botão no cartão de cada aluno).
+    const corpo = (await request.json().catch(() => null)) as { ids?: unknown } | null;
+    const ids = Array.isArray(corpo?.ids) ? new Set(corpo.ids.filter((v): v is string => typeof v === "string")) : null;
+    const contratos = (await contratosDoAno(session.schoolId)).filter((c) => !ids || ids.has(c.id));
     const ipOrigem = getClientIp(request);
     const atualizados: { id: string; nome: string }[] = [];
 

@@ -133,3 +133,16 @@ describe("rota de conferência dos contratos 2027", () => {
     expect(notifyUsers).not.toHaveBeenCalled();
   });
 });
+
+describe("atualização de um contrato só (botão no cartão do aluno)", () => {
+  it("POST com ids atualiza só o contrato pedido", async () => {
+    prismaMock.contrato.findMany.mockResolvedValue([
+      contrato("c1", condicoes(), { mensalidadeValor: "750.00" }),
+      contrato("c4", condicoes(), { mensalidadeValor: "2500.00" }),
+    ]);
+    const req = new NextRequest("http://t/api/admin/contratos/valores", { method: "POST", body: JSON.stringify({ ids: ["c1"] }) });
+    const json = await (await POST(req)).json();
+    expect(json).toEqual({ atualizados: [{ id: "c1", nome: "Aluno c1" }], total: 1 });
+    expect(tx.contrato.updateMany.mock.calls[0][0].data.condicoes).toMatchObject({ parcelaBruta: 819, parcelaLiquida: 819 });
+  });
+});

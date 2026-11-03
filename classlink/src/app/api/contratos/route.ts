@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import type { ContratoStatus } from "@/lib/contratos";
-import { valoresDoContrato } from "@/lib/contrato-modelo/tipos";
+import { MODELO_CONTRATO_2027, valoresDoContrato } from "@/lib/contrato-modelo/tipos";
+import { ROTULO_SITUACAO, conferirValor, precisaAtualizar } from "@/lib/contrato-modelo/conferencia";
 
 const STATUS_VALIDOS: ContratoStatus[] = ["AGUARDANDO_ASSINATURA", "EM_CONFERENCIA", "AGUARDANDO_ORIGINAL", "COMPLETO", "DEVOLVIDO"];
 
@@ -29,6 +30,23 @@ const arquivoSelect = {
  */
 function semDadosFamilia<T extends { dadosFamilia: unknown; condicoes: unknown }>({ dadosFamilia, condicoes, ...resto }: T) {
   return { ...resto, dadosPreenchidos: dadosFamilia !== null, valores: valoresDoContrato(condicoes) };
+}
+
+/**
+ * Para a direção: o valor que saiu no contrato do app (renovação 2027) confere com a mensalidade
+ * cadastrada corrigida? Só faz sentido para o modelo do app; nos demais, null.
+ */
+function conferenciaDoContrato(
+  c: { modelo: string | null; anoLetivo: number; status: string; condicoes: unknown; arquivos: { tipo: string }[] },
+  aluno: { mensalidadeValor: unknown; bolsista: boolean },
+) {
+  if (c.modelo !== MODELO_CONTRATO_2027 || c.anoLetivo !== 2027) return null;
+  const conf = conferirValor(c.condicoes, {
+    mensalidade: aluno.mensalidadeValor === null || aluno.mensalidadeValor === undefined ? null : Number(aluno.mensalidadeValor),
+    bolsista: aluno.bolsista,
+  });
+  const assinado = c.arquivos.some((a) => a.tipo === "ASSINADO") || c.status !== "AGUARDANDO_ASSINATURA";
+  return { ...conf, rotulo: ROTULO_SITUACAO[conf.situacao], assinado, atualizavel: !assinado && precisaAtualizar(conf.situacao) };
 }
 
 export async function GET(request: NextRequest) {
@@ -91,6 +109,8 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               class: { select: { name: true } },
+              mensalidadeValor: true,
+              bolsista: true,
               guardians: { select: { relation: true, guardian: { select: { id: true, name: true, phone: true } } } },
             },
           },
@@ -120,7 +140,10 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json({
-      contratos: contratos.map(semDadosFamilia),
+      contratos: contratos.map((c) => {
+        const { mensalidadeValor, bolsista, ...student } = c.student;
+        return { ...semDadosFamilia({ ...c, student }), conferencia: conferenciaDoContrato(c, { mensalidadeValor, bolsista }) };
+      }),
       resumo: resumo.map((r) => ({ status: r.status, total: r._count._all })),
       anos: anos.map((a) => a.anoLetivo),
     });
