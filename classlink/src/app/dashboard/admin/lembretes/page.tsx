@@ -156,6 +156,13 @@ function Conteudo() {
                 </label>
               ))}
             </fieldset>
+            {config.tipos.includes("BOLETO") && (
+              <p role="note" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                <strong>Atenção — mensalidades:</strong> a baixa dos boletos pagos é feita à mão em Financeiro. O lembrete só sabe que a família
+                pagou depois dessa baixa. Mantenha as baixas em dia (de preferência antes das 10h, quando os lembretes saem) ou desmarque
+                &quot;{ROTULO_TIPO_LEMBRETE.BOLETO}&quot; para não lembrar quem já pagou.
+              </p>
+            )}
             <div className="flex flex-wrap gap-4">
               <Numero campo="diasInicio" rotulo="1º lembrete após (dias)" ajuda="dias corridos de pendência" valor={config.diasInicio} onChange={(v) => setConfig({ ...config, diasInicio: v })} />
               <Numero campo="intervaloDias" rotulo="Intervalo (dias)" ajuda="entre duas mensagens à mesma família" valor={config.intervaloDias} onChange={(v) => setConfig({ ...config, intervaloDias: v })} />
