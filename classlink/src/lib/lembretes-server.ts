@@ -15,6 +15,7 @@ import { dataBR } from "@/lib/boleto-aviso";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
 import {
   CONFIG_PADRAO,
+  diasCorridos,
   ehDomingo,
   mensagemLembrete,
   planejarLembretes,
@@ -165,17 +166,22 @@ async function pendenciasDeBoleto(schoolId: string, agora: Date): Promise<Penden
     const g = b.student.guardians[0];
     if (!g || !g.guardian.active || g.guardian.deletedAt) return [];
     const nome = primeiroNome(b.student.name);
-    const vencido = b.vencimento.getTime() < agora.getTime() && dataBR(b.vencimento) !== dataBR(agora);
+    const data = dataBR(b.vencimento);
+    const diasAte = diasCorridos(agora, b.vencimento);
     return [
       {
         tipo: "BOLETO" as const,
         referenciaId: b.id,
         responsavelId: g.guardianId,
         desde: b.createdAt,
+        vencimento: b.vencimento,
         aluno: b.student.name,
-        descricao: vencido
-          ? `pagar a mensalidade de ${nome}, vencida em ${dataBR(b.vencimento)}`
-          : `pagar a mensalidade de ${nome}, com vencimento em ${dataBR(b.vencimento)}`,
+        descricao:
+          diasAte < 0
+            ? `pagar a mensalidade de ${nome}, vencida em ${data}`
+            : diasAte === 1
+              ? `pagar a mensalidade de ${nome}, que vence amanhã (${data})`
+              : `pagar a mensalidade de ${nome}, com vencimento em ${data}`,
         url: "/dashboard/financeiro",
       },
     ];

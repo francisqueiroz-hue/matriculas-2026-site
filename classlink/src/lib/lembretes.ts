@@ -8,6 +8,8 @@
  *  - cada pendência gera no máximo `maxEnvios` lembretes (padrão 4) e depois para;
  *  - a pendência resolvida (assinou, respondeu, pagou, confirmou) sai da lista na hora e os
  *    lembretes param sozinhos;
+ *  - mensalidade segue o vencimento: 1 lembrete na véspera (com a data), e, se não for paga,
+ *    no dia seguinte ao vencimento e depois a cada `intervaloDias` (ver `situacaoBoleto`);
  *  - nada sai aos domingos, e nada sai enquanto a escola não ativar o envio.
  * Os dias são contados no calendário de Brasília, não em horas: o agendador da Vercel pode
  * atrasar alguns minutos e um intervalo de 72h viraria 4 dias.
@@ -80,6 +82,8 @@ export interface Pendencia {
   descricao: string;
   /** Tela do ClassLink onde a família resolve. */
   url: string;
+  /** Mensalidade: data de vencimento. Muda a regra (véspera, dia seguinte e a cada N dias). */
+  vencimento?: Date;
 }
 
 /** O que já foi registrado para esta pendência (tabela LembretePendencia). */
@@ -146,6 +150,44 @@ export function inicioDaPendencia(p: Pendencia, registro: RegistroLembrete | und
 }
 
 /**
+ * Mensalidade (decisão da direção, 04/11/2026): lembrete na véspera do vencimento, informando a
+ * data; se não for paga, no dia seguinte ao vencimento e depois a cada `intervaloDias`. Domingo
+ * não tem envio: a véspera que cairia no domingo sai no sábado, e o aviso de atraso sai na segunda.
+ * O limite de lembretes conta a véspera. Não depende do intervalo da família: tem data certa.
+ */
+export function situacaoBoleto(
+  vencimento: Date,
+  envios: number,
+  ultimoEnvioEm: Date | null,
+  config: ConfigLembretes,
+  agora: Date,
+): { situacao: SituacaoPendencia; proximoEm: Date | null } {
+  if (envios >= config.maxEnvios) return { situacao: "LIMITE_ATINGIDO", proximoEm: null };
+  const diasAte = diasCorridos(agora, vencimento);
+  // Último envio feito antes do dia do vencimento = o lembrete da véspera.
+  const enviouAntes = ultimoEnvioEm !== null && diasCorridos(ultimoEnvioEm, vencimento) > 0;
+
+  if (diasAte >= 1) {
+    if (enviouAntes) return { situacao: "AGUARDANDO_PRAZO", proximoEm: somarDias(vencimento, 1) };
+    const vesperaNoDomingo = ehDomingo(somarDias(vencimento, -1));
+    const hojeEhDia = diasAte === 1 || (diasAte === 2 && vesperaNoDomingo);
+    return hojeEhDia
+      ? { situacao: "PRONTA", proximoEm: agora }
+      : { situacao: "AGUARDANDO_PRAZO", proximoEm: somarDias(vencimento, vesperaNoDomingo ? -2 : -1) };
+  }
+  if (diasAte === 0) return { situacao: "AGUARDANDO_PRAZO", proximoEm: somarDias(vencimento, 1) };
+
+  // Vencida: 1º aviso no dia seguinte; depois, a cada intervaloDias desde o último aviso de atraso.
+  if (!ultimoEnvioEm || enviouAntes || diasCorridos(ultimoEnvioEm, vencimento) === 0) {
+    return { situacao: "PRONTA", proximoEm: agora };
+  }
+  const desde = diasCorridos(ultimoEnvioEm, agora);
+  return desde >= config.intervaloDias
+    ? { situacao: "PRONTA", proximoEm: agora }
+    : { situacao: "AGUARDANDO_INTERVALO", proximoEm: somarDias(agora, config.intervaloDias - desde) };
+}
+
+/**
  * Decide quem recebe lembrete agora. Pura: recebe as pendências atuais e os registros e
  * devolve o plano (quem recebe, o que vai em cada mensagem e o que foi resolvido).
  */
@@ -183,7 +225,9 @@ export function planejarLembretes(
 
     let situacao: SituacaoPendencia;
     let proximoEm: Date | null;
-    if (envios >= config.maxEnvios) {
+    if (p.vencimento) {
+      ({ situacao, proximoEm } = situacaoBoleto(p.vencimento, envios, ultimoEnvioEm, config, agora));
+    } else if (envios >= config.maxEnvios) {
       situacao = "LIMITE_ATINGIDO";
       proximoEm = null;
     } else if (diasPendente < config.diasInicio) {

@@ -92,7 +92,7 @@ function Conteudo() {
     setAviso(null);
     try {
       await apiJson("/api/admin/lembretes", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(proxima) });
-      setAviso(proxima.ativos ? "Salvo. Os lembretes saem todo dia por volta das 10h (exceto domingo)." : "Salvo. O envio automático está desligado.");
+      setAviso(proxima.ativos ? "Salvo. Os lembretes saem todo dia depois das 12h (exceto domingo)." : "Salvo. O envio automático está desligado.");
       carregar();
     } catch {
       setAviso("Não foi possível salvar. Tente de novo.");
@@ -159,7 +159,7 @@ function Conteudo() {
             {config.tipos.includes("BOLETO") && (
               <p role="note" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
                 <strong>Atenção — mensalidades:</strong> a baixa dos boletos pagos é feita à mão em Financeiro. O lembrete só sabe que a família
-                pagou depois dessa baixa. Mantenha as baixas em dia (de preferência antes das 10h, quando os lembretes saem) ou desmarque
+                pagou depois dessa baixa. Mantenha as baixas em dia (até o meio-dia, antes de os lembretes saírem) ou desmarque
                 &quot;{ROTULO_TIPO_LEMBRETE.BOLETO}&quot; para não lembrar quem já pagou.
               </p>
             )}
@@ -170,7 +170,7 @@ function Conteudo() {
             </div>
             <p className="text-xs text-slate-500">
               Canal: notificação no app; quem não tem o app com notificação ativa recebe pelo WhatsApp da escola. Sem envio aos domingos. A mensagem não informa valores.
-              Mensalidade: só o 1º responsável vinculado recebe, e só até 45 dias após o vencimento. Antes de ligar, confira se os pagamentos recebidos fora do banco já foram baixados em Financeiro.
+              Mensalidade: lembrete na véspera do vencimento (com a data) e, se não for paga, no dia seguinte ao vencimento e depois a cada intervalo, até o máximo. Só o 1º responsável vinculado recebe, e só até 45 dias após o vencimento. Antes de ligar, confira se os pagamentos recebidos fora do banco já foram baixados em Financeiro.
             </p>
             <div className="flex items-center gap-3">
               <button

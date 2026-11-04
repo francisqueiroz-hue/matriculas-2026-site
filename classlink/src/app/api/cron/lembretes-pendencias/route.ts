@@ -5,7 +5,7 @@ import { requireCronSecret } from "@/lib/cron-auth";
 import { executarLembretesDaEscola, type ResultadoExecucao } from "@/lib/lembretes-server";
 
 /**
- * Job diário (13h UTC = 10h de Brasília; ver vercel.json): lembra as famílias das pendências
+ * Job diário (15h UTC = 12h de Brasília, depois do horário de lançar as baixas; ver vercel.json): lembra as famílias das pendências
  * abertas há alguns dias (contrato, autorização, mensalidade, rematrícula). Uma mensagem por
  * família, no máximo a cada N dias, e só nas escolas que ativaram em Gestão › Lembretes.
  * Nas demais, só registra as pendências (para contar os dias) e não envia nada.
