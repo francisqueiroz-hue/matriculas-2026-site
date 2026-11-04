@@ -27,6 +27,19 @@ export function modoConvite(opcoes: {
   return opcoes.dispensou ? "nenhum" : "convite";
 }
 
+/**
+ * O que mostrar depois que o navegador responde ao pedido de permissão:
+ * - nada quando permitiu, quando o pedido foi automático (a pessoa não pediu nada, então não
+ *   cabe um recado na tela) ou quando a janela foi fechada / virou só um sino na barra de
+ *   endereço ("default") — Minha conta continua explicando como ativar;
+ * - "bloqueado" só quando a pessoa tocou em "Ativar avisos" e o navegador recusou, para ela
+ *   saber por que nada aconteceu.
+ */
+export function avisoAposPedido(resultado: NotificationPermission, automatico: boolean): "nenhum" | "bloqueado" {
+  if (automatico || resultado !== "denied") return "nenhum";
+  return "bloqueado";
+}
+
 export function permissaoAtual(): PermissaoAvisos {
   if (typeof Notification === "undefined" || typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return "indisponivel";

@@ -2,7 +2,7 @@
 import { createElement } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DISPENSOU_AVISOS_KEY, PEDIDO_AUTOMATICO_KEY, modoConvite } from "@/lib/convite-avisos";
+import { DISPENSOU_AVISOS_KEY, PEDIDO_AUTOMATICO_KEY, avisoAposPedido, modoConvite } from "@/lib/convite-avisos";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard", useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/firebase-client", () => ({ requestPushToken: vi.fn(async () => "token-123") }));
@@ -30,6 +30,18 @@ describe("modoConvite", () => {
   it("Administração: pedido automático uma única vez, mesmo se antes tocou em Agora não", () => {
     expect(modoConvite({ ...base, permissao: "default", admin: true, dispensou: true })).toBe("pedir-no-primeiro-toque");
     expect(modoConvite({ ...base, permissao: "default", admin: true, pedidoAutomaticoFeito: true })).toBe("nenhum");
+  });
+});
+
+describe("avisoAposPedido", () => {
+  it("sem recado quando permitiu, quando a janela não foi confirmada ou quando o pedido foi automático", () => {
+    expect(avisoAposPedido("granted", false)).toBe("nenhum");
+    expect(avisoAposPedido("default", false)).toBe("nenhum");
+    for (const r of ["granted", "default", "denied"] as const) expect(avisoAposPedido(r, true)).toBe("nenhum");
+  });
+
+  it("explica o bloqueio só para quem tocou em Ativar avisos", () => {
+    expect(avisoAposPedido("denied", false)).toBe("bloqueado");
   });
 });
 
@@ -77,19 +89,39 @@ describe("ConviteAtivarAvisos", () => {
     expect(Notif.requestPermission).toHaveBeenCalledTimes(1);
   });
 
-  it("janela fechada sem escolha: explica uma vez e o convite não volta no próximo acesso", async () => {
+  it("janela fechada sem escolha: nenhum recado na tela e o convite não volta no próximo acesso", async () => {
     permissao("default", "default");
     montar("STAFF");
     await act(async () => {});
     const botao = await screen.findByText("Ativar avisos");
     await act(async () => fireEvent.click(botao));
-    expect(screen.getByRole("status").textContent).toMatch(/não confirmou/);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/não confirmou/)).toBeNull();
     expect(localStorage.getItem(DISPENSOU_AVISOS_KEY)).toBe("1");
 
     cleanup();
     montar("STAFF");
     await act(async () => new Promise((r) => setTimeout(r, 10)));
     expect(screen.queryByText("Ativar avisos")).toBeNull();
+  });
+
+  it("Administração: pedido automático não confirmado ou recusado não deixa recado na tela", async () => {
+    for (const resposta of ["default", "denied"] as const) {
+      localStorage.clear();
+      permissao("default", resposta);
+      montar("ADMIN");
+      await act(async () => fireEvent.click(document.body));
+      expect(screen.queryByRole("status")).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("Ativar avisos recusado pelo navegador: explica como liberar", async () => {
+    permissao("default", "denied");
+    montar("STAFF");
+    const botao = await screen.findByText("Ativar avisos");
+    await act(async () => fireEvent.click(botao));
+    expect(screen.getByRole("status").textContent).toMatch(/bloqueadas/);
   });
 
   it("com a permissão já dada, não mostra convite nem pede de novo", async () => {
