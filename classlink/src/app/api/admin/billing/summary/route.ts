@@ -14,7 +14,7 @@ export async function GET() {
 
     const boletos = await prisma.boleto.findMany({
       where: { schoolId: session.schoolId, mesReferencia },
-      select: { status: true, valor: true, vencimento: true },
+      select: { status: true, valor: true, valorPago: true, vencimento: true },
     });
 
     const resumo = { PENDENTE: 0, PAGO: 0, VENCIDO: 0, ERRO: 0 } as Record<string, number>;
@@ -23,7 +23,8 @@ export async function GET() {
     for (const b of boletos) {
       const status = statusEfetivo(b.status as StatusBoleto, b.vencimento, hoje);
       resumo[status] = (resumo[status] ?? 0) + 1;
-      if (status === "PAGO") valorPago += Number(b.valor);
+      // Recebido: o valor informado na baixa; nas antigas (sem esse dado), o do boleto.
+      if (status === "PAGO") valorPago += Number(b.valorPago ?? b.valor);
       else if (status === "PENDENTE" || status === "VENCIDO") valorPendente += Number(b.valor);
     }
 

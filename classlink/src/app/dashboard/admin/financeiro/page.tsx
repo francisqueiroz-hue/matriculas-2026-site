@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiJson } from "@/lib/api-client";
@@ -57,6 +58,7 @@ function FinanceiroContent() {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [confirmando, setConfirmando] = useState<string | null>(null);
   const [dataPgto, setDataPgto] = useState(hojeISO());
+  const [valorPgto, setValorPgto] = useState("");
   const [salvandoBaixa, setSalvandoBaixa] = useState<string | null>(null);
   const [erroBaixa, setErroBaixa] = useState<string | null>(null);
   const [cobrancas, setCobrancas] = useState<Cobranca[] | null>(null);
@@ -90,7 +92,9 @@ function FinanceiroContent() {
     try {
       await apiJson(`/api/admin/billing/boletos/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(acao === "PAGO" ? { acao, dataPagamento: dataPgto } : { acao }),
+        body: JSON.stringify(
+          acao === "PAGO" ? { acao, dataPagamento: dataPgto, ...(valorPgto.trim() ? { valorPago: valorPgto.trim() } : {}) } : { acao },
+        ),
       });
       setConfirmando(null);
       load();
@@ -137,6 +141,17 @@ function FinanceiroContent() {
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-xl font-bold">Financeiro</h1>
+
+      <Link
+        href="/dashboard/admin/financeiro/conferencia"
+        className="block rounded-xl border border-indigo-200 bg-indigo-50 p-4 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/40"
+      >
+        <p className="font-semibold text-indigo-800 dark:text-indigo-200">Conferir boletos pagos →</p>
+        <p className="text-xs text-slate-600 dark:text-slate-300">
+          Lista todas as baixas do período com valor do boleto, valor recebido e alertas (diferença de valor, sem data,
+          diferente da mensalidade). Corrija valor ou data com o motivo registrado.
+        </p>
+      </Link>
 
       <form onSubmit={salvarConfig} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-500">Configuração de cobrança</h2>
@@ -226,9 +241,18 @@ function FinanceiroContent() {
                         className="rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
                       />
                     </label>
+                    <label className="text-xs text-slate-500">
+                      Valor recebido (R$){" "}
+                      <input
+                        inputMode="decimal"
+                        value={valorPgto}
+                        onChange={(e) => setValorPgto(e.target.value)}
+                        className="w-24 rounded-md border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                      />
+                    </label>
                     <button
                       type="button"
-                      disabled={salvandoBaixa === c.id || !dataPgto}
+                      disabled={salvandoBaixa === c.id || !dataPgto || !valorPgto.trim()}
                       onClick={() => baixar(c.id, "PAGO")}
                       className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
                     >
@@ -252,6 +276,7 @@ function FinanceiroContent() {
                       onClick={() => {
                         setConfirmando(c.id);
                         setDataPgto(hojeISO());
+                        setValorPgto(c.valor.toFixed(2).replace(".", ","));
                         setErroBaixa(null);
                       }}
                       className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
@@ -268,6 +293,13 @@ function FinanceiroContent() {
         {pagos.length > 0 && (
           <details className="pt-2">
             <summary className="cursor-pointer text-xs font-semibold text-slate-500">Marcados como pagos (últimos {pagos.length}) — desfazer se foi engano</summary>
+            <p className="mt-1 text-xs">
+              Para corrigir valor ou data, use{" "}
+              <Link href="/dashboard/admin/financeiro/conferencia" className="text-indigo-600 hover:underline">
+                Conferir boletos pagos
+              </Link>
+              .
+            </p>
             <ul className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
               {pagos.map((p) => (
                 <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
