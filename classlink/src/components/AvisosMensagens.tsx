@@ -8,6 +8,7 @@ import { useCurrentUser } from "@/components/UserContext";
 import {
   DISPENSOU_AVISOS_KEY,
   PEDIDO_AUTOMATICO_KEY,
+  avisoAposPedido,
   gravarMarca,
   lerMarca,
   modoConvite,
@@ -201,7 +202,7 @@ export function AvisosMensagensProvider({ children }: { children: React.ReactNod
   );
 }
 
-type EstadoConvite = "oculto" | "convite" | "sem-janela" | "bloqueado";
+type EstadoConvite = "oculto" | "convite" | "bloqueado";
 
 /**
  * Convite para ativar as notificações do navegador. Aparece uma única vez por aparelho:
@@ -210,21 +211,19 @@ type EstadoConvite = "oculto" | "convite" | "sem-janela" | "bloqueado";
  * dentro do app (o navegador exige um gesto da pessoa e a escolha final é dela). Com a
  * permissão já dada, o PushRegister inscreve o aparelho a cada entrada, sem perguntar nada.
  * Sem permissão, o contador do menu, o número no título da aba e o aviso na tela continuam.
+ * Depois do pedido não há recado na tela, salvo se a pessoa tocou em "Ativar avisos" e o
+ * navegador recusou (ver avisoAposPedido).
  */
 export function ConviteAtivarAvisos() {
   const { role } = useCurrentUser();
   const admin = role === "ADMIN";
   const [estado, setEstado] = useState<EstadoConvite>("oculto");
 
-  const responder = useCallback(async () => {
-    const resultado = await pedirPermissaoEInscrever().catch(() => "denied" as const);
-    if (resultado === "granted") {
-      tocarSom();
-      setEstado("oculto");
-    } else {
-      // Mostra uma vez como ativar depois; a marca já gravada impede que o convite volte.
-      setEstado(resultado === "denied" ? "bloqueado" : "sem-janela");
-    }
+  const responder = useCallback(async (automatico: boolean) => {
+    const resultado = await pedirPermissaoEInscrever().catch(() => "default" as const);
+    if (resultado === "granted") tocarSom();
+    // A marca já gravada impede que o convite volte; Minha conta continua explicando como ativar.
+    setEstado(avisoAposPedido(resultado, automatico) === "bloqueado" ? "bloqueado" : "oculto");
   }, []);
 
   useEffect(() => {
@@ -243,7 +242,7 @@ export function ConviteAtivarAvisos() {
     const aoTocar = () => {
       gravarMarca(PEDIDO_AUTOMATICO_KEY);
       gravarMarca(DISPENSOU_AVISOS_KEY);
-      void responder();
+      void responder(true);
     };
     document.addEventListener("click", aoTocar, { once: true, capture: true });
     return () => document.removeEventListener("click", aoTocar, { capture: true });
@@ -254,7 +253,7 @@ export function ConviteAtivarAvisos() {
   function ativar() {
     gravarMarca(DISPENSOU_AVISOS_KEY);
     setEstado("oculto");
-    void responder();
+    void responder(false);
   }
 
   function dispensar() {
@@ -262,16 +261,12 @@ export function ConviteAtivarAvisos() {
     setEstado("oculto");
   }
 
-  if (estado !== "convite") {
+  if (estado === "bloqueado") {
     return (
       <div role="status" className="mb-4 flex items-start justify-between gap-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
         <p>
-          {estado === "bloqueado" ? (
-            <>🔕 As notificações estão bloqueadas neste navegador. Para liberar, clique no cadeado ao lado do endereço do site e permita as notificações.</>
-          ) : (
-            <>🔔 O navegador não confirmou as notificações. Se apareceu um sino na barra de endereço, clique nele e escolha <strong>Permitir</strong>.</>
-          )}{" "}
-          Este aviso não volta a aparecer; dá para ativar a qualquer momento em{" "}
+          🔕 As notificações estão bloqueadas neste navegador. Para liberar, clique no cadeado ao lado do endereço do site e
+          permita as notificações. Dá para ver o passo a passo em{" "}
           <Link href="/dashboard/conta" className="font-semibold underline">
             Minha conta
           </Link>
