@@ -4,7 +4,8 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { agoraNoFusoDaEscola, mesReferenciaAtual } from "@/lib/billing";
-import { alertasBaixa, mesValido } from "@/lib/conferencia-baixas";
+import { alertasBaixa, mesValido, type Alerta } from "@/lib/conferencia-baixas";
+import { boletosDuplicados, textoDuplicidade } from "@/lib/duplicidade-boletos";
 
 /** Limite de linhas por consulta: um ano inteiro de uma escola pequena cabe com folga. */
 const MAX_LINHAS = 3000;
@@ -26,7 +27,11 @@ export async function GET(request: NextRequest) {
     if (de > ate) throw new ErroDeUsuario("A competência inicial é depois da final.", 400);
 
     const boletos = await prisma.boleto.findMany({
-      where: { schoolId: session.schoolId, status: "PAGO", mesReferencia: { gte: de, lte: ate } },
+      where: {
+        schoolId: session.schoolId,
+        status: "PAGO",
+        mesReferencia: { gte: de, lte: ate },
+      },
       orderBy: [{ mesReferencia: "desc" }, { student: { name: "asc" } }],
       take: MAX_LINHAS + 1,
       include: {
@@ -37,7 +42,11 @@ export async function GET(request: NextRequest) {
             bolsista: true,
             mensalidadeValor: true,
             class: { select: { name: true } },
-            guardians: { orderBy: { createdAt: "asc" }, take: 1, select: { guardian: { select: { name: true } } } },
+            guardians: {
+              orderBy: { createdAt: "asc" },
+              take: 1,
+              select: { guardian: { select: { name: true } } },
+            },
           },
         },
         baixas: {
@@ -46,6 +55,77 @@ export async function GET(request: NextRequest) {
         },
       },
     });
+
+    // Todos os boletos do período (qualquer situação), para achar o mesmo aluno com dois
+    // cadastros e um boleto em cada; e os cancelados, para poder reativar.
+    const doPeriodo = await prisma.boleto.findMany({
+      where: {
+        schoolId: session.schoolId,
+        mesReferencia: { gte: de, lte: ate },
+      },
+      orderBy: [{ mesReferencia: "desc" }],
+      take: MAX_LINHAS * 2,
+      select: {
+        id: true,
+        studentId: true,
+        mesReferencia: true,
+        status: true,
+        valor: true,
+        codigoSolicitacao: true,
+        student: {
+          select: {
+            name: true,
+            deletedAt: true,
+            class: { select: { name: true } },
+          },
+        },
+        baixas: {
+          where: { acao: "CANCELAR" },
+          orderBy: { criadoEm: "desc" },
+          take: 1,
+          select: { porNome: true, criadoEm: true, motivo: true },
+        },
+      },
+    });
+    const duplicados = boletosDuplicados(
+      doPeriodo.map((b) => ({
+        id: b.id,
+        studentId: b.studentId,
+        aluno: b.student.name,
+        turma: b.student.class.name,
+        mesReferencia: b.mesReferencia,
+        status: b.status,
+        alunoExcluido: !!b.student.deletedAt,
+      })),
+    );
+    const cancelados = doPeriodo
+      .filter((b) => b.status === "CANCELADO")
+      .map((b) => ({
+        id: b.id,
+        aluno: b.student.name,
+        turma: b.student.class.name,
+        mesReferencia: b.mesReferencia,
+        valor: Number(b.valor),
+        canceladoPor: b.baixas[0]?.porNome ?? null,
+        canceladoEm: b.baixas[0]?.criadoEm.toISOString() ?? null,
+        motivo: b.baixas[0]?.motivo ?? null,
+      }));
+    // Boletos em aberto que duplicam outro: aparecem aqui para poder cancelar sem caçar na lista.
+    const pendentesDuplicados = doPeriodo
+      .filter((b) => (b.status === "PENDENTE" || b.status === "VENCIDO" || b.status === "ERRO") && duplicados.has(b.id))
+      .map((b) => ({
+        id: b.id,
+        aluno: b.student.name,
+        turma: b.student.class.name,
+        mesReferencia: b.mesReferencia,
+        valor: Number(b.valor),
+        status: b.status,
+        cancelavel: !b.codigoSolicitacao,
+        alertas: (duplicados.get(b.id) ?? []).map((o) => ({
+          codigo: "DUPLICIDADE",
+          texto: textoDuplicidade(o),
+        })),
+      }));
 
     const truncado = boletos.length > MAX_LINHAS;
     const itens = boletos.slice(0, MAX_LINHAS).map((b) => {
@@ -74,21 +154,33 @@ export async function GET(request: NextRequest) {
         baixaEm: ultimaBaixa?.criadoEm.toISOString() ?? null,
         correcoes: correcoes.length,
         ultimaCorrecao: ultimaCorrecao
-          ? { por: ultimaCorrecao.porNome, em: ultimaCorrecao.criadoEm.toISOString(), motivo: ultimaCorrecao.motivo }
+          ? {
+              por: ultimaCorrecao.porNome,
+              em: ultimaCorrecao.criadoEm.toISOString(),
+              motivo: ultimaCorrecao.motivo,
+            }
           : null,
-        alertas: alertasBaixa(
-          {
-            valor,
-            valorPago,
-            vencimento: b.vencimento,
-            pagoEm: b.pagoEm,
-            mensalidadeCadastro: mensalidade,
-            bolsista: b.student.bolsista,
-            alunoExcluido: !!b.student.deletedAt,
-            baixasPago: pagas.length,
-          },
-          hoje,
-        ),
+        alertas: [
+          ...(duplicados.get(b.id) ?? []).map(
+            (o): Alerta => ({
+              codigo: "DUPLICIDADE",
+              texto: textoDuplicidade(o),
+            }),
+          ),
+          ...alertasBaixa(
+            {
+              valor,
+              valorPago,
+              vencimento: b.vencimento,
+              pagoEm: b.pagoEm,
+              mensalidadeCadastro: mensalidade,
+              bolsista: b.student.bolsista,
+              alunoExcluido: !!b.student.deletedAt,
+              baixasPago: pagas.length,
+            },
+            hoje,
+          ),
+        ],
       };
     });
 
@@ -101,12 +193,26 @@ export async function GET(request: NextRequest) {
         if (i.valorPago === null) t.semValorInformado += 1;
         return t;
       },
-      { quantidade: 0, valorBoletos: 0, valorRecebido: 0, comAlerta: 0, semValorInformado: 0 },
+      {
+        quantidade: 0,
+        valorBoletos: 0,
+        valorRecebido: 0,
+        comAlerta: 0,
+        semValorInformado: 0,
+      },
     );
     totais.valorBoletos = Math.round(totais.valorBoletos * 100) / 100;
     totais.valorRecebido = Math.round(totais.valorRecebido * 100) / 100;
 
-    return NextResponse.json({ de, ate, itens, totais, truncado });
+    return NextResponse.json({
+      de,
+      ate,
+      itens,
+      totais,
+      truncado,
+      cancelados,
+      pendentesDuplicados,
+    });
   } catch (error) {
     return handleApiError(error);
   }

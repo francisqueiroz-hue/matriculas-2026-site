@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
-import { createStudentSchema } from "@/lib/validators";
+import { novoAlunoSchema } from "@/lib/validators";
+import { nomesSemelhantes } from "@/lib/nomes-semelhantes";
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,7 +27,26 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN");
-    const body = createStudentSchema.parse(await request.json());
+    const body = novoAlunoSchema.parse(await request.json());
+
+    // O mesmo aluno cadastrado duas vezes vira duas cobranças por mês (uma por cadastro).
+    // Nome semelhante a um aluno ativo: devolve quem é, e só cria se a direção confirmar.
+    if (!body.confirmarSemelhante) {
+      const ativos = await prisma.student.findMany({
+        where: { schoolId: session.schoolId, deletedAt: null },
+        select: { id: true, name: true, class: { select: { name: true } } },
+      });
+      const semelhantes = ativos.filter((a) => nomesSemelhantes(a.name, body.name));
+      if (semelhantes.length > 0) {
+        return NextResponse.json(
+          {
+            error: "Já existe aluno com nome parecido.",
+            semelhantes: semelhantes.map((a) => ({ id: a.id, name: a.name, turma: a.class.name })),
+          },
+          { status: 409 },
+        );
+      }
+    }
 
     const cls = await prisma.class.findFirst({ where: { id: body.classId, schoolId: session.schoolId } });
     if (!cls) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
