@@ -45,3 +45,76 @@ export function transicaoBaixa(
   }
   return { status: "PENDENTE", pagoEm: null };
 }
+
+/** Teto de sanidade para valores digitados (evita um zero a mais virar cobrança). */
+export const VALOR_MAXIMO = 50_000;
+
+/**
+ * Valor em reais vindo da tela: aceita número ou texto "1.234,56" / "1234.56".
+ * Devolve centavos arredondados; lança ErroDeUsuario se não for positivo ou passar do teto.
+ */
+export function valorEmReais(entrada: number | string, campo = "Valor"): number {
+  let n: number;
+  if (typeof entrada === "number") n = entrada;
+  else {
+    const t = entrada.trim().replace(/^R\$\s*/i, "");
+    if (!/^\d{1,3}(\.\d{3})*(,\d{1,2})?$|^\d+([.,]\d{1,2})?$/.test(t)) {
+      throw new ErroDeUsuario(`${campo} inválido.`, 400);
+    }
+    n = t.includes(",") ? Number(t.replace(/\./g, "").replace(",", ".")) : Number(t);
+  }
+  if (!Number.isFinite(n) || n <= 0) throw new ErroDeUsuario(`${campo} precisa ser maior que zero.`, 400);
+  if (n > VALOR_MAXIMO) throw new ErroDeUsuario(`${campo} acima do limite (R$ ${VALOR_MAXIMO.toLocaleString("pt-BR")}).`, 400);
+  return Math.round(n * 100) / 100;
+}
+
+export interface CorrecaoPedida {
+  valor?: number; // valor do boleto (devido)
+  valorPago?: number; // valor recebido
+  dataPagamento?: Date;
+}
+
+export interface BoletoParaCorrigir {
+  status: StatusBoleto;
+  codigoSolicitacao: string | null;
+  valor: number;
+  valorPago: number | null;
+  pagoEm: Date | null;
+}
+
+/**
+ * Correção de uma baixa manual já feita (valor do boleto, valor recebido e/ou data).
+ * Só vale para boleto marcado como pago à mão; pagamento confirmado pelo banco não se
+ * altera aqui. Devolve só os campos que mudam; lança se nada muda.
+ */
+export function correcaoBaixa(
+  boleto: BoletoParaCorrigir,
+  pedido: CorrecaoPedida,
+): { valor?: number; valorPago?: number; pagoEm?: Date } {
+  if (boleto.status !== "PAGO") throw new ErroDeUsuario("Só dá para corrigir boleto marcado como pago.", 409);
+  if (boleto.codigoSolicitacao) {
+    throw new ErroDeUsuario("Pagamento confirmado pelo banco não pode ser corrigido aqui.", 409);
+  }
+  const mudancas: { valor?: number; valorPago?: number; pagoEm?: Date } = {};
+  if (pedido.valor !== undefined && centavos(pedido.valor) !== centavos(boleto.valor)) mudancas.valor = pedido.valor;
+  const pagoAtual = boleto.valorPago ?? boleto.valor;
+  if (
+    pedido.valorPago !== undefined &&
+    (boleto.valorPago === null || centavos(pedido.valorPago) !== centavos(pagoAtual))
+  ) {
+    mudancas.valorPago = pedido.valorPago;
+  }
+  if (pedido.dataPagamento && (!boleto.pagoEm || !mesmoDia(pedido.dataPagamento, boleto.pagoEm))) {
+    mudancas.pagoEm = pedido.dataPagamento;
+  }
+  if (Object.keys(mudancas).length === 0) throw new ErroDeUsuario("Nada foi alterado.", 400);
+  return mudancas;
+}
+
+function centavos(v: number): number {
+  return Math.round(v * 100);
+}
+
+function mesmoDia(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}

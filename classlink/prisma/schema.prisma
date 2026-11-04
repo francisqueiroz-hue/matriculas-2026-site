@@ -543,6 +543,9 @@ model Boleto {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   pagoEm    DateTime?
+  // Valor efetivamente recebido, informado na baixa manual. Nulo nas baixas antigas (antes
+  // deste campo) e nas confirmadas pelo banco: nesses casos vale o próprio valor do boleto.
+  valorPago Decimal?  @db.Decimal(10, 2)
 
   baixas BoletoBaixaLog[]
 
@@ -558,11 +561,17 @@ model BoletoBaixaLog {
   boleto         Boleto       @relation(fields: [boletoId], references: [id], onDelete: Cascade)
   boletoId       String
   schoolId       String
-  acao           String // "PAGO" | "DESFAZER"
+  acao           String // "PAGO" | "DESFAZER" | "CORRIGIR"
   statusAnterior BoletoStatus
   statusNovo     BoletoStatus
   dataPagamento  DateTime? // data informada na baixa (nula ao desfazer)
   valor          Decimal      @db.Decimal(10, 2) // valor do boleto no momento da ação
+  valorPago      Decimal?     @db.Decimal(10, 2) // valor recebido após a ação
+  // Na correção: como estava antes (valor do boleto, valor recebido, data) e o motivo.
+  valorAnterior         Decimal?  @db.Decimal(10, 2)
+  valorPagoAnterior     Decimal?  @db.Decimal(10, 2)
+  dataPagamentoAnterior DateTime?
+  motivo                String?
   porUserId      String
   porNome        String
   criadoEm       DateTime     @default(now())
