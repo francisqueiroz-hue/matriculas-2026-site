@@ -102,6 +102,14 @@ model School {
   diaVencimentoPadrao Int? // dia do mês usado como vencimento quando o aluno não tem um específico
   diaEmissaoBoletos   Int? // dia do mês em que o job de emissão deve rodar
 
+  // Lembretes automáticos de pendências às famílias. Desligado até a direção ativar no painel
+  // (nada é enviado só por publicar o código). Ver src/lib/lembretes.ts.
+  lembretesAtivos        Boolean        @default(false)
+  lembretesTipos         LembreteTipo[] @default([CONTRATO, COMUNICADO, BOLETO, REMATRICULA])
+  lembretesDiasInicio    Int            @default(3) // 1º lembrete quando a pendência completa N dias
+  lembretesIntervaloDias Int            @default(3) // mínimo de dias entre dois lembretes à mesma família
+  lembretesMaxEnvios     Int            @default(4) // lembretes por pendência, no máximo
+
   users                 User[]
   classes               Class[]
   students              Student[]
@@ -118,6 +126,7 @@ model School {
   contratoConfigs       ContratoConfig[]
   matriculaDocumentos   MatriculaDocumento[]
   consentimentosLgpd    ConsentimentoLgpd[]
+  lembretesPendencia    LembretePendencia[]
 }
 
 model User {
@@ -207,6 +216,9 @@ model User {
 
   // Consentimentos LGPD registrados em nome deste responsável (SetNull ao excluir a conta)
   consentimentosLgpd ConsentimentoLgpd[]
+
+  // Lembretes automáticos de pendências recebidos por este responsável
+  lembretesPendencia LembretePendencia[]
 
   @@index([schoolId])
 }
@@ -1098,4 +1110,41 @@ model CspViolacao {
   ultimaVez   DateTime @default(now())
 
   @@index([ultimaVez])
+}
+
+// ─── Lembretes automáticos de pendências ──────────────────────────────────────
+// Uma linha por pendência e responsável: quando a pendência começou, quantos lembretes já
+// saíram e quando foi o último. A pendência em si é sempre recalculada da fonte (contrato,
+// comunicado, boleto, rematrícula); quando ela some, a linha recebe `resolvidoEm` e os
+// lembretes param. Não guarda texto de mensagem nem dado financeiro (LGPD: só o necessário).
+
+enum LembreteTipo {
+  CONTRATO // contrato de matrícula aguardando assinatura ou devolvido para correção
+  COMUNICADO // autorização de passeio/evento ou confirmação de presença sem resposta
+  BOLETO // mensalidade em aberto
+  REMATRICULA // família ainda não confirmou a rematrícula da campanha ativa
+}
+
+model LembretePendencia {
+  id       String @id @default(cuid())
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  tipo          LembreteTipo
+  // Id da origem (contrato, boleto) ou chave composta ("comunicadoId:alunoId", "2027:alunoId").
+  referenciaId  String
+  responsavel   User   @relation(fields: [responsavelId], references: [id], onDelete: Cascade)
+  responsavelId String
+
+  pendenteDesde DateTime
+  envios        Int       @default(0)
+  ultimoEnvioEm DateTime?
+  resolvidoEm   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tipo, referenciaId, responsavelId])
+  @@index([schoolId, resolvidoEm])
+  @@index([responsavelId])
 }
