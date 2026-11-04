@@ -245,3 +245,12 @@ export const acaoContratoSchema = z.discriminatedUnion("acao", [
   z.object({ acao: z.literal("ORIGINAL_RECEBIDO") }),
   z.object({ acao: z.literal("DEVOLVER"), motivo: z.string().trim().min(3, "Informe o motivo da devolução").max(500) }),
 ]);
+
+/** Configuração dos lembretes automáticos de pendências (Gestão › Lembretes). */
+export const configLembretesSchema = z.object({
+  ativos: z.boolean(),
+  tipos: z.array(z.enum(["CONTRATO", "COMUNICADO", "BOLETO", "REMATRICULA"])).max(4),
+  diasInicio: z.number().int().min(1).max(30),
+  intervaloDias: z.number().int().min(2).max(30),
+  maxEnvios: z.number().int().min(1).max(10),
+});

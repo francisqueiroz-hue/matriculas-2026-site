@@ -89,6 +89,11 @@ const adminLinks: NavLink[] = [
     label: "Financeiro",
     icon: "M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z M3 10h18 M7 15h3",
   },
+  {
+    href: "/dashboard/admin/lembretes",
+    label: "Lembretes",
+    icon: "M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9 M13.7 21a2 2 0 01-3.4 0",
+  },
 ];
 
 const notasLink: NavLink = {

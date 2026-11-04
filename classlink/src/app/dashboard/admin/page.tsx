@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { AdminGuard } from "@/components/AdminGuard";
 import { DiagnosticoAvisos } from "@/components/DiagnosticoAvisos";
 import { EnviarGuiaFamilias } from "@/components/EnviarGuiaFamilias";
@@ -69,6 +70,16 @@ export default function AdminMetricsPage() {
         <h1 className="text-xl font-bold">Painel de engajamento</h1>
 
         <EnviarGuiaFamilias />
+
+        <Link
+          href="/dashboard/admin/lembretes"
+          className="block rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 hover:bg-indigo-100"
+        >
+          <span className="font-semibold">Lembretes de pendências</span>
+          <span className="block text-xs">
+            Contratos para assinar, autorizações sem resposta, mensalidades em aberto e rematrículas não confirmadas: veja quem recebe lembrete e quando.
+          </span>
+        </Link>
 
         {metrics && (
           <>
