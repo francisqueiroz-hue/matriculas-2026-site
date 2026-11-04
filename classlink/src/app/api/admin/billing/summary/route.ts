@@ -13,7 +13,8 @@ export async function GET() {
     const mesReferencia = mesReferenciaAtual(hoje);
 
     const boletos = await prisma.boleto.findMany({
-      where: { schoolId: session.schoolId, mesReferencia },
+      // Cancelado (ex.: duplicidade) não entra na conta.
+      where: { schoolId: session.schoolId, mesReferencia, status: { not: "CANCELADO" } },
       select: { status: true, valor: true, valorPago: true, vencimento: true },
     });
 

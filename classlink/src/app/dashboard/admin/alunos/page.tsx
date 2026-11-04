@@ -70,7 +70,23 @@ function AlunosContent() {
     e.preventDefault();
     setError(null);
     try {
-      await apiJson("/api/admin/students", { method: "POST", body: JSON.stringify({ name, classId }) });
+      const enviar = (confirmarSemelhante: boolean) =>
+        apiFetch("/api/admin/students", { method: "POST", body: JSON.stringify({ name, classId, confirmarSemelhante }) });
+      let resposta = await enviar(false);
+      if (resposta.status === 409) {
+        // Nome parecido com aluno já cadastrado: evita o mesmo aluno com dois cadastros (e duas cobranças).
+        const dados = (await resposta.json().catch(() => ({}))) as { semelhantes?: { name: string; turma: string }[] };
+        const lista = (dados.semelhantes ?? []).map((a) => `• ${a.name} (${a.turma})`).join("\n");
+        const ok = confirm(
+          `Já existe aluno com nome parecido:\n${lista}\n\nSe for o mesmo aluno, cancele e use o cadastro existente (cadastrar de novo gera cobrança em dobro). Cadastrar mesmo assim?`,
+        );
+        if (!ok) return;
+        resposta = await enviar(true);
+      }
+      if (!resposta.ok) {
+        const dados = (await resposta.json().catch(() => ({}))) as { error?: string };
+        throw new Error(dados.error ?? "Erro ao cadastrar aluno");
+      }
       setName("");
       load();
     } catch (err) {

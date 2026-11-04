@@ -16,7 +16,8 @@ export type CodigoAlerta =
   | "DATA_DISTANTE"
   | "BOLSISTA"
   | "BAIXA_REFEITA"
-  | "ALUNO_EXCLUIDO";
+  | "ALUNO_EXCLUIDO"
+  | "DUPLICIDADE";
 
 export interface Alerta {
   codigo: CodigoAlerta;
@@ -55,7 +56,11 @@ export function alertasBaixa(b: BoletoPagoConferencia, hoje: Date): Alerta[] {
     });
   }
   if (b.mensalidadeCadastro === null) {
-    if (!b.bolsista) alertas.push({ codigo: "SEM_MENSALIDADE", texto: "Aluno sem mensalidade no cadastro" });
+    if (!b.bolsista)
+      alertas.push({
+        codigo: "SEM_MENSALIDADE",
+        texto: "Aluno sem mensalidade no cadastro",
+      });
   } else if (cent(b.mensalidadeCadastro) !== cent(b.valor)) {
     alertas.push({
       codigo: "DIFERENTE_MENSALIDADE",
@@ -67,16 +72,33 @@ export function alertasBaixa(b: BoletoPagoConferencia, hoje: Date): Alerta[] {
   } else {
     const fimHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59).getTime();
     if (b.pagoEm.getTime() > fimHoje) {
-      alertas.push({ codigo: "DATA_FUTURA", texto: "Data de pagamento no futuro" });
+      alertas.push({
+        codigo: "DATA_FUTURA",
+        texto: "Data de pagamento no futuro",
+      });
     } else if (Math.abs(b.pagoEm.getTime() - b.vencimento.getTime()) > DIAS_DATA_DISTANTE * DIA_MS) {
-      alertas.push({ codigo: "DATA_DISTANTE", texto: `Pago a mais de ${DIAS_DATA_DISTANTE} dias do vencimento` });
+      alertas.push({
+        codigo: "DATA_DISTANTE",
+        texto: `Pago a mais de ${DIAS_DATA_DISTANTE} dias do vencimento`,
+      });
     }
   }
-  if (b.bolsista) alertas.push({ codigo: "BOLSISTA", texto: "Aluno marcado como bolsista (isento)" });
+  if (b.bolsista)
+    alertas.push({
+      codigo: "BOLSISTA",
+      texto: "Aluno marcado como bolsista (isento)",
+    });
   if (b.baixasPago > 1) {
-    alertas.push({ codigo: "BAIXA_REFEITA", texto: `Baixa lançada ${b.baixasPago} vezes (desfeita e refeita)` });
+    alertas.push({
+      codigo: "BAIXA_REFEITA",
+      texto: `Baixa desfeita e lançada de novo (${b.baixasPago} vezes): confira data e valor`,
+    });
   }
-  if (b.alunoExcluido) alertas.push({ codigo: "ALUNO_EXCLUIDO", texto: "Aluno excluído do cadastro" });
+  if (b.alunoExcluido)
+    alertas.push({
+      codigo: "ALUNO_EXCLUIDO",
+      texto: "Aluno excluído do cadastro",
+    });
 
   return alertas;
 }

@@ -17,6 +17,9 @@ export const createStudentSchema = z.object({
 
 export const updateStudentSchema = createStudentSchema.partial();
 
+/** No cadastro: a direção confirma quando o nome parece de aluno já cadastrado (irmão, homônimo). */
+export const novoAlunoSchema = createStudentSchema.extend({ confirmarSemelhante: z.boolean().optional() });
+
 export const linkGuardianSchema = z
   .object({
     guardianEmail: z.string().email().optional(),

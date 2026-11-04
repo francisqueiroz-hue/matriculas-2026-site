@@ -37,6 +37,30 @@ interface Resposta {
   itens: Linha[];
   totais: { quantidade: number; valorBoletos: number; valorRecebido: number; comAlerta: number; semValorInformado: number };
   truncado: boolean;
+  cancelados: Cancelado[];
+  pendentesDuplicados: PendenteDuplicado[];
+}
+
+interface Cancelado {
+  id: string;
+  aluno: string;
+  turma: string;
+  mesReferencia: string;
+  valor: number;
+  canceladoPor: string | null;
+  canceladoEm: string | null;
+  motivo: string | null;
+}
+
+interface PendenteDuplicado {
+  id: string;
+  aluno: string;
+  turma: string;
+  mesReferencia: string;
+  valor: number;
+  status: string;
+  cancelavel: boolean;
+  alertas: Alerta[];
 }
 
 const btn = "rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-60";
@@ -180,6 +204,34 @@ function ConferenciaContent() {
     }
   }
 
+  /** Cancelar (boleto em duplicidade) ou reativar um cancelado; pede o motivo, que vai para o histórico. */
+  async function cancelarOuReativar(b: { id: string; aluno: string; mesReferencia: string }, acao: "CANCELAR" | "REATIVAR") {
+    const pergunta =
+      acao === "CANCELAR"
+        ? `Cancelar o boleto de ${b.aluno} (${competencia(b.mesReferencia)})?\nEle sai das cobranças, dos lembretes, dos totais e da tela da família. Fica no histórico e pode ser reativado.\n\nMotivo (obrigatório):`
+        : `Reativar o boleto de ${b.aluno} (${competencia(b.mesReferencia)})? Ele volta para “em aberto” e entra nos lembretes.\n\nMotivo (obrigatório):`;
+    const motivo = window.prompt(pergunta, acao === "CANCELAR" ? "Boleto em duplicidade" : "");
+    if (motivo === null) return;
+    if (motivo.trim().length < 3) {
+      setAviso("Informe o motivo (pelo menos 3 letras).");
+      return;
+    }
+    setDesfazendo(b.id);
+    setAviso(null);
+    try {
+      await apiJson(`/api/admin/billing/boletos/${b.id}`, { method: "PATCH", body: JSON.stringify({ acao, motivo: motivo.trim() }) });
+      setAviso(acao === "CANCELAR" ? `Boleto de ${b.aluno} cancelado e registrado no histórico.` : `Boleto de ${b.aluno} reativado.`);
+      carregar();
+    } catch (err) {
+      setAviso(err instanceof Error ? err.message : "Não foi possível concluir");
+    } finally {
+      setDesfazendo(null);
+    }
+  }
+
+  const temDuplicidade =
+    (dados?.itens ?? []).some((l) => l.alertas.some((a) => a.codigo === "DUPLICIDADE")) || (dados?.pendentesDuplicados?.length ?? 0) > 0;
+
   function baixarCsv() {
     const cab = [
       "Competência", "Aluno", "Turma", "Responsável", "Vencimento", "Valor do boleto", "Valor recebido",
@@ -290,6 +342,53 @@ function ConferenciaContent() {
         <p className="text-sm text-slate-500">{soAlertas || busca ? "Nada encontrado com esses filtros." : "Nenhum boleto pago neste período."}</p>
       )}
 
+      {temDuplicidade && (
+        <div className="space-y-1 rounded-xl border border-red-300 bg-red-50 p-4 text-sm dark:border-red-900 dark:bg-red-950/40">
+          <p className="font-semibold text-red-800 dark:text-red-200">Possível aluno cadastrado duas vezes</p>
+          <p className="text-xs text-slate-700 dark:text-slate-300">
+            O app não gera dois boletos do mesmo mês para o mesmo cadastro; quando aparece duplicidade, é o mesmo aluno com dois
+            cadastros (cada um com o seu boleto). Para corrigir:
+          </p>
+          <ol className="list-decimal space-y-0.5 pl-5 text-xs text-slate-700 dark:text-slate-300">
+            <li>Veja abaixo os boletos marcados com “Possível duplicidade” e decida qual cadastro é o certo (o que tem responsável vinculado).</li>
+            <li>No boleto do cadastro errado, clique em “Cancelar boleto (duplicado)” e confirme o motivo. Se a família pagou só uma vez e a baixa foi lançada no cadastro errado, cancele esse e dê baixa no boleto do cadastro certo.</li>
+            <li>Depois, em Alunos, exclua o cadastro repetido para não gerar novo boleto no mês que vem.</li>
+          </ol>
+        </div>
+      )}
+
+      {(dados?.pendentesDuplicados?.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold">Boletos em aberto que repetem outro do mesmo mês</h2>
+          <ul className="space-y-2">
+            {dados!.pendentesDuplicados.map((p) => (
+              <li key={p.id} className="rounded-xl border border-red-300 bg-white p-3 text-sm dark:border-red-900 dark:bg-slate-900">
+                <p className="font-medium">
+                  {p.aluno} <span className="font-normal text-slate-500">· {p.turma} · {competencia(p.mesReferencia)} · {reais(p.valor)} · em aberto</span>
+                </p>
+                <ul className="mt-1 flex flex-wrap gap-1">
+                  {p.alertas.map((a, i) => (
+                    <li key={i} className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-900 dark:bg-red-900/40 dark:text-red-200">
+                      {a.texto}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-2">
+                  {p.cancelavel ? (
+                    <button type="button" onClick={() => cancelarOuReativar(p, "CANCELAR")} disabled={desfazendo === p.id} className={btnSecundario}>
+                      Cancelar boleto (duplicado)
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-400">Emitido no banco: cancele no próprio banco</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <h2 className="pt-2 text-sm font-semibold">Boletos pagos</h2>
+        </div>
+      )}
+
       <ul className="space-y-2">
         {linhas.map((l) => (
           <li
@@ -328,8 +427,15 @@ function ConferenciaContent() {
             </div>
             {l.alertas.length > 0 && (
               <ul className="mt-2 flex flex-wrap gap-1">
-                {l.alertas.map((a) => (
-                  <li key={a.codigo} className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                {l.alertas.map((a, i) => (
+                  <li
+                    key={`${a.codigo}-${i}`}
+                    className={`rounded-full px-2 py-0.5 text-xs ${
+                      a.codigo === "DUPLICIDADE"
+                        ? "bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-200"
+                        : "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
+                    }`}
+                  >
                     {a.texto}
                   </li>
                 ))}
@@ -349,7 +455,10 @@ function ConferenciaContent() {
                     Corrigir valor ou data
                   </button>
                   <button type="button" onClick={() => desfazer(l)} disabled={desfazendo === l.id} className={btnSecundario}>
-                    {desfazendo === l.id ? "Desfazendo..." : "Não foi pago (desfazer)"}
+                    {desfazendo === l.id ? "Aguarde..." : "Não foi pago (desfazer)"}
+                  </button>
+                  <button type="button" onClick={() => cancelarOuReativar(l, "CANCELAR")} disabled={desfazendo === l.id} className={btnSecundario}>
+                    Cancelar boleto (duplicado)
                   </button>
                 </>
               ) : (
@@ -370,6 +479,31 @@ function ConferenciaContent() {
           </li>
         ))}
       </ul>
+
+      {(dados?.cancelados?.length ?? 0) > 0 && (
+        <details className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+          <summary className="cursor-pointer text-sm font-semibold">Boletos cancelados no período ({dados!.cancelados.length})</summary>
+          <ul className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
+            {dados!.cancelados.map((c) => (
+              <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <div>
+                  <p className="font-medium">
+                    {c.aluno} <span className="font-normal text-slate-500">· {c.turma} · {competencia(c.mesReferencia)} · {reais(c.valor)}</span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {c.canceladoPor ? `Cancelado por ${c.canceladoPor}` : "Cancelado"}
+                    {c.canceladoEm && ` em ${new Date(c.canceladoEm).toLocaleDateString("pt-BR")}`}
+                    {c.motivo && `: “${c.motivo}”`}
+                  </p>
+                </div>
+                <button type="button" onClick={() => cancelarOuReativar(c, "REATIVAR")} disabled={desfazendo === c.id} className={btnSecundario}>
+                  Reativar
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

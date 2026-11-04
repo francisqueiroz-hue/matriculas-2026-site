@@ -60,6 +60,7 @@ enum BoletoStatus {
   PAGO
   VENCIDO
   ERRO // falha na emissão junto ao Banco Inter
+  CANCELADO // cancelado pela escola (ex.: boleto em duplicidade); motivo no BoletoBaixaLog
 }
 
 enum Trimestre {
@@ -561,7 +562,7 @@ model BoletoBaixaLog {
   boleto         Boleto       @relation(fields: [boletoId], references: [id], onDelete: Cascade)
   boletoId       String
   schoolId       String
-  acao           String // "PAGO" | "DESFAZER" | "CORRIGIR"
+  acao           String // "PAGO" | "DESFAZER" | "CORRIGIR" | "CANCELAR" | "REATIVAR"
   statusAnterior BoletoStatus
   statusNovo     BoletoStatus
   dataPagamento  DateTime? // data informada na baixa (nula ao desfazer)

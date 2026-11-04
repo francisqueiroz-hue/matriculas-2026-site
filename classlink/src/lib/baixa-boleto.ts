@@ -1,6 +1,6 @@
 import { ErroDeUsuario } from "@/lib/erros";
 
-export type StatusBoleto = "PENDENTE" | "PAGO" | "VENCIDO" | "ERRO";
+export type StatusBoleto = "PENDENTE" | "PAGO" | "VENCIDO" | "ERRO" | "CANCELADO";
 
 /**
  * Sem automação do banco nada muda PENDENTE → VENCIDO sozinho; por isso o atraso é
@@ -36,6 +36,7 @@ export function transicaoBaixa(
   dataPagamento: Date,
 ): { status: StatusBoleto; pagoEm: Date | null } {
   if (acao === "PAGO") {
+    if (boleto.status === "CANCELADO") throw new ErroDeUsuario("Este boleto está cancelado. Reative-o antes de dar baixa.", 409);
     if (boleto.status === "PAGO") throw new ErroDeUsuario("Este boleto já está marcado como pago.", 409);
     return { status: "PAGO", pagoEm: dataPagamento };
   }
@@ -87,10 +88,7 @@ export interface BoletoParaCorrigir {
  * Só vale para boleto marcado como pago à mão; pagamento confirmado pelo banco não se
  * altera aqui. Devolve só os campos que mudam; lança se nada muda.
  */
-export function correcaoBaixa(
-  boleto: BoletoParaCorrigir,
-  pedido: CorrecaoPedida,
-): { valor?: number; valorPago?: number; pagoEm?: Date } {
+export function correcaoBaixa(boleto: BoletoParaCorrigir, pedido: CorrecaoPedida): { valor?: number; valorPago?: number; pagoEm?: Date } {
   if (boleto.status !== "PAGO") throw new ErroDeUsuario("Só dá para corrigir boleto marcado como pago.", 409);
   if (boleto.codigoSolicitacao) {
     throw new ErroDeUsuario("Pagamento confirmado pelo banco não pode ser corrigido aqui.", 409);
@@ -98,10 +96,7 @@ export function correcaoBaixa(
   const mudancas: { valor?: number; valorPago?: number; pagoEm?: Date } = {};
   if (pedido.valor !== undefined && centavos(pedido.valor) !== centavos(boleto.valor)) mudancas.valor = pedido.valor;
   const pagoAtual = boleto.valorPago ?? boleto.valor;
-  if (
-    pedido.valorPago !== undefined &&
-    (boleto.valorPago === null || centavos(pedido.valorPago) !== centavos(pagoAtual))
-  ) {
+  if (pedido.valorPago !== undefined && (boleto.valorPago === null || centavos(pedido.valorPago) !== centavos(pagoAtual))) {
     mudancas.valorPago = pedido.valorPago;
   }
   if (pedido.dataPagamento && (!boleto.pagoEm || !mesmoDia(pedido.dataPagamento, boleto.pagoEm))) {
@@ -117,4 +112,25 @@ function centavos(v: number): number {
 
 function mesmoDia(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/**
+ * Cancelar um boleto lançado por engano (ex.: o mesmo aluno cobrado duas vezes no mês) ou
+ * reativar um cancelado. O cancelado sai das cobranças, dos lembretes, dos totais e da
+ * tela da família, mas continua no banco com o histórico. Boleto emitido no banco precisa
+ * ser baixado/cancelado no próprio banco: aqui não se cancela.
+ */
+export function transicaoCancelamento(
+  acao: "CANCELAR" | "REATIVAR",
+  boleto: { status: StatusBoleto; codigoSolicitacao: string | null },
+): StatusBoleto {
+  if (boleto.codigoSolicitacao) {
+    throw new ErroDeUsuario("Boleto emitido no banco: cancele no próprio banco, não por aqui.", 409);
+  }
+  if (acao === "CANCELAR") {
+    if (boleto.status === "CANCELADO") throw new ErroDeUsuario("Este boleto já está cancelado.", 409);
+    return "CANCELADO";
+  }
+  if (boleto.status !== "CANCELADO") throw new ErroDeUsuario("Este boleto não está cancelado.", 409);
+  return "PENDENTE";
 }

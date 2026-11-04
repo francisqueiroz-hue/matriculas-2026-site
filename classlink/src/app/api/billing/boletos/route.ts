@@ -14,7 +14,8 @@ export async function GET() {
     });
 
     const boletos = await prisma.boleto.findMany({
-      where: { studentId: { in: links.map((l) => l.studentId) } },
+      // Cancelado pela escola (ex.: lançado em duplicidade) não aparece para a família.
+      where: { studentId: { in: links.map((l) => l.studentId) }, status: { not: "CANCELADO" } },
       include: { student: { select: { id: true, name: true } } },
       orderBy: [{ mesReferencia: "desc" }],
     });
