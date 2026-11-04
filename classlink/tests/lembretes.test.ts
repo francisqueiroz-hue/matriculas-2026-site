@@ -170,3 +170,51 @@ describe("mensagemLembrete", () => {
     expect(m.url).toBe("/dashboard");
   });
 });
+
+describe("mensalidade: véspera, dia seguinte e a cada 3 dias", () => {
+  const VENC = new Date("2026-12-05T15:00:00Z"); // sábado, 05/12/2026
+  const dia = (d: number) => new Date(Date.UTC(2026, 11, d, 15, 0, 0)); // 12h de Brasília
+  const boleto = (over: Partial<Pendencia> = {}) =>
+    pendencia({ tipo: "BOLETO", referenciaId: "b1", desde: new Date("2026-12-01T07:00:00Z"), vencimento: VENC, ...over });
+
+  it("sem pagamento: 04/12, 06/12 cai no domingo → 07/12, 10/12, 13/12 é domingo → 14/12, e para no limite", () => {
+    const enviados: number[] = [];
+    let reg: RegistroLembrete = registro({ tipo: "BOLETO", referenciaId: "b1", pendenteDesde: new Date("2026-12-01T07:00:00Z") });
+    for (let d = 1; d <= 31; d++) {
+      const agora = dia(d);
+      if (ehDomingo(agora)) continue; // o cron não envia aos domingos
+      const plano = planejarLembretes([boleto()], [reg], config, agora);
+      if (plano.envios.length > 0) {
+        enviados.push(d);
+        reg = { ...reg, envios: reg.envios + 1, ultimoEnvioEm: agora };
+      }
+    }
+    expect(enviados).toEqual([4, 7, 10, 14]);
+  });
+
+  it("vencimento na segunda: a véspera cairia no domingo e sai no sábado", () => {
+    const segunda = new Date("2027-01-04T15:00:00Z");
+    const sabado = new Date("2027-01-02T15:00:00Z");
+    const sexta = new Date("2027-01-01T15:00:00Z");
+    expect(planejarLembretes([boleto({ vencimento: segunda })], [], config, sexta).envios).toHaveLength(0);
+    expect(planejarLembretes([boleto({ vencimento: segunda })], [], config, sabado).envios).toHaveLength(1);
+  });
+
+  it("no dia do vencimento não envia; boleto lançado depois da véspera só recebe o aviso de atraso", () => {
+    expect(planejarLembretes([boleto()], [], config, dia(5)).envios).toHaveLength(0);
+    expect(planejarLembretes([boleto()], [], config, dia(7)).envios).toHaveLength(1);
+  });
+
+  it("a mensalidade não espera o intervalo da família (tem data certa) e leva junto o que estiver pronto", () => {
+    const registros = [registro({ tipo: "CONTRATO", referenciaId: "c9", envios: 1, ultimoEnvioEm: dia(3) })];
+    const plano = planejarLembretes([boleto(), pendencia({ referenciaId: "c9", desde: dia(1) })], registros, config, dia(4));
+    expect(plano.envios).toHaveLength(1);
+    expect(plano.envios[0].pendencias.map((p) => p.tipo)).toEqual(["BOLETO"]);
+  });
+
+  it("paga: some da lista e não é mais lembrada", () => {
+    const plano = planejarLembretes([], [registro({ tipo: "BOLETO", referenciaId: "b1", envios: 1, ultimoEnvioEm: dia(4) })], config, dia(7));
+    expect(plano.envios).toHaveLength(0);
+    expect(plano.resolvidos).toHaveLength(1);
+  });
+});

@@ -142,7 +142,7 @@ describe("executarLembretesDaEscola", () => {
     const r = await executarLembretesDaEscola("s1", QUARTA);
     expect(r.enviadas).toBe(1);
     const aviso = notifyUsers.mock.calls[0][1] as { body: string };
-    expect(aviso.body).toContain("pagar a mensalidade de Ana, com vencimento em 05/11/2026");
+    expect(aviso.body).toContain("pagar a mensalidade de Ana, que vence amanhã (05/11/2026)");
     expect(aviso.body).not.toMatch(/R\$/);
   });
 });
