@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { limparValorPublico } from "@/lib/firebase-config-publica";
 import { FONTE_REGRAS_CACHE_SW } from "@/lib/sw-cache";
+import { FONTE_PUSH_SW } from "@/lib/sw-push";
 
 /**
  * Service worker único do app: cache de arquivos estáticos públicos (offline mínimo) +
@@ -90,6 +91,32 @@ self.addEventListener("notificationclick", (event) => {
         }
       }
       return self.clients.openWindow(alvo);
+    }),
+  );
+});
+
+${FONTE_PUSH_SW}
+// Registrado ANTES do Firebase: os dois recebem o mesmo push. Com o ClassLink visível o
+// Firebase não mostra nada (só repassa à página); se nenhuma janela visível tem foco
+// (ex.: computador, ClassLink aberto atrás de outro programa), a notificação sai daqui.
+// Também avisa a página, que atualiza o contador e o aviso na tela na hora.
+self.addEventListener("push", (event) => {
+  let payload = null;
+  try {
+    payload = event.data ? event.data.json() : null;
+  } catch (e) {
+    return;
+  }
+  if (!payload || !payload.notification) return;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
+      for (const janela of janelas) {
+        try {
+          janela.postMessage({ origem: "classlink-push" });
+        } catch (e) {}
+      }
+      const aviso = notificacaoParaJanelaSemFoco(payload, janelas);
+      return aviso ? self.registration.showNotification(aviso.titulo, aviso.opcoes) : undefined;
     }),
   );
 });

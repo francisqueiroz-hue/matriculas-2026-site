@@ -16,6 +16,7 @@ import {
   permissaoAtual,
 } from "@/lib/convite-avisos";
 import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
+import { pessoaOlhandoOPainel } from "@/lib/atencao-painel";
 
 interface UltimaMensagem {
   id: string;
@@ -131,13 +132,16 @@ export function AvisosMensagensProvider({ children }: { children: React.ReactNod
     if (primeiraCarga || !mudou || !dados.ultima) return totalMudou;
 
     // Mensagem nova. Se a pessoa já está olhando essa conversa, não precisa avisar.
+    const atento = pessoaOlhandoOPainel();
     const naConversa = pathnameRef.current === dados.ultima.url.split("?")[0];
-    if (naConversa && document.visibilityState === "visible") return true;
+    if (naConversa && atento) return true;
 
     tocarSom();
-    if (document.visibilityState === "visible") {
+    if (atento) {
       setAviso(dados.ultima);
     } else {
+      // Aba oculta OU janela visível sem foco (no computador, o ClassLink aberto atrás de
+      // outro programa): o aviso dentro da página ninguém veria, então vai para o sistema.
       void mostrarNotificacao(dados.ultima, dados.total);
     }
     return true;
@@ -145,7 +149,20 @@ export function AvisosMensagensProvider({ children }: { children: React.ReactNod
 
   // Consulta adaptativa (ver lib/consulta-adaptativa): espaça sem novidade, volta ao ritmo
   // normal com mensagem nova ou ao voltar para a aba, e não consulta sem internet.
-  useConsultaAdaptativa(verificar, CONSULTA_CONTADOR);
+  const consultarAgora = useConsultaAdaptativa(verificar, CONSULTA_CONTADOR);
+
+  // Push recebido pelo service worker (sw.js avisa as janelas abertas): consulta na hora em vez
+  // de esperar o próximo ciclo (até 60 s).
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    const aoReceber = (event: MessageEvent) => {
+      const dados = event.data as { origem?: string } | null;
+      if (dados?.origem === "classlink-push") consultarAgora();
+    };
+    navigator.serviceWorker.addEventListener("message", aoReceber);
+    navigator.serviceWorker.startMessages?.();
+    return () => navigator.serviceWorker.removeEventListener("message", aoReceber);
+  }, [consultarAgora]);
 
   // Ao trocar de página (ex.: abrir a conversa, que marca como lida), atualiza o contador.
   useEffect(() => {
