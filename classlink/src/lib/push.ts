@@ -36,16 +36,36 @@ export function origemPublica(env: Record<string, string | undefined> = process.
   }
 }
 
+/**
+ * Mesma "etiqueta" do aviso que o painel mostra (AvisosMensagens): o aviso de mensagem nova
+ * substitui o anterior em vez de aparecer duas vezes (push + painel) ou empilhar.
+ */
+export const TAG_AVISO_MENSAGENS = "classlink-mensagens";
+
+function ehLinkDeMensagens(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    return new URL(url, "https://x.invalid").pathname.startsWith("/dashboard/mensagens");
+  } catch {
+    return false;
+  }
+}
+
 /** Monta a mensagem para o FCM (separada para teste). */
 export function montarMensagemPush(tokens: string[], aviso: AvisoPush, origem: string | null): MulticastMessage {
   const link = aviso.url ? (/^https:\/\//i.test(aviso.url) ? aviso.url : origem ? new URL(aviso.url, origem).href : null) : null;
+  const notificacaoWeb = {
+    ...(origem && { icon: `${origem}/icons/icon-192.png`, badge: `${origem}/icons/icon-192.png` }),
+    // renotify: cada mensagem nova toca/vibra, mesmo substituindo o aviso anterior.
+    ...(ehLinkDeMensagens(aviso.url) && { tag: TAG_AVISO_MENSAGENS, renotify: true }),
+  };
   return {
     tokens,
     notification: { title: aviso.title, body: aviso.body },
     webpush: {
       // Urgency high: o iPhone/Android entrega na hora, mesmo com o aparelho em repouso.
       headers: { Urgency: "high", TTL: String(3 * 24 * 60 * 60) },
-      notification: origem ? { icon: `${origem}/icons/icon-192.png`, badge: `${origem}/icons/icon-192.png` } : undefined,
+      notification: Object.keys(notificacaoWeb).length > 0 ? notificacaoWeb : undefined,
       ...(link && { fcmOptions: { link } }),
     },
     ...(aviso.url && { data: { url: aviso.url } }),
