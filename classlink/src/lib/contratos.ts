@@ -81,10 +81,11 @@ export function proximoStatus(status: ContratoStatus, acao: ContratoAcao, metodo
  * e-mail): a direção anexa o documento e confirma. Vale para todo contrato ainda não concluído:
  * aguardando a família, devolvido, em conferência (a família enviou um arquivo, mas a escola tem
  * o assinado por outro meio; o envio da família continua no histórico) e aguardando a via
- * original (a direção anexa a digitalização do original). Só o contrato completo fica de fora.
+ * original (a direção anexa a digitalização do original). Contrato completo só quando ficou sem
+ * nenhum PDF assinado guardado (aprovado sem arquivo): a direção anexa o documento para o registro.
  */
-export function podeConfirmarPelaEscola(status: ContratoStatus): boolean {
-  return status !== "COMPLETO";
+export function podeConfirmarPelaEscola(status: ContratoStatus, temAssinado = true): boolean {
+  return status !== "COMPLETO" || !temAssinado;
 }
 
 /**

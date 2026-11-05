@@ -81,13 +81,13 @@ export async function POST(request: NextRequest) {
     const existente = dados.contratoId
       ? await prisma.contrato.findFirst({
           where: { id: dados.contratoId, schoolId: session.schoolId, studentId: aluno.id },
-          select: { id: true, status: true, anoLetivo: true, titulo: true },
+          select: { id: true, status: true, anoLetivo: true, titulo: true, _count: { select: { arquivos: { where: { tipo: "ASSINADO" } } } } },
         })
       : null;
     if (dados.contratoId) {
       if (!existente) throw new ErroRecusa("Contrato não encontrado", 404);
-      if (!podeConfirmarPelaEscola(existente.status)) {
-        throw new ErroRecusa("Este contrato já foi concluído.", 409);
+      if (!podeConfirmarPelaEscola(existente.status, existente._count.arquivos > 0)) {
+        throw new ErroRecusa("Este contrato já foi concluído e tem o PDF assinado guardado.", 409);
       }
     } else {
       // Renovação sem contrato no app: evita deixar um contrato aberto duplicado (que seguiria
@@ -97,7 +97,8 @@ export async function POST(request: NextRequest) {
           schoolId: session.schoolId,
           studentId: aluno.id,
           anoLetivo: dados.anoLetivo,
-          status: { not: "COMPLETO" },
+          // Não concluído, ou concluído sem PDF assinado guardado (anexar no cartão dele).
+          OR: [{ status: { not: "COMPLETO" } }, { arquivos: { none: { tipo: "ASSINADO" } } }],
         },
         select: { id: true },
       });

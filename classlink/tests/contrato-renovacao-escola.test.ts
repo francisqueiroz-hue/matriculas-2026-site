@@ -109,6 +109,8 @@ describe("regras da confirmação pela escola", () => {
     expect(podeConfirmarPelaEscola("EM_CONFERENCIA")).toBe(true);
     expect(podeConfirmarPelaEscola("AGUARDANDO_ORIGINAL")).toBe(true);
     expect(podeConfirmarPelaEscola("COMPLETO")).toBe(false);
+    // Aprovado sem nenhum PDF assinado guardado: a direção pode anexar o documento.
+    expect(podeConfirmarPelaEscola("COMPLETO", false)).toBe(true);
   });
 
   it("gov.br completa; à mão completa só com a via original na escola", () => {
@@ -128,7 +130,7 @@ describe("regras da confirmação pela escola", () => {
 
 describe("confirmar renovação de contrato já enviado pelo app", () => {
   beforeEach(() => {
-    banco.prisma.contrato.findFirst.mockResolvedValue({ id: "c1", status: "AGUARDANDO_ASSINATURA", anoLetivo: 2027, titulo: "Contrato 2027" });
+    banco.prisma.contrato.findFirst.mockResolvedValue({ id: "c1", status: "AGUARDANDO_ASSINATURA", anoLetivo: 2027, titulo: "Contrato 2027", _count: { arquivos: 0 } });
   });
 
   it("anexa o PDF, completa o contrato, registra auditoria e avisa a família", async () => {
@@ -159,15 +161,23 @@ describe("confirmar renovação de contrato já enviado pelo app", () => {
 
   it("contrato em conferência (família já enviou) ou aguardando a via original também pode ser confirmado", async () => {
     for (const status of ["EM_CONFERENCIA", "AGUARDANDO_ORIGINAL"]) {
-      banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status, anoLetivo: 2027, titulo: "x" });
+      banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status, anoLetivo: 2027, titulo: "x", _count: { arquivos: 1 } });
       const res = await confirmar(formulario({ ...base, contratoId: "c1" }));
       expect(res.status).toBe(201);
       expect(banco.tx.contrato.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: { id: "c1", status } }));
     }
   });
 
-  it("recusa contrato já concluído", async () => {
-    banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "COMPLETO", anoLetivo: 2027, titulo: "x" });
+  it("contrato aprovado sem PDF assinado guardado: anexa e mantém completo", async () => {
+    banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "COMPLETO", anoLetivo: 2027, titulo: "x", _count: { arquivos: 0 } });
+    const res = await confirmar(formulario({ ...base, contratoId: "c1" }));
+    expect(res.status).toBe(201);
+    expect(banco.tx.contrato.updateMany.mock.calls[0][0]).toMatchObject({ where: { id: "c1", status: "COMPLETO" }, data: { status: "COMPLETO" } });
+    expect(banco.tx.contratoArquivo.create.mock.calls[0][0].data).toMatchObject({ contratoId: "c1", tipo: "ASSINADO" });
+  });
+
+  it("recusa contrato já concluído com PDF assinado", async () => {
+    banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "COMPLETO", anoLetivo: 2027, titulo: "x", _count: { arquivos: 1 } });
     const res = await confirmar(formulario({ ...base, contratoId: "c1" }));
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatch(/concluído/);
