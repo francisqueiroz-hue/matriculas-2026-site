@@ -15,6 +15,54 @@ interface ResultadoTeste {
   erros?: string[];
 }
 
+interface AparelhoRegistrado {
+  id: string;
+  aparelho: string | null;
+  atualizadoEm: string;
+  ultimoEnvioEm: string | null;
+  ultimoErro: string | null;
+}
+
+function dataHora(iso: string): string {
+  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+}
+
+/**
+ * Aparelhos da conta que recebem avisos (iPhone, computador...), com o último aviso que o
+ * servidor conseguiu entregar a cada um. Permite conferir, de qualquer aparelho, se o celular
+ * continua registrado — o teste abaixo registra o aparelho de novo e por isso sempre chega.
+ */
+function AparelhosDaConta({ atualizar }: { atualizar: number }) {
+  const [aparelhos, setAparelhos] = useState<AparelhoRegistrado[] | null>(null);
+  useEffect(() => {
+    apiJson<{ aparelhos: AparelhoRegistrado[] }>("/api/push/aparelhos")
+      .then((r) => setAparelhos(r.aparelhos))
+      .catch(() => setAparelhos(null));
+  }, [atualizar]);
+  if (!aparelhos) return null;
+  return (
+    <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+      <p className="font-medium text-slate-700 dark:text-slate-200">Aparelhos desta conta que recebem avisos</p>
+      {aparelhos.length === 0 ? (
+        <p className="mt-1">Nenhum aparelho registrado. Abra o ClassLink no celular e toque em “Enviar notificação de teste”.</p>
+      ) : (
+        <ul className="mt-1 space-y-1">
+          {aparelhos.map((a) => (
+            <li key={a.id}>
+              <span className="font-medium">{a.aparelho ?? "Aparelho"}</span>
+              {" · aberto em "}
+              {dataHora(a.atualizadoEm)}
+              {" · último aviso entregue: "}
+              {a.ultimoEnvioEm ? dataHora(a.ultimoEnvioEm) : "nenhum ainda"}
+              {a.ultimoErro && <span className="block text-red-700 dark:text-red-400">Último erro: {a.ultimoErro}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function estadoAtual(): Estado {
   const nav = window.navigator as Navigator & { standalone?: boolean };
   const instalado = window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
@@ -32,6 +80,7 @@ export function NotificacoesAparelho() {
   const [estado, setEstado] = useState<Estado>("carregando");
   const [enviando, setEnviando] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
+  const [versaoLista, setVersaoLista] = useState(0);
   const iphone = typeof navigator !== "undefined" && isIosDevice(navigator.userAgent);
 
   useEffect(() => {
@@ -73,6 +122,7 @@ export function NotificacoesAparelho() {
       setMensagem({ tipo: "erro", texto: `Não deu certo. Detalhe para o suporte: ${detalhe}` });
     } finally {
       setEnviando(false);
+      setVersaoLista((v) => v + 1);
     }
   }
 
@@ -152,6 +202,7 @@ export function NotificacoesAparelho() {
           >
             {enviando ? "Enviando…" : "Enviar notificação de teste"}
           </button>
+          <AparelhosDaConta atualizar={versaoLista} />
         </div>
       )}
 
