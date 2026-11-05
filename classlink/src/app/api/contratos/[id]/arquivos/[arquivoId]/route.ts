@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { AuthError, requireRole } from "@/lib/session";
+import { caminhoParaRenovar } from "@/lib/renovacao-sessao";
 import { handleApiError } from "@/lib/http";
 import { nomeArquivoPdfSeguro } from "@/lib/contratos";
 import { carregarContratoComAcesso } from "@/lib/contratos-server";
@@ -47,6 +48,18 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/contrato
 
     return new NextResponse(new Blob([Uint8Array.from(arquivo.conteudo)]), { headers: cabecalhos });
   } catch (error) {
+    // Link aberto direto no navegador (ex.: link antigo, aba nova) com a sessão de 15 min vencida:
+    // em vez de baixar um arquivo de erro no lugar do PDF, renova a sessão e leva à tela de
+    // Contratos. Chamadas do app (fetch) continuam recebendo 401 e renovam sozinhas.
+    if (error instanceof AuthError && error.status === 401 && ehNavegacao(request)) {
+      return NextResponse.redirect(new URL(caminhoParaRenovar("/dashboard/contratos"), request.url));
+    }
     return handleApiError(error);
   }
+}
+
+function ehNavegacao(request: NextRequest): boolean {
+  const destino = request.headers.get("sec-fetch-dest");
+  if (destino) return destino === "document" || destino === "iframe";
+  return (request.headers.get("accept") ?? "").includes("text/html");
 }

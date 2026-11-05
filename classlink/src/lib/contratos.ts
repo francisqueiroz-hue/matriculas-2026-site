@@ -109,6 +109,15 @@ export function caminhoContratoValido(caminho: string, escolaId: string, contrat
 }
 
 /** Nome de arquivo seguro para o cabeçalho Content-Disposition: sem caminho, aspas ou quebras de linha. */
+/**
+ * Texto que acompanha o PDF quando a secretaria envia o contrato direto à família (WhatsApp,
+ * e-mail), para quem não conseguiu baixar pelo app.
+ */
+export function textoEnvioPdf(aluno: string): string {
+  const nome = aluno.trim().split(/\s+/)[0] || "seu filho(a)";
+  return `Segue o contrato de matrícula de ${nome} em PDF. Dá para assinar grátis pelo gov.br (${LINK_ASSINADOR_GOVBR}) ou à mão. Depois, envie o PDF assinado pelo ClassLink, no menu Contratos, ou responda por aqui.`;
+}
+
 export function nomeArquivoPdfSeguro(nome: string): string {
   const base = nome.split(/[\\/]/).pop() ?? "";
   let limpo = base

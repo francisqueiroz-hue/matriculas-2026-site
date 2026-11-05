@@ -7,6 +7,7 @@ import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
 import { MODELO_CONTRATO_2027, formatarDinheiro, type ValoresContrato as Valores } from "@/lib/contrato-modelo/tipos";
 import type { SituacaoValor } from "@/lib/contrato-modelo/conferencia";
 import { ValoresContrato } from "@/components/ValoresContrato";
+import { AcoesPdf } from "@/components/AcoesPdf";
 import { ContratoModeloPainel } from "./ContratoModeloPainel";
 import {
   CONTRATO_LIMITE_ENVIO_SERVIDOR,
@@ -15,6 +16,8 @@ import {
   METODO_LABEL,
   STATUS_CONTRATO_LABEL,
   formatarDataHora,
+  nomeArquivoPdfSeguro,
+  textoEnvioPdf,
   validarPdf,
   type ContratoMetodo,
   type ContratoStatus,
@@ -110,8 +113,8 @@ const btn =
 const btnPrimario = `${btn} bg-indigo-600 text-white hover:bg-indigo-700`;
 const btnSecundario = `${btn} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
 
-function urlArquivo(contratoId: string, arquivoId: string, download = false) {
-  return `/api/contratos/${contratoId}/arquivos/${arquivoId}${download ? "?download=1" : ""}`;
+function urlArquivo(contratoId: string, arquivoId: string) {
+  return `/api/contratos/${contratoId}/arquivos/${arquivoId}`;
 }
 
 function linkWhatsApp(telefone: string, responsavel: string, aluno: string) {
@@ -367,12 +370,16 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
             SHA-256 {ultimo.sha256.slice(0, 16)}… · IP {ultimo.ipOrigem ?? "não informado"}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <a href={urlArquivo(c.id, ultimo.id)} target="_blank" rel="noopener noreferrer" className={btnSecundario}>
-              Ver assinado
-            </a>
-            <a href={urlArquivo(c.id, ultimo.id, true)} className={btnSecundario}>
-              Baixar
-            </a>
+            <AcoesPdf
+              url={urlArquivo(c.id, ultimo.id)}
+              nome={nomeArquivoPdfSeguro(ultimo.nomeArquivo)}
+              rotuloBaixar="Baixar"
+              rotuloAbrir="Ver assinado"
+              rotuloCompartilhar="Compartilhar"
+              tituloCompartilhar={`${c.titulo} (assinado) - ${c.student.name}`}
+              classePrimario={btnSecundario}
+              classeSecundario={btnSecundario}
+            />
             {c.metodoAssinatura === "GOVBR" && (
               <a href={LINK_VALIDAR_ITI} target="_blank" rel="noopener noreferrer" className={btnSecundario}>
                 Conferir no validar.iti.gov.br ↗
@@ -436,6 +443,25 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
         </div>
       )}
 
+      {modelo && (
+        <div className="mt-3">
+          <p className="mb-1 text-xs font-medium text-slate-600">
+            Contrato enviado para assinar (PDF){aguardandoFamilia && " — baixe ou envie o arquivo direto à família se ela não conseguir pelo app"}
+          </p>
+          <AcoesPdf
+            url={urlArquivo(c.id, modelo.id)}
+            nome={nomeArquivoPdfSeguro(modelo.nomeArquivo)}
+            rotuloBaixar="Baixar PDF"
+            rotuloAbrir="Ver contrato enviado"
+            rotuloCompartilhar="Enviar PDF (WhatsApp, e-mail…)"
+            tituloCompartilhar={c.titulo}
+            textoCompartilhar={textoEnvioPdf(c.student.name)}
+            classePrimario={btnPrimario}
+            classeSecundario={btnSecundario}
+          />
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {c.status === "EM_CONFERENCIA" && !devolvendo && (
           <>
@@ -451,11 +477,6 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
           <button type="button" disabled={salvando} onClick={() => agir({ acao: "ORIGINAL_RECEBIDO" })} className={btnPrimario}>
             Registrar via original recebida
           </button>
-        )}
-        {modelo && (
-          <a href={urlArquivo(c.id, modelo.id)} target="_blank" rel="noopener noreferrer" className={btnSecundario}>
-            Ver contrato enviado
-          </a>
         )}
         {aguardandoFamilia &&
           c.student.guardians

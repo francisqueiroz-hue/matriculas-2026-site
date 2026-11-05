@@ -113,7 +113,7 @@ const AREAS = [
   },
   {
     titulo: "Contratos",
-    texto: "Baixe o contrato, assine pelo gov.br (grátis, sem imprimir) ou à mão, e envie o PDF assinado pelo próprio app. A tela mostra cada passo e se a secretaria pediu algum ajuste.",
+    texto: "Baixe o contrato em PDF (no celular, “Salvar ou enviar o PDF” guarda o arquivo ou manda para o seu WhatsApp/e-mail), assine pelo gov.br (grátis, sem imprimir) ou à mão, e envie o PDF assinado pelo próprio app. A tela mostra cada passo e se a secretaria pediu algum ajuste.",
     path: "M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z M14 3v5h5 M9 13h6 M9 17h4",
   },
   {
