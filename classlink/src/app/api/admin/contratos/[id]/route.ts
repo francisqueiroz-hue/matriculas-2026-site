@@ -57,6 +57,15 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
       throw e;
     }
 
+    // Sem o PDF modelo a família não tem o que assinar nem onde reenviar (contrato registrado
+    // direto pela escola): nesse caso a direção substitui o assinado pelo cartão.
+    if (body.acao === "REABRIR" && !(await prisma.contratoArquivo.count({ where: { contratoId: id, tipo: "MODELO" } }))) {
+      return NextResponse.json(
+        { error: "Este contrato foi registrado pela escola, sem modelo para a família assinar. Use \"Anexar/substituir o contrato assinado\"." },
+        { status: 409 },
+      );
+    }
+
     if (body.acao === "APROVAR" && contrato.metodoAssinatura === "GOVBR" && !body.confirmarSemAssinatura) {
       if ((await ultimoPdfTemAssinatura(id)) === false) {
         return NextResponse.json({ error: ERRO_SEM_ASSINATURA_DIGITAL, codigo: "SEM_ASSINATURA_DIGITAL" }, { status: 409 });

@@ -634,7 +634,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
             {substituicao ? "Anexar/substituir o contrato assinado" : "Confirmar renovação (assinado fora do app)"}
           </button>
         )}
-        {(c.status === "COMPLETO" || c.status === "AGUARDANDO_ORIGINAL") && !devolvendo && (
+        {(c.status === "COMPLETO" || c.status === "AGUARDANDO_ORIGINAL") && modelo && !devolvendo && (
           <button type="button" disabled={salvando} onClick={() => setDevolvendo("REABRIR")} className="px-2 py-2 text-xs text-red-700 hover:underline">
             Reabrir e devolver à família
           </button>

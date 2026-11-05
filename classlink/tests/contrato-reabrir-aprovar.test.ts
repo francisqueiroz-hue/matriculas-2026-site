@@ -12,7 +12,7 @@ const banco = vi.hoisted(() => {
     tx,
     prisma: {
       contrato: { findFirst: vi.fn() },
-      contratoArquivo: { findFirst: vi.fn() },
+      contratoArquivo: { findFirst: vi.fn(), count: vi.fn() },
       guardianStudent: { findMany: vi.fn(async () => [{ guardianId: "resp1" }]) },
       $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
     },
@@ -39,6 +39,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   banco.tx.contrato.updateMany.mockResolvedValue({ count: 1 });
   banco.prisma.contratoArquivo.findFirst.mockResolvedValue({ conteudo: pdfSemAssinatura, blobPath: null });
+  banco.prisma.contratoArquivo.count.mockResolvedValue(1);
 });
 
 describe("aprovar envio gov.br", () => {
@@ -84,5 +85,14 @@ describe("reabrir contrato aprovado", () => {
   it("não reabre contrato que não foi aprovado", async () => {
     banco.prisma.contrato.findFirst.mockResolvedValue({ id: "c1", studentId: "a1", status: "AGUARDANDO_ASSINATURA", metodoAssinatura: null, student: { name: "Ravi" } });
     expect((await PATCH(req({ acao: "REABRIR", motivo: "teste" }), ctx)).status).toBe(409);
+  });
+
+  it("não reabre contrato registrado pela escola sem modelo (a família não teria como reenviar)", async () => {
+    banco.prisma.contrato.findFirst.mockResolvedValue({ id: "c1", studentId: "a1", status: "COMPLETO", metodoAssinatura: "MANUSCRITA", student: { name: "Ravi" } });
+    banco.prisma.contratoArquivo.count.mockResolvedValue(0);
+    const res = await PATCH(req({ acao: "REABRIR", motivo: "teste" }), ctx);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/Anexar\/substituir/);
+    expect(banco.tx.contrato.updateMany).not.toHaveBeenCalled();
   });
 });
