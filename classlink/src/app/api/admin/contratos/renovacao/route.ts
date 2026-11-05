@@ -11,7 +11,8 @@ import {
   alunoDoCaminhoRenovacao,
   dataIsoParaBr,
   nomeArquivoPdfSeguro,
-  podeConfirmarPelaEscola,
+  MOTIVO_SUBSTITUICAO_MIN,
+  ehSubstituicaoDeAssinado,
   statusAposConfirmacaoEscola,
   validarPdf,
 } from "@/lib/contratos";
@@ -77,7 +78,8 @@ export async function POST(request: NextRequest) {
     });
     if (!aluno) throw new ErroRecusa("Aluno não encontrado", 404);
 
-    // Contrato já enviado pelo app: só completa se ainda espera a família.
+    // Contrato já enviado pelo app: a direção anexa o assinado em qualquer situação; em contrato
+    // completo que já tem PDF assinado é uma substituição, que exige motivo.
     const existente = dados.contratoId
       ? await prisma.contrato.findFirst({
           where: { id: dados.contratoId, schoolId: session.schoolId, studentId: aluno.id },
@@ -86,25 +88,19 @@ export async function POST(request: NextRequest) {
       : null;
     if (dados.contratoId) {
       if (!existente) throw new ErroRecusa("Contrato não encontrado", 404);
-      if (!podeConfirmarPelaEscola(existente.status, existente._count.arquivos > 0)) {
-        throw new ErroRecusa("Este contrato já foi concluído e tem o PDF assinado guardado.", 409);
+      if (ehSubstituicaoDeAssinado(existente.status, existente._count.arquivos > 0) && (dados.observacao ?? "").length < MOTIVO_SUBSTITUICAO_MIN) {
+        throw new ErroRecusa("Informe o motivo da substituição do contrato assinado (ex.: o arquivo aprovado não tinha assinatura).", 400);
       }
     } else {
-      // Renovação sem contrato no app: evita deixar um contrato aberto duplicado (que seguiria
-      // gerando lembretes à família) — nesse caso a confirmação é feita no cartão dele.
-      const aberto = await prisma.contrato.findFirst({
-        where: {
-          schoolId: session.schoolId,
-          studentId: aluno.id,
-          anoLetivo: dados.anoLetivo,
-          // Não concluído, ou concluído sem PDF assinado guardado (anexar no cartão dele).
-          OR: [{ status: { not: "COMPLETO" } }, { arquivos: { none: { tipo: "ASSINADO" } } }],
-        },
+      // Renovação sem contrato no app: se o aluno já tem contrato do ano, o documento vai no
+      // cartão desse contrato (evita duplicar e deixar lembretes rodando).
+      const jaTem = await prisma.contrato.findFirst({
+        where: { schoolId: session.schoolId, studentId: aluno.id, anoLetivo: dados.anoLetivo },
         select: { id: true },
       });
-      if (aberto) {
+      if (jaTem) {
         throw new ErroRecusa(
-          `${aluno.name} já tem contrato ${dados.anoLetivo} no app ainda não concluído. Use "Confirmar renovação" no cartão desse contrato.`,
+          `${aluno.name} já tem contrato ${dados.anoLetivo} no app. Anexe o documento pelo botão no cartão desse contrato.`,
           409,
         );
       }
@@ -122,10 +118,12 @@ export async function POST(request: NextRequest) {
     const agora = new Date();
     // Contrato já aprovado (só faltava o PDF guardado) continua completo: anexar não reabre pendência.
     const novoStatus = existente?.status === "COMPLETO" ? "COMPLETO" : statusAposConfirmacaoEscola(dados.metodo, dados.originalNaEscola);
+    const substituicao = !!existente && ehSubstituicaoDeAssinado(existente.status, existente._count.arquivos > 0);
     const detalhe = [
+      substituicao ? "Substitui o PDF assinado anterior (que continua guardado)" : null,
       `${METODO_LABEL[dados.metodo]} · assinado em ${dataIsoParaBr(dados.dataAssinatura)}`,
       dados.metodo === "MANUSCRITA" ? (dados.originalNaEscola ? "via original arquivada na escola" : "falta a via original") : null,
-      dados.observacao ? `Obs.: ${dados.observacao}` : null,
+      dados.observacao ? `${substituicao ? "Motivo" : "Obs."}: ${dados.observacao}` : null,
     ]
       .filter(Boolean)
       .join(" · ");

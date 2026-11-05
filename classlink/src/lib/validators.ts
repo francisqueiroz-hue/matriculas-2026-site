@@ -275,7 +275,9 @@ export const confirmarRenovacaoDiretoSchema = z.object({
 });
 
 export const acaoContratoSchema = z.discriminatedUnion("acao", [
-  z.object({ acao: z.literal("APROVAR") }),
+  // confirmarSemAssinatura: a direção viu o aviso de que o PDF "gov.br" não tem assinatura digital e aprova mesmo assim.
+  z.object({ acao: z.literal("APROVAR"), confirmarSemAssinatura: z.boolean().optional() }),
+  z.object({ acao: z.literal("REABRIR"), motivo: z.string().trim().min(3, "Informe o motivo para reabrir").max(500) }),
   z.object({ acao: z.literal("ORIGINAL_RECEBIDO") }),
   z.object({ acao: z.literal("DEVOLVER"), motivo: z.string().trim().min(3, "Informe o motivo da devolução").max(500) }),
 ]);

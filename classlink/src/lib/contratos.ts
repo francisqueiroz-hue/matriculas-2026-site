@@ -3,7 +3,7 @@
 
 export type ContratoStatus = "AGUARDANDO_ASSINATURA" | "EM_CONFERENCIA" | "AGUARDANDO_ORIGINAL" | "COMPLETO" | "DEVOLVIDO";
 export type ContratoMetodo = "GOVBR" | "MANUSCRITA";
-export type ContratoAcao = "PREENCHER_DADOS" | "ENVIAR_ASSINADO" | "APROVAR" | "DEVOLVER" | "ORIGINAL_RECEBIDO";
+export type ContratoAcao = "PREENCHER_DADOS" | "ENVIAR_ASSINADO" | "APROVAR" | "DEVOLVER" | "ORIGINAL_RECEBIDO" | "REABRIR";
 
 /**
  * Até 4 MB o PDF passa pela função do app (abaixo do teto de 4,5 MB por requisição das
@@ -46,6 +46,9 @@ const TRANSICOES: Record<Exclude<ContratoAcao, "APROVAR">, { de: ContratoStatus[
   ENVIAR_ASSINADO: { de: ["AGUARDANDO_ASSINATURA", "DEVOLVIDO"], para: "EM_CONFERENCIA" },
   DEVOLVER: { de: ["EM_CONFERENCIA"], para: "DEVOLVIDO" },
   ORIGINAL_RECEBIDO: { de: ["AGUARDANDO_ORIGINAL"], para: "COMPLETO" },
+  // Contrato aprovado por engano (ex.: arquivo sem assinatura): a escola reabre e devolve à
+  // família com o motivo. O histórico e os arquivos anteriores continuam guardados.
+  REABRIR: { de: ["COMPLETO", "AGUARDANDO_ORIGINAL"], para: "DEVOLVIDO" },
 };
 
 const MENSAGEM_TRANSICAO_INVALIDA: Record<ContratoAcao, string> = {
@@ -54,6 +57,7 @@ const MENSAGEM_TRANSICAO_INVALIDA: Record<ContratoAcao, string> = {
   APROVAR: "Só é possível aprovar um contrato que está em conferência.",
   DEVOLVER: "Só é possível devolver um contrato que está em conferência.",
   ORIGINAL_RECEBIDO: "Este contrato não está aguardando a via original.",
+  REABRIR: "Só é possível reabrir um contrato já aprovado.",
 };
 
 export function podeEnviarAssinado(status: ContratoStatus): boolean {
@@ -78,15 +82,21 @@ export function proximoStatus(status: ContratoStatus, acao: ContratoAcao, metodo
 
 /**
  * Renovação assinada fora do app (papel na secretaria, PDF do gov.br recebido por WhatsApp ou
- * e-mail): a direção anexa o documento e confirma. Vale para todo contrato ainda não concluído:
- * aguardando a família, devolvido, em conferência (a família enviou um arquivo, mas a escola tem
- * o assinado por outro meio; o envio da família continua no histórico) e aguardando a via
- * original (a direção anexa a digitalização do original). Contrato completo só quando ficou sem
- * nenhum PDF assinado guardado (aprovado sem arquivo): a direção anexa o documento para o registro.
+ * e-mail): a direção anexa o documento e confirma, em qualquer situação do contrato. Os arquivos
+ * anteriores (da família ou da escola) continuam guardados no histórico.
+ *
+ * Em contrato já completo e com PDF assinado guardado, anexar é uma SUBSTITUIÇÃO (ex.: foi
+ * aprovado um arquivo sem assinatura): exige motivo, que fica no histórico.
  */
-export function podeConfirmarPelaEscola(status: ContratoStatus, temAssinado = true): boolean {
-  return status !== "COMPLETO" || !temAssinado;
+export function ehSubstituicaoDeAssinado(status: ContratoStatus, temAssinado: boolean): boolean {
+  return status === "COMPLETO" && temAssinado;
 }
+
+export const MOTIVO_SUBSTITUICAO_MIN = 5;
+
+/** Recusa ao aprovar envio "gov.br" cujo PDF não tem assinatura digital (a tela pede confirmação). */
+export const ERRO_SEM_ASSINATURA_DIGITAL =
+  "Nenhuma assinatura digital encontrada no PDF enviado, mas a família marcou gov.br. Confira antes de aprovar.";
 
 /**
  * Status depois da confirmação pela direção: gov.br já fica completo; assinatura à mão fica

@@ -8,6 +8,7 @@ import {
   CONTRATO_LIMITE_ENVIO_SERVIDOR,
   CONTRATO_MAX_BYTES,
   ContratoErro,
+  MOTIVO_SUBSTITUICAO_MIN,
   mensagemArquivoGrande,
   validarPdf,
   type ContratoMetodo,
@@ -37,6 +38,7 @@ export function ConfirmarRenovacao({
   anoLetivo,
   titulo,
   idCampos,
+  exigeMotivo = false,
   onConfirmado,
   onCancelar,
 }: {
@@ -47,6 +49,8 @@ export function ConfirmarRenovacao({
   titulo?: string;
   /** Prefixo dos ids dos campos (rótulos acessíveis únicos na página). */
   idCampos: string;
+  /** Contrato já completo com PDF assinado: é uma substituição e o motivo é obrigatório. */
+  exigeMotivo?: boolean;
   onConfirmado: (mensagem: string) => void;
   onCancelar?: () => void;
 }) {
@@ -80,7 +84,14 @@ export function ConfirmarRenovacao({
     }
   }
 
-  const pronto = Boolean(metodo && arquivo && declaracao && dataAssinatura && (contratoId || (titulo && titulo.trim().length >= 3)));
+  const pronto = Boolean(
+    metodo &&
+      arquivo &&
+      declaracao &&
+      dataAssinatura &&
+      (contratoId || (titulo && titulo.trim().length >= 3)) &&
+      (!exigeMotivo || observacao.trim().length >= MOTIVO_SUBSTITUICAO_MIN),
+  );
 
   async function confirmar(e: React.FormEvent) {
     e.preventDefault();
@@ -171,14 +182,16 @@ export function ConfirmarRenovacao({
         </div>
         <div>
           <label htmlFor={`${idCampos}-obs`} className="mb-1 block text-xs font-medium text-slate-700">
-            Observação (opcional, fica no histórico)
+            {exigeMotivo ? "Motivo da substituição (obrigatório, fica no histórico)" : "Observação (opcional, fica no histórico)"}
           </label>
           <input
             id={`${idCampos}-obs`}
             maxLength={300}
+            required={exigeMotivo}
+            minLength={exigeMotivo ? MOTIVO_SUBSTITUICAO_MIN : undefined}
             value={observacao}
             onChange={(e) => setObservacao(e.target.value)}
-            placeholder="Ex.: assinado na secretaria; PDF recebido por WhatsApp"
+            placeholder={exigeMotivo ? "Ex.: o arquivo aprovado não tinha assinatura digital" : "Ex.: assinado na secretaria; PDF recebido por WhatsApp"}
             className="min-h-10 w-full rounded-md border border-slate-300 bg-white px-3"
           />
         </div>
@@ -217,7 +230,7 @@ export function ConfirmarRenovacao({
 
       <div className="flex flex-wrap gap-2">
         <button type="submit" disabled={!pronto || enviando} className={btnPrimario}>
-          {enviando ? "Confirmando…" : "Confirmar renovação"}
+          {enviando ? "Confirmando…" : exigeMotivo ? "Substituir contrato assinado" : "Confirmar renovação"}
         </button>
         {onCancelar && (
           <button type="button" onClick={onCancelar} className={btnSecundario}>
