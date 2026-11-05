@@ -101,7 +101,12 @@ export async function notifyUsers(userIds: string[], aviso: AvisoPush): Promise<
     if (TOKEN_INVALIDO.has(codigo)) invalidos.push(tokens[i].id);
   });
   if (erros.length > invalidos.length) console.error("Falha no envio de push", erros);
-  if (invalidos.length > 0) await prisma.pushToken.deleteMany({ where: { id: { in: invalidos } } });
+  if (invalidos.length > 0) {
+    // Aparelho que deixou de aceitar push (ex.: iPhone que cancelou a inscrição). Fica no log
+    // para o diagnóstico: o aparelho volta a receber quando a pessoa abre o app nele de novo.
+    console.warn(`Push: ${invalidos.length} aparelho(s) não aceitam mais avisos; registro removido`, { userIds });
+    await prisma.pushToken.deleteMany({ where: { id: { in: invalidos } } });
+  }
 
   return { aparelhos: tokens.length, enviados: response.successCount, erros };
 }
