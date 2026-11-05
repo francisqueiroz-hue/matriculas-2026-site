@@ -40,6 +40,8 @@ interface ContratoFamilia {
   metodoAssinatura: ContratoMetodo | null;
   assinadoEnviadoEm: string | null;
   motivoDevolucao: string | null;
+  /** A escola anexou o contrato assinado fora do app (ex.: em papel na secretaria). */
+  confirmadoPelaEscola?: boolean;
   modelo: string | null;
   dadosPreenchidos: boolean;
   valores: Valores | null;
@@ -369,7 +371,8 @@ function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; on
 
       {contrato.status === "COMPLETO" && (
         <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">
-          Contrato completo ✓ Obrigado! Guarde uma cópia do arquivo assinado.
+          Contrato completo ✓ {contrato.confirmadoPelaEscola && "A escola registrou o contrato assinado. "}Obrigado! Guarde uma cópia do
+          arquivo assinado.
         </p>
       )}
 
@@ -379,7 +382,7 @@ function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; on
             <AcoesPdf
               url={urlArquivo(contrato.id, ultimoEnvio.id)}
               nome={nomeArquivoPdfSeguro(ultimoEnvio.nomeArquivo)}
-              rotuloBaixar="Baixar o contrato que enviei"
+              rotuloBaixar={contrato.confirmadoPelaEscola ? "Baixar o contrato assinado" : "Baixar o contrato que enviei"}
               rotuloAbrir={null}
               rotuloCompartilhar="Salvar ou enviar o assinado"
               tituloCompartilhar={contrato.titulo}

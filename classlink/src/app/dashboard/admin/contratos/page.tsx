@@ -10,6 +10,7 @@ import { ValoresContrato } from "@/components/ValoresContrato";
 import { AcoesPdf } from "@/components/AcoesPdf";
 import { ContratoModeloPainel } from "./ContratoModeloPainel";
 import { ConferenciaAssinatura } from "./ConferenciaAssinatura";
+import { ConfirmarRenovacao } from "./ConfirmarRenovacao";
 import {
   CONTRATO_LIMITE_ENVIO_SERVIDOR,
   ContratoErro,
@@ -36,7 +37,7 @@ interface Arquivo {
 
 interface Evento {
   id: string;
-  tipo: "CRIADO" | "DADOS_PREENCHIDOS" | "CONDICOES_ATUALIZADAS" | "ASSINADO_ENVIADO" | "DEVOLVIDO" | "CONFERIDO" | "ORIGINAL_RECEBIDO";
+  tipo: "CRIADO" | "DADOS_PREENCHIDOS" | "CONDICOES_ATUALIZADAS" | "ASSINADO_ENVIADO" | "DEVOLVIDO" | "CONFERIDO" | "ORIGINAL_RECEBIDO" | "RENOVACAO_CONFIRMADA";
   ipOrigem: string | null;
   arquivoSha256: string | null;
   detalhe: string | null;
@@ -52,6 +53,8 @@ interface Contrato {
   metodoAssinatura: ContratoMetodo | null;
   assinadoEnviadoEm: string | null;
   motivoDevolucao: string | null;
+  /** A direção anexou o contrato assinado fora do app e confirmou a renovação. */
+  confirmadoPelaEscola: boolean;
   modelo: string | null;
   dadosPreenchidos: boolean;
   valores: Valores | null;
@@ -106,6 +109,7 @@ const EVENTO_LABEL: Record<Evento["tipo"], string> = {
   DEVOLVIDO: "Devolvido para correção",
   CONFERIDO: "Conferido e aprovado",
   ORIGINAL_RECEBIDO: "Via original recebida",
+  RENOVACAO_CONFIRMADA: "Renovação confirmada pela escola (contrato assinado fora do app, anexado pela direção)",
 };
 
 const btn =
@@ -292,11 +296,131 @@ function NovoContrato({ ano, contratos, onCriado }: { ano: number; contratos: Co
   );
 }
 
+/**
+ * Renovação que nunca passou pelo app (contrato feito e assinado fora): a direção escolhe o
+ * aluno, anexa o contrato assinado e confirma. O app cria o registro já assinado.
+ */
+function RegistrarRenovacaoForaDoApp({ ano, contratos, onRegistrado }: { ano: number; contratos: Contrato[]; onRegistrado: () => void }) {
+  const [alunos, setAlunos] = useState<AlunoOpcao[]>([]);
+  const [studentId, setStudentId] = useState("");
+  const [titulo, setTitulo] = useState(`Contrato de prestação de serviços educacionais ${ano}`);
+  const [sucesso, setSucesso] = useState<string | null>(null);
+  const [chave, setChave] = useState(0);
+
+  useEffect(() => {
+    apiJson<{ students: AlunoOpcao[] }>("/api/admin/students")
+      .then((data) => setAlunos(data.students))
+      .catch(() => setAlunos([]));
+  }, []);
+
+  const contratoDoAluno = useMemo(() => {
+    const m = new Map<string, Contrato>();
+    for (const c of contratos) if (c.anoLetivo === ano) m.set(c.student.id, c);
+    return m;
+  }, [contratos, ano]);
+
+  const porTurma = useMemo(() => {
+    const grupos = new Map<string, AlunoOpcao[]>();
+    for (const a of alunos) grupos.set(a.class.name, [...(grupos.get(a.class.name) ?? []), a]);
+    return [...grupos.entries()];
+  }, [alunos]);
+
+  const aluno = alunos.find((a) => a.id === studentId);
+  const existente = studentId ? contratoDoAluno.get(studentId) : undefined;
+  const existenteAberto = existente && (existente.status === "AGUARDANDO_ASSINATURA" || existente.status === "DEVOLVIDO" || existente.status === "EM_CONFERENCIA");
+
+  return (
+    <div className="space-y-3 p-4 text-sm">
+      <p className="text-slate-600">
+        Para alunos que renovaram com contrato feito e assinado fora do app. Se o contrato já foi enviado pelo app, use o botão
+        &quot;Confirmar renovação&quot; no cartão dele, na lista abaixo.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="renovar-aluno" className="mb-1 block text-xs font-medium text-slate-600">
+            Aluno
+          </label>
+          <select
+            id="renovar-aluno"
+            value={studentId}
+            onChange={(e) => {
+              setStudentId(e.target.value);
+              setSucesso(null);
+            }}
+            className="min-h-10 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
+          >
+            <option value="">Escolha o aluno…</option>
+            {porTurma.map(([turma, lista]) => (
+              <optgroup key={turma} label={turma}>
+                {lista.map((a) => {
+                  const c = contratoDoAluno.get(a.id);
+                  return (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                      {c ? ` — já tem contrato ${ano} (${STATUS_CONTRATO_LABEL[c.status].toLowerCase()})` : ""}
+                    </option>
+                  );
+                })}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="renovar-titulo" className="mb-1 block text-xs font-medium text-slate-600">
+            Título do contrato ({ano})
+          </label>
+          <input
+            id="renovar-titulo"
+            minLength={3}
+            maxLength={150}
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            className="min-h-10 w-full rounded-md border border-slate-300 px-3 text-sm"
+          />
+        </div>
+      </div>
+      {sucesso && (
+        <p role="status" className="font-medium text-emerald-800">
+          ✓ {sucesso}
+        </p>
+      )}
+      {aluno && existenteAberto && (
+        <p className="rounded-md bg-amber-50 p-2 text-amber-900">
+          {aluno.name} já tem contrato {ano} enviado pelo app ({STATUS_CONTRATO_LABEL[existente!.status].toLowerCase()}). Confirme a
+          renovação no cartão desse contrato, na lista abaixo, para não ficar um contrato duplicado em aberto.
+        </p>
+      )}
+      {aluno && !existenteAberto && (
+        <>
+          {existente && (
+            <p className="text-amber-800">Atenção: {aluno.name} já tem um contrato {ano} concluído. Registre só se for outro documento (ex.: aditivo).</p>
+          )}
+          <ConfirmarRenovacao
+            key={`${studentId}-${chave}`}
+            studentId={aluno.id}
+            nomeAluno={aluno.name}
+            anoLetivo={ano}
+            titulo={titulo}
+            idCampos="renovacao-nova"
+            onConfirmado={(msg) => {
+              setSucesso(msg);
+              setStudentId("");
+              setChave((k) => k + 1);
+              onRegistrado();
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void }) {
   const [devolvendo, setDevolvendo] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
 
   const modelo = c.arquivos.find((a) => a.tipo === "MODELO");
   const doApp = c.modelo === MODELO_CONTRATO_2027;
@@ -363,7 +487,8 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
       {ultimo && (
         <div className="mt-3 rounded-lg bg-slate-50 p-3">
           <p className="font-medium text-slate-900">
-            Enviado por {ultimo.enviadoPor?.name ?? "responsável"} em {formatarDataHora(ultimo.createdAt)}
+            {c.confirmadoPelaEscola ? "Assinado fora do app · anexado pela escola" : "Enviado"} por{" "}
+            {ultimo.enviadoPor?.name ?? (c.confirmadoPelaEscola ? "direção" : "responsável")} em {formatarDataHora(ultimo.createdAt)}
             {c.metodoAssinatura && ` · ${METODO_LABEL[c.metodoAssinatura]}`}
           </p>
           <p className="mt-1 break-all font-mono text-xs text-slate-500">
@@ -492,12 +617,38 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
                 Lembrar {g.guardian.name.split(" ")[0]} no WhatsApp
               </a>
             ))}
+        {aguardandoFamilia && !confirmando && (
+          <button type="button" onClick={() => setConfirmando(true)} className={`${btn} border border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50`}>
+            Confirmar renovação (assinado fora do app)
+          </button>
+        )}
         {c.status === "AGUARDANDO_ASSINATURA" && envios.length === 0 && (
           <button type="button" onClick={excluir} className="px-2 py-2 text-xs text-red-700 hover:underline">
             Excluir (enviado por engano)
           </button>
         )}
       </div>
+
+      {confirmando && aguardandoFamilia && (
+        <div className="mt-3 space-y-2">
+          <p className="text-slate-700">
+            Use quando a família assinou fora do app (papel na secretaria, PDF do gov.br recebido por WhatsApp ou e-mail). Anexe o
+            contrato assinado: ele fica guardado aqui com o histórico, o contrato conta como renovado e os lembretes param.
+          </p>
+          <ConfirmarRenovacao
+            studentId={c.student.id}
+            nomeAluno={c.student.name}
+            contratoId={c.id}
+            anoLetivo={c.anoLetivo}
+            idCampos={`renovacao-${c.id}`}
+            onConfirmado={() => {
+              setConfirmando(false);
+              onMudou();
+            }}
+            onCancelar={() => setConfirmando(false)}
+          />
+        </div>
+      )}
 
       {devolvendo && (
         <div className="mt-3 space-y-2">
@@ -636,6 +787,15 @@ function ContratosContent() {
       </div>
 
       <ContratoModeloPainel ano={ano} jaTemModelo={jaTemModelo} onEnviado={carregar} />
+
+      <details className="rounded-xl border border-emerald-200 bg-white">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-emerald-800">
+          Confirmar renovação assinada fora do app (anexar o contrato)
+        </summary>
+        <div className="border-t border-slate-100">
+          <RegistrarRenovacaoForaDoApp key={ano} ano={ano} contratos={dados?.contratos ?? []} onRegistrado={carregar} />
+        </div>
+      </details>
 
       <details className="rounded-xl border border-slate-200 bg-white">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-slate-700">Enviar um PDF próprio (aditivo ou outro modelo)</summary>

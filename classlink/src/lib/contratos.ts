@@ -76,6 +76,43 @@ export function proximoStatus(status: ContratoStatus, acao: ContratoAcao, metodo
   return regra.para;
 }
 
+/**
+ * Renovação assinada fora do app (papel na secretaria, PDF do gov.br recebido por WhatsApp ou
+ * e-mail): a direção anexa o documento e confirma. Vale para contrato que ainda espera a família
+ * (aguardando ou devolvido). Em conferência, a direção usa Aprovar/Devolver; depois disso o
+ * contrato já está resolvido.
+ */
+export function podeConfirmarPelaEscola(status: ContratoStatus): boolean {
+  return status === "AGUARDANDO_ASSINATURA" || status === "DEVOLVIDO";
+}
+
+/**
+ * Status depois da confirmação pela direção: gov.br já fica completo; assinatura à mão fica
+ * completa só se a via original em papel já está arquivada na escola.
+ */
+export function statusAposConfirmacaoEscola(metodo: ContratoMetodo, originalNaEscola: boolean): ContratoStatus {
+  return metodo === "MANUSCRITA" && !originalNaEscola ? "AGUARDANDO_ORIGINAL" : "COMPLETO";
+}
+
+const UUID_PDF = "[0-9a-f-]{36}\\.pdf";
+
+/**
+ * Caminho do PDF que a direção envia direto ao armazenamento ao confirmar uma renovação:
+ * classlink/<escola>/contratos/renovacao/<aluno>/<uuid>.pdf. Devolve o id do aluno, ou null
+ * quando o caminho não segue o formato (ou é de outra escola).
+ */
+export function alunoDoCaminhoRenovacao(caminho: string, escolaId: string): string | null {
+  if (!escolaId || escolaId.replace(/[^A-Za-z0-9_-]/g, "") !== escolaId) return null;
+  const m = new RegExp(`^classlink/${escolaId}/contratos/renovacao/([A-Za-z0-9_-]+)/${UUID_PDF}$`).exec(caminho);
+  return m ? m[1] : null;
+}
+
+/** "2026-11-04" → "04/11/2026" (data informada pela direção, sem fuso). */
+export function dataIsoParaBr(iso: string): string {
+  const [a, m, d] = iso.split("-");
+  return `${d}/${m}/${a}`;
+}
+
 /** Excluir só é permitido antes de qualquer envio da família — depois disso o histórico é prova. */
 export function podeExcluirContrato(status: ContratoStatus, totalEnviosFamilia: number): boolean {
   return status === "AGUARDANDO_ASSINATURA" && totalEnviosFamilia === 0;
