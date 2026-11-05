@@ -18,7 +18,8 @@ import {
   STATUS_CONTRATO_LABEL,
   formatarDataHora,
   nomeArquivoPdfSeguro,
-  podeConfirmarPelaEscola,
+  ERRO_SEM_ASSINATURA_DIGITAL,
+  ehSubstituicaoDeAssinado,
   textoEnvioPdf,
   validarPdf,
   type ContratoMetodo,
@@ -328,7 +329,6 @@ function RegistrarRenovacaoForaDoApp({ ano, contratos, onRegistrado }: { ano: nu
 
   const aluno = alunos.find((a) => a.id === studentId);
   const existente = studentId ? contratoDoAluno.get(studentId) : undefined;
-  const existenteAberto = existente && podeConfirmarPelaEscola(existente.status, existente.arquivos.some((a) => a.tipo === "ASSINADO"));
 
   return (
     <div className="space-y-3 p-4 text-sm">
@@ -385,17 +385,14 @@ function RegistrarRenovacaoForaDoApp({ ano, contratos, onRegistrado }: { ano: nu
           ✓ {sucesso}
         </p>
       )}
-      {aluno && existenteAberto && (
+      {aluno && existente && (
         <p className="rounded-md bg-amber-50 p-2 text-amber-900">
-          {aluno.name} já tem contrato {ano} enviado pelo app ({STATUS_CONTRATO_LABEL[existente!.status].toLowerCase()}). Confirme a
-          renovação no cartão desse contrato, na lista abaixo, para não ficar um contrato duplicado em aberto.
+          {aluno.name} já tem contrato {ano} no app ({STATUS_CONTRATO_LABEL[existente.status].toLowerCase()}). Anexe o documento pelo
+          botão no cartão desse contrato, na lista abaixo, para não duplicar.
         </p>
       )}
-      {aluno && !existenteAberto && (
+      {aluno && !existente && (
         <>
-          {existente && (
-            <p className="text-amber-800">Atenção: {aluno.name} já tem um contrato {ano} concluído. Registre só se for outro documento (ex.: aditivo).</p>
-          )}
           <ConfirmarRenovacao
             key={`${studentId}-${chave}`}
             studentId={aluno.id}
@@ -417,7 +414,7 @@ function RegistrarRenovacaoForaDoApp({ ano, contratos, onRegistrado }: { ano: nu
 }
 
 function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void }) {
-  const [devolvendo, setDevolvendo] = useState(false);
+  const [devolvendo, setDevolvendo] = useState<false | "DEVOLVER" | "REABRIR">(false);
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -428,11 +425,25 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
   const envios = c.arquivos.filter((a) => a.tipo === "ASSINADO");
   const ultimo = envios[0];
 
-  async function agir(body: Record<string, string>) {
+  const substituicao = ehSubstituicaoDeAssinado(c.status, envios.length > 0);
+
+  async function agir(body: Record<string, string | boolean>) {
     setSalvando(true);
     setErro(null);
     try {
-      await apiJson(`/api/admin/contratos/${c.id}`, { method: "PATCH", body: JSON.stringify(body) });
+      try {
+        await apiJson(`/api/admin/contratos/${c.id}`, { method: "PATCH", body: JSON.stringify(body) });
+      } catch (err) {
+        // Envio marcado como gov.br sem assinatura digital no PDF: só aprova com confirmação explícita.
+        if (body.acao !== "APROVAR" || !(err instanceof Error) || err.message !== ERRO_SEM_ASSINATURA_DIGITAL) throw err;
+        const ok = confirm(
+          `Atenção: o PDF enviado para ${c.student.name} NÃO tem assinatura digital, mas a família marcou "gov.br".\n\n` +
+            `Pode ser o contrato sem assinar, uma foto ou uma impressão em PDF. O recomendado é "Devolver para correção".\n\n` +
+            `Aprovar mesmo assim?`,
+        );
+        if (!ok) return;
+        await apiJson(`/api/admin/contratos/${c.id}`, { method: "PATCH", body: JSON.stringify({ ...body, confirmarSemAssinatura: true }) });
+      }
       setDevolvendo(false);
       setMotivo("");
       onMudou();
@@ -594,7 +605,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
             <button type="button" disabled={salvando} onClick={() => agir({ acao: "APROVAR" })} className={`${btn} bg-emerald-600 text-white hover:bg-emerald-700`}>
               Aprovar
             </button>
-            <button type="button" disabled={salvando} onClick={() => setDevolvendo(true)} className={btnSecundario}>
+            <button type="button" disabled={salvando} onClick={() => setDevolvendo("DEVOLVER")} className={btnSecundario}>
               Devolver para correção
             </button>
           </>
@@ -618,9 +629,14 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
                 Lembrar {g.guardian.name.split(" ")[0]} no WhatsApp
               </a>
             ))}
-        {podeConfirmarPelaEscola(c.status, envios.length > 0) && !confirmando && (
+        {!confirmando && (
           <button type="button" onClick={() => setConfirmando(true)} className={`${btn} border border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50`}>
-            Confirmar renovação (assinado fora do app)
+            {substituicao ? "Anexar/substituir o contrato assinado" : "Confirmar renovação (assinado fora do app)"}
+          </button>
+        )}
+        {(c.status === "COMPLETO" || c.status === "AGUARDANDO_ORIGINAL") && !devolvendo && (
+          <button type="button" disabled={salvando} onClick={() => setDevolvendo("REABRIR")} className="px-2 py-2 text-xs text-red-700 hover:underline">
+            Reabrir e devolver à família
           </button>
         )}
         {c.status === "AGUARDANDO_ASSINATURA" && envios.length === 0 && (
@@ -630,19 +646,27 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
         )}
       </div>
 
-      {confirmando && podeConfirmarPelaEscola(c.status, envios.length > 0) && (
+      {confirmando && (
         <div className="mt-3 space-y-2">
-          <p className="text-slate-700">
-            Use quando a família assinou fora do app (papel na secretaria, PDF do gov.br recebido por WhatsApp ou e-mail). Anexe o
-            contrato assinado: ele fica guardado aqui com o histórico, o contrato conta como renovado e os lembretes param.
-            {envios.length > 0 && " O arquivo que a família já enviou continua guardado no histórico."}
-          </p>
+          {substituicao ? (
+            <p className="text-slate-700">
+              Este contrato já está completo. Anexe o contrato assinado correto (ex.: o arquivo aprovado não tinha assinatura). O
+              arquivo anterior continua guardado no histórico e o motivo fica registrado.
+            </p>
+          ) : (
+            <p className="text-slate-700">
+              Use quando a família assinou fora do app (papel na secretaria, PDF do gov.br recebido por WhatsApp ou e-mail). Anexe o
+              contrato assinado: ele fica guardado aqui com o histórico, o contrato conta como renovado e os lembretes param.
+              {envios.length > 0 && " O arquivo que a família já enviou continua guardado no histórico."}
+            </p>
+          )}
           <ConfirmarRenovacao
             studentId={c.student.id}
             nomeAluno={c.student.name}
             contratoId={c.id}
             anoLetivo={c.anoLetivo}
             idCampos={`renovacao-${c.id}`}
+            exigeMotivo={substituicao}
             onConfirmado={() => {
               setConfirmando(false);
               onMudou();
@@ -654,6 +678,12 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
 
       {devolvendo && (
         <div className="mt-3 space-y-2">
+          {devolvendo === "REABRIR" && (
+            <p className="text-slate-700">
+              O contrato volta para &quot;Devolvido para correção&quot; e a família recebe o aviso para enviar de novo. Os arquivos e o
+              histórico continuam guardados.
+            </p>
+          )}
           <label htmlFor={`motivo-${c.id}`} className="block text-xs font-medium text-slate-600">
             O que a família precisa corrigir? (aparece para ela)
           </label>
@@ -670,10 +700,10 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
             <button
               type="button"
               disabled={salvando || motivo.trim().length < 3}
-              onClick={() => agir({ acao: "DEVOLVER", motivo })}
+              onClick={() => agir({ acao: devolvendo === "REABRIR" ? "REABRIR" : "DEVOLVER", motivo })}
               className={btnPrimario}
             >
-              Devolver
+              {devolvendo === "REABRIR" ? "Reabrir e devolver" : "Devolver"}
             </button>
             <button type="button" onClick={() => setDevolvendo(false)} className={btnSecundario}>
               Cancelar

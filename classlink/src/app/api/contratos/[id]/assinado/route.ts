@@ -86,7 +86,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/contrat
     await prisma.$transaction(async (tx) => {
       const { count } = await tx.contrato.updateMany({
         where: { id, status: contrato.status },
-        data: { status: novoStatus, metodoAssinatura: dados.metodo, assinadoEnviadoEm: agora, motivoDevolucao: null },
+        data: { status: novoStatus, metodoAssinatura: dados.metodo, assinadoEnviadoEm: agora, motivoDevolucao: null, confirmadoPelaEscola: false },
       });
       if (count === 0) throw new ContratoErro("Este contrato acabou de ser atualizado. Recarregue a página.");
       await tx.contratoArquivo.create({

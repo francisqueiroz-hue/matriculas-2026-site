@@ -47,7 +47,7 @@ vi.mock("@/lib/session", () => ({
   },
 }));
 
-import { alunoDoCaminhoRenovacao, podeConfirmarPelaEscola, statusAposConfirmacaoEscola } from "@/lib/contratos";
+import { alunoDoCaminhoRenovacao, ehSubstituicaoDeAssinado, statusAposConfirmacaoEscola } from "@/lib/contratos";
 import { POST as confirmar } from "@/app/api/admin/contratos/renovacao/route";
 import { POST as autorizar } from "@/app/api/admin/contratos/renovacao/envio/route";
 
@@ -103,14 +103,12 @@ beforeEach(() => {
 });
 
 describe("regras da confirmação pela escola", () => {
-  it("para todo contrato ainda não concluído", () => {
-    expect(podeConfirmarPelaEscola("AGUARDANDO_ASSINATURA")).toBe(true);
-    expect(podeConfirmarPelaEscola("DEVOLVIDO")).toBe(true);
-    expect(podeConfirmarPelaEscola("EM_CONFERENCIA")).toBe(true);
-    expect(podeConfirmarPelaEscola("AGUARDANDO_ORIGINAL")).toBe(true);
-    expect(podeConfirmarPelaEscola("COMPLETO")).toBe(false);
-    // Aprovado sem nenhum PDF assinado guardado: a direção pode anexar o documento.
-    expect(podeConfirmarPelaEscola("COMPLETO", false)).toBe(true);
+  it("só é substituição (exige motivo) em contrato completo que já tem PDF assinado", () => {
+    expect(ehSubstituicaoDeAssinado("COMPLETO", true)).toBe(true);
+    expect(ehSubstituicaoDeAssinado("COMPLETO", false)).toBe(false);
+    for (const s of ["AGUARDANDO_ASSINATURA", "DEVOLVIDO", "EM_CONFERENCIA", "AGUARDANDO_ORIGINAL"] as const) {
+      expect(ehSubstituicaoDeAssinado(s, true)).toBe(false);
+    }
   });
 
   it("gov.br completa; à mão completa só com a via original na escola", () => {
@@ -184,12 +182,24 @@ describe("confirmar renovação de contrato já enviado pelo app", () => {
     expect(push.notifyUsers).toHaveBeenCalledWith(["resp1"], expect.objectContaining({ body: expect.not.stringMatching(/via original/) }));
   });
 
-  it("recusa contrato já concluído com PDF assinado", async () => {
+  it("contrato completo com PDF assinado: substituir exige motivo", async () => {
     banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "COMPLETO", anoLetivo: 2027, titulo: "x", _count: { arquivos: 1 } });
     const res = await confirmar(formulario({ ...base, contratoId: "c1" }));
-    expect(res.status).toBe(409);
-    expect((await res.json()).error).toMatch(/concluído/);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/motivo/);
     expect(banco.prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("substitui o PDF de contrato completo com motivo, mantém completo e guarda o anterior", async () => {
+    banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "COMPLETO", anoLetivo: 2027, titulo: "x", _count: { arquivos: 1 } });
+    const res = await confirmar(formulario({ ...base, contratoId: "c1", observacao: "arquivo aprovado sem assinatura" }));
+    expect(res.status).toBe(201);
+    expect(banco.tx.contrato.updateMany.mock.calls[0][0].data.status).toBe("COMPLETO");
+    // Só cria o novo arquivo: o anterior não é apagado.
+    expect(banco.tx.contratoArquivo.create).toHaveBeenCalledTimes(1);
+    const detalhe = banco.tx.contratoEvento.create.mock.calls[0][0].data.detalhe;
+    expect(detalhe).toContain("Substitui o PDF assinado anterior");
+    expect(detalhe).toContain("Motivo: arquivo aprovado sem assinatura");
   });
 
   it("se a família enviou ao mesmo tempo, não sobrescreve", async () => {
@@ -237,7 +247,7 @@ describe("renovação sem contrato no app", () => {
     expect((await confirmar(formulario(base))).status).toBe(400);
   });
 
-  it("aluno com contrato do ano em aberto no app: manda confirmar no cartão (sem duplicar)", async () => {
+  it("aluno que já tem contrato do ano no app: manda anexar no cartão (sem duplicar)", async () => {
     banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1" });
     const res = await confirmar(formulario({ ...base, titulo: "Contrato 2027" }));
     expect(res.status).toBe(409);
