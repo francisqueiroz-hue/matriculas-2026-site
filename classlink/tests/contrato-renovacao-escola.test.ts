@@ -176,6 +176,14 @@ describe("confirmar renovação de contrato já enviado pelo app", () => {
     expect(banco.tx.contratoArquivo.create.mock.calls[0][0].data).toMatchObject({ contratoId: "c1", tipo: "ASSINADO" });
   });
 
+  it("contrato aprovado sem PDF continua completo mesmo marcado à mão sem a via original", async () => {
+    banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "COMPLETO", anoLetivo: 2027, titulo: "x", _count: { arquivos: 0 } });
+    const res = await confirmar(formulario({ ...base, contratoId: "c1", metodo: "MANUSCRITA", originalNaEscola: "false" }));
+    expect(res.status).toBe(201);
+    expect(banco.tx.contrato.updateMany.mock.calls[0][0].data.status).toBe("COMPLETO");
+    expect(push.notifyUsers).toHaveBeenCalledWith(["resp1"], expect.objectContaining({ body: expect.not.stringMatching(/via original/) }));
+  });
+
   it("recusa contrato já concluído com PDF assinado", async () => {
     banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "COMPLETO", anoLetivo: 2027, titulo: "x", _count: { arquivos: 1 } });
     const res = await confirmar(formulario({ ...base, contratoId: "c1" }));

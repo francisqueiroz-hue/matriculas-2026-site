@@ -120,7 +120,8 @@ export async function POST(request: NextRequest) {
     const sha256 = sha256Hex(pdf);
     const ipOrigem = getClientIp(request);
     const agora = new Date();
-    const novoStatus = statusAposConfirmacaoEscola(dados.metodo, dados.originalNaEscola);
+    // Contrato já aprovado (só faltava o PDF guardado) continua completo: anexar não reabre pendência.
+    const novoStatus = existente?.status === "COMPLETO" ? "COMPLETO" : statusAposConfirmacaoEscola(dados.metodo, dados.originalNaEscola);
     const detalhe = [
       `${METODO_LABEL[dados.metodo]} · assinado em ${dataIsoParaBr(dados.dataAssinatura)}`,
       dados.metodo === "MANUSCRITA" ? (dados.originalNaEscola ? "via original arquivada na escola" : "falta a via original") : null,
