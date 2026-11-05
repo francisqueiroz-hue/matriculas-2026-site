@@ -14,6 +14,7 @@ import {
   formatarDataHora,
   megabytes,
   mensagemArquivoGrande,
+  nomeArquivoPdfSeguro,
   podeEnviarAssinado,
   validarPdf,
   type ContratoMetodo,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/contratos";
 import { MODELO_CONTRATO_2027, type ValoresContrato as Valores } from "@/lib/contrato-modelo/tipos";
 import { ValoresContrato } from "@/components/ValoresContrato";
+import { AcoesPdf } from "@/components/AcoesPdf";
 import { FormularioDados } from "./FormularioDados";
 
 interface ArquivoResumo {
@@ -59,8 +61,8 @@ const botaoPrimario =
 const botaoSecundario =
   "inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
 
-function urlArquivo(contratoId: string, arquivoId: string, download = false) {
-  return `/api/contratos/${contratoId}/arquivos/${arquivoId}${download ? "?download=1" : ""}`;
+function urlArquivo(contratoId: string, arquivoId: string) {
+  return `/api/contratos/${contratoId}/arquivos/${arquivoId}`;
 }
 
 function FormularioEnvio({ contrato, onEnviado }: { contrato: ContratoFamilia; onEnviado: () => void }) {
@@ -289,19 +291,27 @@ function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; on
                   ? " O contrato já está com os dados que você preencheu no app."
                   : " Os seus dados podem ser preenchidos à mão no próprio contrato ou, se preferir, aqui no app (opcional).")}
             </p>
-            <div className="flex flex-wrap gap-2">
-              <a href={urlArquivo(contrato.id, modelo.id, true)} className={botaoPrimario}>
-                Baixar contrato (PDF)
-              </a>
-              <a href={urlArquivo(contrato.id, modelo.id)} target="_blank" rel="noopener noreferrer" className={botaoSecundario}>
-                Ler no navegador
-              </a>
+            <AcoesPdf
+              url={urlArquivo(contrato.id, modelo.id)}
+              nome={nomeArquivoPdfSeguro(modelo.nomeArquivo)}
+              carregarAntes
+              rotuloBaixar="Baixar contrato (PDF)"
+              rotuloAbrir="Ler no navegador"
+              rotuloCompartilhar="Salvar ou enviar o PDF"
+              tituloCompartilhar={contrato.titulo}
+              classePrimario={botaoPrimario}
+              classeSecundario={botaoSecundario}
+            >
               {doApp && (
                 <button type="button" onClick={() => setCorrigindo(true)} className={botaoSecundario}>
                   {contrato.dadosPreenchidos ? "Corrigir meus dados" : "Preencher meus dados no app (opcional)"}
                 </button>
               )}
-            </div>
+            </AcoesPdf>
+            <p className="mt-2 text-xs text-slate-500">
+              No celular, “Salvar ou enviar o PDF” guarda o arquivo em Arquivos/Downloads ou manda para o seu WhatsApp ou e-mail —
+              é esse arquivo que você envia no Assinador gov.br.
+            </p>
           </li>
           <li>
             <h3 className="text-sm font-semibold text-slate-900">2. Assine</h3>
@@ -364,16 +374,30 @@ function ContratoCard({ contrato, onAtualizar }: { contrato: ContratoFamilia; on
       )}
 
       {!aguardandoFamilia && (modelo || ultimoEnvio) && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 space-y-2">
           {ultimoEnvio && (
-            <a href={urlArquivo(contrato.id, ultimoEnvio.id, true)} className={botaoSecundario}>
-              Baixar o contrato que enviei
-            </a>
+            <AcoesPdf
+              url={urlArquivo(contrato.id, ultimoEnvio.id)}
+              nome={nomeArquivoPdfSeguro(ultimoEnvio.nomeArquivo)}
+              rotuloBaixar="Baixar o contrato que enviei"
+              rotuloAbrir={null}
+              rotuloCompartilhar="Salvar ou enviar o assinado"
+              tituloCompartilhar={contrato.titulo}
+              classePrimario={botaoSecundario}
+              classeSecundario={botaoSecundario}
+            />
           )}
           {modelo && (
-            <a href={urlArquivo(contrato.id, modelo.id)} target="_blank" rel="noopener noreferrer" className={botaoSecundario}>
-              Ver contrato original
-            </a>
+            <AcoesPdf
+              url={urlArquivo(contrato.id, modelo.id)}
+              nome={nomeArquivoPdfSeguro(modelo.nomeArquivo)}
+              rotuloBaixar="Baixar contrato original"
+              rotuloAbrir="Ver contrato original"
+              rotuloCompartilhar="Salvar ou enviar o original"
+              tituloCompartilhar={contrato.titulo}
+              classePrimario={botaoSecundario}
+              classeSecundario={botaoSecundario}
+            />
           )}
         </div>
       )}
