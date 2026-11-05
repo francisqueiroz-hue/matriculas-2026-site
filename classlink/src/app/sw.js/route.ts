@@ -97,8 +97,9 @@ self.addEventListener("notificationclick", (event) => {
 
 ${FONTE_PUSH_SW}
 // Registrado ANTES do Firebase: os dois recebem o mesmo push. Com o ClassLink visível o
-// Firebase não mostra nada (só repassa à página); se nenhuma janela visível tem foco
-// (ex.: computador, ClassLink aberto atrás de outro programa), a notificação sai daqui.
+// Firebase não mostra nada (só repassa à página), então a notificação sai daqui; com a
+// pessoa olhando o app, sai silenciosa. Todo push termina com notificação: no iPhone, push
+// sem notificação faz o Safari cancelar a inscrição e o aparelho para de receber avisos.
 // Também avisa a página, que atualiza o contador e o aviso na tela na hora.
 self.addEventListener("push", (event) => {
   let payload = null;
@@ -115,7 +116,7 @@ self.addEventListener("push", (event) => {
           janela.postMessage({ origem: "classlink-push" });
         } catch (e) {}
       }
-      const aviso = notificacaoParaJanelaSemFoco(payload, janelas);
+      const aviso = notificacaoComJanelaVisivel(payload, janelas);
       return aviso ? self.registration.showNotification(aviso.titulo, aviso.opcoes) : undefined;
     }),
   );
