@@ -243,6 +243,37 @@ export const envioAssinadoDiretoSchema = envioAssinadoSchema.extend({
   nomeArquivo: z.string().max(300),
 });
 
+/**
+ * Direção confirma a renovação assinada fora do app, anexando o PDF. Com `contratoId`, completa
+ * o contrato já enviado; sem ele, registra um contrato novo para o aluno (título obrigatório).
+ * Campos chegam como texto (formulário) ou JSON (PDF acima de 4 MB já no armazenamento).
+ */
+export const confirmarRenovacaoSchema = z
+  .object({
+    studentId: z.string().min(1, "Escolha o aluno"),
+    contratoId: z.string().min(1).optional(),
+    anoLetivo: z.coerce.number().int().min(2020).max(2100),
+    titulo: z.string().trim().max(150).optional(),
+    metodo: z.enum(["GOVBR", "MANUSCRITA"], { error: "Informe como o contrato foi assinado" }),
+    originalNaEscola: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+    dataAssinatura: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data da assinatura")
+      .refine((v) => {
+        const t = Date.parse(`${v}T00:00:00Z`);
+        // Tolera um dia por causa do fuso (a direção informa a data local).
+        return Number.isFinite(t) && t >= Date.parse("2020-01-01T00:00:00Z") && t <= Date.now() + 24 * 3600 * 1000;
+      }, "A data da assinatura não pode ser no futuro"),
+    observacao: z.string().trim().max(300).optional(),
+    declaracao: z.literal("true", { error: "Marque a declaração para confirmar a renovação" }),
+  })
+  .refine((d) => d.contratoId || (d.titulo && d.titulo.length >= 3), { message: "Informe o título do contrato", path: ["titulo"] });
+
+export const confirmarRenovacaoDiretoSchema = z.object({
+  path: z.string().min(1).max(300),
+  nomeArquivo: z.string().max(300),
+});
+
 export const acaoContratoSchema = z.discriminatedUnion("acao", [
   z.object({ acao: z.literal("APROVAR") }),
   z.object({ acao: z.literal("ORIGINAL_RECEBIDO") }),
