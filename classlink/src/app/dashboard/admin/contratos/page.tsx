@@ -9,10 +9,10 @@ import type { SituacaoValor } from "@/lib/contrato-modelo/conferencia";
 import { ValoresContrato } from "@/components/ValoresContrato";
 import { AcoesPdf } from "@/components/AcoesPdf";
 import { ContratoModeloPainel } from "./ContratoModeloPainel";
+import { ConferenciaAssinatura } from "./ConferenciaAssinatura";
 import {
   CONTRATO_LIMITE_ENVIO_SERVIDOR,
   ContratoErro,
-  LINK_VALIDAR_ITI,
   METODO_LABEL,
   STATUS_CONTRATO_LABEL,
   formatarDataHora,
@@ -380,17 +380,17 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
               classePrimario={btnSecundario}
               classeSecundario={btnSecundario}
             />
-            {c.metodoAssinatura === "GOVBR" && (
-              <a href={LINK_VALIDAR_ITI} target="_blank" rel="noopener noreferrer" className={btnSecundario}>
-                Conferir no validar.iti.gov.br ↗
-              </a>
-            )}
           </div>
-          {c.status === "EM_CONFERENCIA" && c.metodoAssinatura === "GOVBR" && (
-            <p className="mt-2 text-xs text-slate-600">
-              Dica: baixe o PDF e envie no validar.iti.gov.br. O relatório deve mostrar a assinatura gov.br válida e o nome do responsável.
-            </p>
-          )}
+          <div className="mt-2">
+            <ConferenciaAssinatura
+              contratoId={c.id}
+              arquivoId={ultimo.id}
+              urlPdf={urlArquivo(c.id, ultimo.id)}
+              nomePdf={nomeArquivoPdfSeguro(ultimo.nomeArquivo)}
+              metodoGovBr={c.metodoAssinatura === "GOVBR"}
+              classeBotao={btnSecundario}
+            />
+          </div>
           {c.status === "EM_CONFERENCIA" && c.metodoAssinatura === "MANUSCRITA" && (
             <p className="mt-2 text-xs text-slate-600">
               Assinatura à mão: ao aprovar, o contrato fica aguardando a via original em papel.
