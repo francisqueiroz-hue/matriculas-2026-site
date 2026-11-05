@@ -87,12 +87,7 @@ export async function POST(request: NextRequest) {
     if (dados.contratoId) {
       if (!existente) throw new ErroRecusa("Contrato não encontrado", 404);
       if (!podeConfirmarPelaEscola(existente.status)) {
-        throw new ErroRecusa(
-          existente.status === "EM_CONFERENCIA"
-            ? "A família já enviou este contrato: confira e aprove (ou devolva) no cartão."
-            : "Este contrato já foi concluído.",
-          409,
-        );
+        throw new ErroRecusa("Este contrato já foi concluído.", 409);
       }
     } else {
       // Renovação sem contrato no app: evita deixar um contrato aberto duplicado (que seguiria
@@ -102,13 +97,13 @@ export async function POST(request: NextRequest) {
           schoolId: session.schoolId,
           studentId: aluno.id,
           anoLetivo: dados.anoLetivo,
-          status: { in: ["AGUARDANDO_ASSINATURA", "DEVOLVIDO", "EM_CONFERENCIA"] },
+          status: { not: "COMPLETO" },
         },
         select: { id: true },
       });
       if (aberto) {
         throw new ErroRecusa(
-          `${aluno.name} já tem contrato ${dados.anoLetivo} no app esperando a família. Use "Confirmar renovação" no cartão desse contrato.`,
+          `${aluno.name} já tem contrato ${dados.anoLetivo} no app ainda não concluído. Use "Confirmar renovação" no cartão desse contrato.`,
           409,
         );
       }

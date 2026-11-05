@@ -18,6 +18,7 @@ import {
   STATUS_CONTRATO_LABEL,
   formatarDataHora,
   nomeArquivoPdfSeguro,
+  podeConfirmarPelaEscola,
   textoEnvioPdf,
   validarPdf,
   type ContratoMetodo,
@@ -327,7 +328,7 @@ function RegistrarRenovacaoForaDoApp({ ano, contratos, onRegistrado }: { ano: nu
 
   const aluno = alunos.find((a) => a.id === studentId);
   const existente = studentId ? contratoDoAluno.get(studentId) : undefined;
-  const existenteAberto = existente && (existente.status === "AGUARDANDO_ASSINATURA" || existente.status === "DEVOLVIDO" || existente.status === "EM_CONFERENCIA");
+  const existenteAberto = existente && podeConfirmarPelaEscola(existente.status);
 
   return (
     <div className="space-y-3 p-4 text-sm">
@@ -617,7 +618,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
                 Lembrar {g.guardian.name.split(" ")[0]} no WhatsApp
               </a>
             ))}
-        {aguardandoFamilia && !confirmando && (
+        {podeConfirmarPelaEscola(c.status) && !confirmando && (
           <button type="button" onClick={() => setConfirmando(true)} className={`${btn} border border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50`}>
             Confirmar renovação (assinado fora do app)
           </button>
@@ -629,11 +630,12 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
         )}
       </div>
 
-      {confirmando && aguardandoFamilia && (
+      {confirmando && podeConfirmarPelaEscola(c.status) && (
         <div className="mt-3 space-y-2">
           <p className="text-slate-700">
             Use quando a família assinou fora do app (papel na secretaria, PDF do gov.br recebido por WhatsApp ou e-mail). Anexe o
             contrato assinado: ele fica guardado aqui com o histórico, o contrato conta como renovado e os lembretes param.
+            {envios.length > 0 && " O arquivo que a família já enviou continua guardado no histórico."}
           </p>
           <ConfirmarRenovacao
             studentId={c.student.id}

@@ -103,11 +103,11 @@ beforeEach(() => {
 });
 
 describe("regras da confirmação pela escola", () => {
-  it("só para contrato que ainda espera a família", () => {
+  it("para todo contrato ainda não concluído", () => {
     expect(podeConfirmarPelaEscola("AGUARDANDO_ASSINATURA")).toBe(true);
     expect(podeConfirmarPelaEscola("DEVOLVIDO")).toBe(true);
-    expect(podeConfirmarPelaEscola("EM_CONFERENCIA")).toBe(false);
-    expect(podeConfirmarPelaEscola("AGUARDANDO_ORIGINAL")).toBe(false);
+    expect(podeConfirmarPelaEscola("EM_CONFERENCIA")).toBe(true);
+    expect(podeConfirmarPelaEscola("AGUARDANDO_ORIGINAL")).toBe(true);
     expect(podeConfirmarPelaEscola("COMPLETO")).toBe(false);
   });
 
@@ -157,13 +157,20 @@ describe("confirmar renovação de contrato já enviado pelo app", () => {
     expect(banco.tx.contratoEvento.create.mock.calls[0][0].data.detalhe).toContain("falta a via original");
   });
 
-  it("recusa contrato em conferência ou concluído", async () => {
-    banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "EM_CONFERENCIA", anoLetivo: 2027, titulo: "x" });
+  it("contrato em conferência (família já enviou) ou aguardando a via original também pode ser confirmado", async () => {
+    for (const status of ["EM_CONFERENCIA", "AGUARDANDO_ORIGINAL"]) {
+      banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status, anoLetivo: 2027, titulo: "x" });
+      const res = await confirmar(formulario({ ...base, contratoId: "c1" }));
+      expect(res.status).toBe(201);
+      expect(banco.tx.contrato.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: { id: "c1", status } }));
+    }
+  });
+
+  it("recusa contrato já concluído", async () => {
+    banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "COMPLETO", anoLetivo: 2027, titulo: "x" });
     const res = await confirmar(formulario({ ...base, contratoId: "c1" }));
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toMatch(/aprove/);
-    banco.prisma.contrato.findFirst.mockResolvedValueOnce({ id: "c1", status: "COMPLETO", anoLetivo: 2027, titulo: "x" });
-    expect((await confirmar(formulario({ ...base, contratoId: "c1" }))).status).toBe(409);
+    expect((await res.json()).error).toMatch(/concluído/);
     expect(banco.prisma.$transaction).not.toHaveBeenCalled();
   });
 
