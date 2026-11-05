@@ -81,18 +81,13 @@ export async function POST(request: NextRequest) {
     const existente = dados.contratoId
       ? await prisma.contrato.findFirst({
           where: { id: dados.contratoId, schoolId: session.schoolId, studentId: aluno.id },
-          select: { id: true, status: true, anoLetivo: true, titulo: true },
+          select: { id: true, status: true, anoLetivo: true, titulo: true, _count: { select: { arquivos: { where: { tipo: "ASSINADO" } } } } },
         })
       : null;
     if (dados.contratoId) {
       if (!existente) throw new ErroRecusa("Contrato não encontrado", 404);
-      if (!podeConfirmarPelaEscola(existente.status)) {
-        throw new ErroRecusa(
-          existente.status === "EM_CONFERENCIA"
-            ? "A família já enviou este contrato: confira e aprove (ou devolva) no cartão."
-            : "Este contrato já foi concluído.",
-          409,
-        );
+      if (!podeConfirmarPelaEscola(existente.status, existente._count.arquivos > 0)) {
+        throw new ErroRecusa("Este contrato já foi concluído e tem o PDF assinado guardado.", 409);
       }
     } else {
       // Renovação sem contrato no app: evita deixar um contrato aberto duplicado (que seguiria
@@ -102,13 +97,14 @@ export async function POST(request: NextRequest) {
           schoolId: session.schoolId,
           studentId: aluno.id,
           anoLetivo: dados.anoLetivo,
-          status: { in: ["AGUARDANDO_ASSINATURA", "DEVOLVIDO", "EM_CONFERENCIA"] },
+          // Não concluído, ou concluído sem PDF assinado guardado (anexar no cartão dele).
+          OR: [{ status: { not: "COMPLETO" } }, { arquivos: { none: { tipo: "ASSINADO" } } }],
         },
         select: { id: true },
       });
       if (aberto) {
         throw new ErroRecusa(
-          `${aluno.name} já tem contrato ${dados.anoLetivo} no app esperando a família. Use "Confirmar renovação" no cartão desse contrato.`,
+          `${aluno.name} já tem contrato ${dados.anoLetivo} no app ainda não concluído. Use "Confirmar renovação" no cartão desse contrato.`,
           409,
         );
       }
@@ -124,7 +120,8 @@ export async function POST(request: NextRequest) {
     const sha256 = sha256Hex(pdf);
     const ipOrigem = getClientIp(request);
     const agora = new Date();
-    const novoStatus = statusAposConfirmacaoEscola(dados.metodo, dados.originalNaEscola);
+    // Contrato já aprovado (só faltava o PDF guardado) continua completo: anexar não reabre pendência.
+    const novoStatus = existente?.status === "COMPLETO" ? "COMPLETO" : statusAposConfirmacaoEscola(dados.metodo, dados.originalNaEscola);
     const detalhe = [
       `${METODO_LABEL[dados.metodo]} · assinado em ${dataIsoParaBr(dados.dataAssinatura)}`,
       dados.metodo === "MANUSCRITA" ? (dados.originalNaEscola ? "via original arquivada na escola" : "falta a via original") : null,
