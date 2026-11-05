@@ -251,6 +251,13 @@ model PushToken {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+  /// Descrição curta do aparelho ("iPhone", "Mac · Chrome"), lida do navegador no registro.
+  aparelho      String?
+  /// Última vez que o aparelho confirmou o registro (a cada abertura do app).
+  atualizadoEm  DateTime  @default(now())
+  /// Último aviso que o Firebase aceitou para este aparelho, e o último erro (se houve).
+  ultimoEnvioEm DateTime?
+  ultimoErro    String?
 
   @@index([userId])
 }

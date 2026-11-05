@@ -80,9 +80,12 @@ export async function notifyUsers(userIds: string[], aviso: AvisoPush): Promise<
 
   const tokens = await prisma.pushToken.findMany({
     where: { userId: { in: userIds } },
-    select: { id: true, token: true },
+    select: { id: true, token: true, aparelho: true },
   });
-  if (tokens.length === 0) return vazio;
+  if (tokens.length === 0) {
+    console.info("[push] nenhum aparelho registrado", { titulo: aviso.title, userIds });
+    return vazio;
+  }
 
   const response = await getMessaging(app).sendEachForMulticast(
     montarMensagemPush(
@@ -94,17 +97,45 @@ export async function notifyUsers(userIds: string[], aviso: AvisoPush): Promise<
 
   const erros: string[] = [];
   const invalidos: string[] = [];
+  const aceitos: string[] = [];
+  const falhas: { id: string; erro: string }[] = [];
   response.responses.forEach((res, i) => {
-    if (res.success) return;
+    if (res.success) {
+      aceitos.push(tokens[i].id);
+      return;
+    }
     const codigo = res.error?.code ?? "desconhecido";
-    erros.push(res.error?.message ? `${codigo}: ${res.error.message}` : codigo);
+    const erro = res.error?.message ? `${codigo}: ${res.error.message}` : codigo;
+    erros.push(erro);
     if (TOKEN_INVALIDO.has(codigo)) invalidos.push(tokens[i].id);
+    else falhas.push({ id: tokens[i].id, erro: erro.slice(0, 300) });
+  });
+
+  // Um registro por envio, com o resultado de cada aparelho: é o que permite saber, quando
+  // alguém diz "não chegou no celular", se o aviso saiu do servidor para aquele aparelho.
+  console.info("[push] envio", {
+    titulo: aviso.title,
+    userIds,
+    aparelhos: tokens.map((t, i) => `${t.aparelho ?? "?"}: ${response.responses[i]?.success ? "aceito" : (response.responses[i]?.error?.code ?? "erro")}`),
   });
   if (erros.length > invalidos.length) console.error("Falha no envio de push", erros);
+
+  // Diagnóstico por aparelho (Minha conta). Falha aqui não pode atrapalhar o envio.
+  const agora = new Date();
+  await Promise.all([
+    aceitos.length > 0
+      ? prisma.pushToken.updateMany({ where: { id: { in: aceitos } }, data: { ultimoEnvioEm: agora, ultimoErro: null } })
+      : null,
+    ...falhas.map((f) => prisma.pushToken.update({ where: { id: f.id }, data: { ultimoErro: f.erro } })),
+  ]).catch((err) => console.error("[push] falha ao registrar o diagnóstico do envio", err));
+
   if (invalidos.length > 0) {
     // Aparelho que deixou de aceitar push (ex.: iPhone que cancelou a inscrição). Fica no log
     // para o diagnóstico: o aparelho volta a receber quando a pessoa abre o app nele de novo.
-    console.warn(`Push: ${invalidos.length} aparelho(s) não aceitam mais avisos; registro removido`, { userIds });
+    console.warn(`Push: ${invalidos.length} aparelho(s) não aceitam mais avisos; registro removido`, {
+      userIds,
+      aparelhos: tokens.filter((t) => invalidos.includes(t.id)).map((t) => t.aparelho ?? "?"),
+    });
     await prisma.pushToken.deleteMany({ where: { id: { in: invalidos } } });
   }
 
