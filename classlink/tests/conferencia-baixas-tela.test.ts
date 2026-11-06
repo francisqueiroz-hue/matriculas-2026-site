@@ -38,6 +38,14 @@ const apiJson = vi.fn(async (path: string, init?: RequestInit) => {
       itens: [
         linha("b1", "Bia Souza", { valorPago: 1150, diferenca: -50, alertas: [{ codigo: "PAGO_DIFERENTE", texto: "Recebido a menos: R$ 50,00" }] }),
         linha("b2", "Caio Lima"),
+        linha("b3", "Pedro Alves", {
+          valor: 1450,
+          valorPago: 1479.48,
+          diferenca: 29.48,
+          vencimento: "2026-11-05T12:00:00.000Z",
+          pagoEm: "2026-11-06T12:00:00.000Z",
+          encargos: { diasAtraso: 1, cobrado: 29.48, multa: 29, juros: 0.48, previsto: 29.48 },
+        }),
       ],
     };
   }
@@ -62,6 +70,27 @@ describe("tela Conferir boletos pagos", () => {
     fireEvent.click(screen.getByLabelText("Só os que precisam de conferência"));
     expect(screen.queryByText("Caio Lima")).toBeNull();
     expect(screen.getByText("Bia Souza")).toBeTruthy();
+  });
+
+  it("pago com atraso: mostra juros/multa, sem pedir conferência", async () => {
+    await act(async () => {
+      render(createElement(Pagina));
+    });
+    expect(screen.getByText(/Juros\/multa por atraso: R\$\s?29,48/)).toBeTruthy();
+    expect(screen.queryByText(/Recebido a mais/)).toBeNull();
+    fireEvent.click(screen.getByLabelText("Só os que precisam de conferência"));
+    expect(screen.queryByText("Pedro Alves")).toBeNull();
+  });
+
+  it("ao corrigir, mostra a multa e os juros do contrato para a data de pagamento", async () => {
+    await act(async () => {
+      render(createElement(Pagina));
+    });
+    fireEvent.click(screen.getAllByText("Corrigir valor ou data")[2]);
+    const dica = screen.getByText(/Pago 1 dia\(s\) depois do vencimento/).textContent ?? "";
+    expect(dica).toMatch(/29,00/);
+    expect(dica).toMatch(/0,48/);
+    expect(dica).toMatch(/1\.479,48/);
   });
 
   it("corrige com motivo e envia ao servidor", async () => {

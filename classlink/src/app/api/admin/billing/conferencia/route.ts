@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { agoraNoFusoDaEscola, mesReferenciaAtual } from "@/lib/billing";
-import { alertasBaixa, mesValido, type Alerta } from "@/lib/conferencia-baixas";
+import { alertasBaixa, encargosAtraso, mesValido, type Alerta } from "@/lib/conferencia-baixas";
 import { boletosDuplicados, textoDuplicidade } from "@/lib/duplicidade-boletos";
 
 /** Limite de linhas por consulta: um ano inteiro de uma escola pequena cabe com folga. */
@@ -136,6 +136,7 @@ export async function GET(request: NextRequest) {
       const ultimaBaixa = pagas[pagas.length - 1] ?? null;
       const correcoes = b.baixas.filter((x) => x.acao === "CORRIGIR");
       const ultimaCorrecao = correcoes[correcoes.length - 1] ?? null;
+      const encargos = encargosAtraso({ valor, valorPago, vencimento: b.vencimento, pagoEm: b.pagoEm });
       return {
         id: b.id,
         aluno: b.student.name,
@@ -147,6 +148,8 @@ export async function GET(request: NextRequest) {
         valorPago,
         mensalidadeCadastro: mensalidade,
         diferenca: valorPago === null ? 0 : Math.round((valorPago - valor) * 100) / 100,
+        // Pago com atraso e a diferença cabe na multa + juros do contrato: encargos, não divergência.
+        encargos: encargos?.dentroDoContrato ? encargos : null,
         pagoEm: b.pagoEm ? b.pagoEm.toISOString() : null,
         // Confirmado pelo banco (boleto emitido no Inter): não se corrige nem desfaz aqui.
         manual: !b.codigoSolicitacao,
@@ -191,6 +194,7 @@ export async function GET(request: NextRequest) {
         t.valorRecebido += i.valorPago ?? i.valor;
         if (i.alertas.length > 0) t.comAlerta += 1;
         if (i.valorPago === null) t.semValorInformado += 1;
+        if (i.encargos) t.encargosAtraso += i.encargos.cobrado;
         return t;
       },
       {
@@ -199,10 +203,12 @@ export async function GET(request: NextRequest) {
         valorRecebido: 0,
         comAlerta: 0,
         semValorInformado: 0,
+        encargosAtraso: 0,
       },
     );
     totais.valorBoletos = Math.round(totais.valorBoletos * 100) / 100;
     totais.valorRecebido = Math.round(totais.valorRecebido * 100) / 100;
+    totais.encargosAtraso = Math.round(totais.encargosAtraso * 100) / 100;
 
     return NextResponse.json({
       de,
