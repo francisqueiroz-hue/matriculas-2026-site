@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiJson } from "@/lib/api-client";
-import { celulaCsv } from "@/lib/conferencia-baixas";
+import { celulaCsv, diasDeAtraso, encargosPrevistos } from "@/lib/conferencia-baixas";
 
 interface Alerta {
   codigo: string;
@@ -22,6 +22,8 @@ interface Linha {
   valorPago: number | null;
   mensalidadeCadastro: number | null;
   diferenca: number;
+  /** Pago com atraso e a diferença cabe na multa + juros do contrato. */
+  encargos?: { diasAtraso: number; cobrado: number; multa: number; juros: number; previsto: number } | null;
   pagoEm: string | null;
   manual: boolean;
   baixaPor: string | null;
@@ -35,7 +37,7 @@ interface Resposta {
   de: string;
   ate: string;
   itens: Linha[];
-  totais: { quantidade: number; valorBoletos: number; valorRecebido: number; comAlerta: number; semValorInformado: number };
+  totais: { quantidade: number; valorBoletos: number; valorRecebido: number; comAlerta: number; semValorInformado: number; encargosAtraso?: number };
   truncado: boolean;
   cancelados: Cancelado[];
   pendentesDuplicados: PendenteDuplicado[];
@@ -91,6 +93,12 @@ function Correcao({ linha, onFechar, onSalvo }: { linha: Linha; onFechar: () => 
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  // Ajuda a conferir: multa + juros do contrato para a data informada.
+  const valorTexto = valor.trim().replace(/^R\$\s*/i, "");
+  const valorNum = valorTexto.includes(",") ? Number(valorTexto.replace(/\./g, "").replace(",", ".")) : Number(valorTexto);
+  const dias = data ? diasDeAtraso(new Date(linha.vencimento), new Date(`${data}T12:00:00.000Z`)) : 0;
+  const previstos = Number.isFinite(valorNum) && valorNum > 0 ? encargosPrevistos(valorNum, dias) : null;
+
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     setSalvando(true);
@@ -135,10 +143,17 @@ function Correcao({ linha, onFechar, onSalvo }: { linha: Linha; onFechar: () => 
           maxLength={300}
           minLength={3}
           required
-          placeholder="Ex.: valor digitado errado; família pagou R$ 50 a menos"
+          placeholder="Ex.: valor digitado errado; família pagou R$ 50 a menos; pago com atraso (multa e juros)"
           className={`${campo} w-full`}
         />
       </label>
+      {previstos && previstos.total > 0 && (
+        <p className="text-xs text-slate-600 dark:text-slate-300">
+          Pago {dias} dia(s) depois do vencimento: pelo contrato, multa de 2% ({reais(previstos.multa)}) + juros de 1% ao mês (
+          {reais(previstos.juros)}) = {reais(previstos.total)}. Com encargos, o valor recebido fica em até{" "}
+          {reais(valorNum + previstos.total)}.
+        </p>
+      )}
       {linha.mensalidadeCadastro !== null && (
         <p className="text-xs text-slate-500">Mensalidade no cadastro do aluno: {reais(linha.mensalidadeCadastro)}.</p>
       )}
@@ -235,7 +250,7 @@ function ConferenciaContent() {
   function baixarCsv() {
     const cab = [
       "Competência", "Aluno", "Turma", "Responsável", "Vencimento", "Valor do boleto", "Valor recebido",
-      "Diferença", "Mensalidade no cadastro", "Pago em", "Baixa por", "Baixa lançada em", "Correções", "Alertas",
+      "Diferença", "Juros/multa por atraso", "Mensalidade no cadastro", "Pago em", "Baixa por", "Baixa lançada em", "Correções", "Alertas",
     ];
     const num = (v: number | null) => (v === null ? "" : v.toFixed(2).replace(".", ","));
     const corpo = linhas.map((l) => [
@@ -247,6 +262,7 @@ function ConferenciaContent() {
       num(l.valor),
       l.valorPago === null ? "não informado" : num(l.valorPago),
       num(l.diferenca),
+      l.encargos ? num(l.encargos.cobrado) : "",
       num(l.mensalidadeCadastro),
       dia(l.pagoEm),
       l.baixaPor ?? "",
@@ -321,6 +337,7 @@ function ConferenciaContent() {
           <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
             <p className="text-xs text-slate-500">Recebido</p>
             <p className="text-xl font-bold text-green-700 dark:text-green-400">{reais(t.valorRecebido)}</p>
+            {!!t.encargosAtraso && <p className="text-xs text-slate-500">inclui {reais(t.encargosAtraso)} de juros/multa por atraso</p>}
           </div>
           <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40">
             <p className="text-xs text-amber-800 dark:text-amber-300">Precisam de conferência</p>
@@ -418,13 +435,26 @@ function ConferenciaContent() {
                   <dd className="font-semibold">{l.valorPago === null ? <span className="font-normal text-slate-400">não informado</span> : reais(l.valorPago)}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Diferença</dt>
-                  <dd className={`font-semibold ${l.diferenca < 0 ? "text-red-600" : l.diferenca > 0 ? "text-amber-700" : ""}`}>
+                  <dt className="text-slate-500">{l.encargos ? "Juros/multa" : "Diferença"}</dt>
+                  <dd
+                    className={`font-semibold ${
+                      l.encargos ? "text-green-700 dark:text-green-400" : l.diferenca < 0 ? "text-red-600" : l.diferenca > 0 ? "text-amber-700" : ""
+                    }`}
+                  >
                     {l.diferenca === 0 ? "—" : reais(l.diferenca)}
                   </dd>
                 </div>
               </dl>
             </div>
+            {l.encargos && (
+              <p
+                className="mt-2 inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-800 dark:bg-green-900/30 dark:text-green-200"
+                title={`Contrato: multa de 2% (${reais(l.encargos.multa)}) + juros de 1% ao mês (${reais(l.encargos.juros)}) = ${reais(l.encargos.previsto)}`}
+              >
+                Juros/multa por atraso: {reais(l.encargos.cobrado)} ({l.encargos.diasAtraso} dia(s) de atraso; contrato prevê até{" "}
+                {reais(l.encargos.previsto)})
+              </p>
+            )}
             {l.alertas.length > 0 && (
               <ul className="mt-2 flex flex-wrap gap-1">
                 {l.alertas.map((a, i) => (

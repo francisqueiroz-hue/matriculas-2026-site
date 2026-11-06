@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { alertasBaixa, celulaCsv, mesValido, type BoletoPagoConferencia } from "@/lib/conferencia-baixas";
+import { alertasBaixa, celulaCsv, encargosAtraso, encargosPrevistos, mesValido, type BoletoPagoConferencia } from "@/lib/conferencia-baixas";
 import { correcaoBaixa, valorEmReais } from "@/lib/baixa-boleto";
 
 const prismaMock = vi.hoisted(() => {
@@ -84,6 +84,34 @@ describe("alertasBaixa", () => {
     expect(codigos({ bolsista: true, mensalidadeCadastro: null })).toEqual(["BOLSISTA"]);
     expect(codigos({ baixasPago: 2 })).toEqual(["BAIXA_REFEITA"]);
     expect(codigos({ alunoExcluido: true })).toEqual(["ALUNO_EXCLUIDO"]);
+  });
+});
+
+describe("juros e multa por atraso (Cláusula 9ª: multa 2% + juros 1% a.m. pro rata)", () => {
+  // Caso real: boleto de R$ 1.450,00, vence 05/11, pago 06/11 com R$ 1.479,48.
+  const pedro = { ...base, valor: 1450, valorPago: 1479.48, mensalidadeCadastro: 1450, vencimento: new Date(2026, 10, 5, 12), pagoEm: new Date(2026, 10, 6, 12) };
+  it("1 dia de atraso: multa R$ 29,00 + juros R$ 0,48 = R$ 29,48, sem alerta", () => {
+    expect(encargosPrevistos(1450, 1)).toEqual({ multa: 29, juros: 0.48, total: 29.48 });
+    expect(encargosAtraso(pedro)).toMatchObject({ diasAtraso: 1, cobrado: 29.48, previsto: 29.48, dentroDoContrato: true });
+    expect(alertasBaixa(pedro, new Date(2026, 10, 6, 15))).toEqual([]);
+  });
+  it("juros crescem com os dias; cobrar menos que o previsto também é encargo", () => {
+    expect(encargosPrevistos(1200, 30)).toEqual({ multa: 24, juros: 12, total: 36 });
+    expect(encargosAtraso({ ...base, valorPago: 1210, pagoEm: new Date(2026, 9, 15, 12) })).toMatchObject({ diasAtraso: 10, dentroDoContrato: true });
+  });
+  it("acima da multa + juros do contrato continua pedindo conferência", () => {
+    const a = alertasBaixa({ ...pedro, valorPago: 1500 }, new Date(2026, 10, 6, 15));
+    expect(a.map((x) => x.codigo)).toEqual(["PAGO_DIFERENTE"]);
+    expect(a[0].texto).toMatch(/acima da multa e juros do contrato/);
+    expect(a[0].texto).toMatch(/29,48/);
+  });
+  it("pago em dia (ou antes) com valor maior continua sendo recebido a mais", () => {
+    expect(encargosAtraso({ ...pedro, pagoEm: new Date(2026, 10, 5, 12) })).toBeNull();
+    expect(alertasBaixa({ ...pedro, pagoEm: new Date(2026, 10, 5, 12) }, new Date(2026, 10, 6, 15))[0].texto).toMatch(/a mais/);
+  });
+  it("pago com atraso e valor menor não vira encargo", () => {
+    expect(encargosAtraso({ ...pedro, valorPago: 1400 })).toBeNull();
+    expect(alertasBaixa({ ...pedro, valorPago: 1400 }, new Date(2026, 10, 6, 15))[0].texto).toMatch(/a menos/);
   });
 });
 
@@ -235,6 +263,25 @@ describe("GET conferência", () => {
     expect(d.itens[0]).toMatchObject({ aluno: "Bia", valor: 1200, valorPago: 1150, diferenca: -50, baixaPor: "Secretaria", manual: true });
     expect(d.itens[0].alertas.map((a: { codigo: string }) => a.codigo)).toEqual(["PAGO_DIFERENTE"]);
     expect(d.totais).toMatchObject({ quantidade: 1, valorBoletos: 1200, valorRecebido: 1150, comAlerta: 1 });
+  });
+
+  it("pago com atraso dentro da multa + juros: encargos, sem alerta e fora de 'precisam de conferência'", async () => {
+    prismaMock.boleto.findMany.mockResolvedValue([
+      {
+        ...boletoPago,
+        valor: 1450,
+        valorPago: 1479.48,
+        mesReferencia: "2026-10",
+        vencimento: new Date(2026, 9, 5, 12),
+        pagoEm: new Date(2026, 9, 6, 12),
+        student: { name: "Pedro", deletedAt: null, bolsista: false, mensalidadeValor: 1450, class: { name: "1º Ano A" }, guardians: [] },
+        baixas: [{ acao: "PAGO", porNome: "Secretaria", criadoEm: new Date(2026, 9, 6), motivo: null }],
+      },
+    ]);
+    const d = await (await get("?de=2026-10&ate=2026-10")).json();
+    expect(d.itens[0].alertas).toEqual([]);
+    expect(d.itens[0].encargos).toMatchObject({ diasAtraso: 1, cobrado: 29.48, multa: 29, juros: 0.48, previsto: 29.48 });
+    expect(d.totais).toMatchObject({ comAlerta: 0, valorRecebido: 1479.48, encargosAtraso: 29.48 });
   });
 
   it("valida competência e perfil", async () => {
