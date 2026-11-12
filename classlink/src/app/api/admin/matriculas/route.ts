@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ANO_LETIVO_MATRICULAS, solicitacoesParaCsv } from "@/lib/solicitacoes-matricula";
+import { cabecalhosDownloadCsv } from "@/lib/csv";
 
 const TIPOS = ["PRE_MATRICULA", "REMATRICULA"] as const;
 const STATUS = ["NOVA", "EM_ATENDIMENTO", "VISITA_AGENDADA", "MATRICULADO", "DESISTIU"] as const;
@@ -49,10 +50,7 @@ export async function GET(request: NextRequest) {
 
     if (params.get("format") === "csv") {
       return new NextResponse(solicitacoesParaCsv(solicitacoes), {
-        headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="matriculas-${ano}.csv"`,
-        },
+        headers: cabecalhosDownloadCsv(`matriculas-${ano}.csv`),
       });
     }
 

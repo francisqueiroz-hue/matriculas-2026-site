@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
-
-function csvEscape(value: string) {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
+import { cabecalhosDownloadCsv, celulaCsv } from "@/lib/csv";
 
 const RESPOSTA_LABEL: Record<string, string> = {
   AUTORIZADO: "Autorizado",
@@ -38,11 +34,11 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/comunicados
       ["Aluno", "Responsável", "E-mail", "Resposta", "Data/Hora"].join(","),
       ...respostas.map((r) =>
         [
-          csvEscape(r.aluno.name),
-          csvEscape(r.responsavel.name),
-          csvEscape(r.responsavel.email ?? ""),
-          csvEscape(RESPOSTA_LABEL[r.resposta] ?? r.resposta),
-          csvEscape(r.dataHoraResposta.toLocaleString("pt-BR")),
+          celulaCsv(r.aluno.name),
+          celulaCsv(r.responsavel.name),
+          celulaCsv(r.responsavel.email ?? ""),
+          celulaCsv(RESPOSTA_LABEL[r.resposta] ?? r.resposta),
+          celulaCsv(r.dataHoraResposta.toLocaleString("pt-BR")),
         ].join(","),
       ),
     ];
@@ -50,10 +46,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/comunicados
     const csv = "﻿" + linhas.join("\n"); // BOM para acentuação correta no Excel
 
     return new NextResponse(csv, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="comunicado-${comunicadoId}.csv"`,
-      },
+      headers: cabecalhosDownloadCsv(`comunicado-${comunicadoId}.csv`),
     });
   } catch (error) {
     return handleApiError(error);

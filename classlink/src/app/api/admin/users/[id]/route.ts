@@ -10,6 +10,7 @@ import { normalizePhoneBR } from "@/lib/whatsapp";
 import { telefoneEmUso } from "@/lib/usuarios";
 import { perfilDaFuncao } from "@/lib/equipe";
 import { descreverEnvio, enviarAcessoPeloApp } from "@/lib/envio-acesso";
+import { encerrarTodasAsSessoes } from "@/lib/renovacao-sessao";
 
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/users/[id]">) {
   try {
@@ -69,7 +70,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
         },
       });
       if (temporaryPassword) {
-        await tx.refreshToken.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+        await tx.refreshToken.updateMany(encerrarTodasAsSessoes(id));
       }
       return updated;
     });

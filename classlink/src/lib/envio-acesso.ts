@@ -14,6 +14,7 @@ import { modeloDisponivel } from "@/lib/whatsapp-modelos";
 /** Margem de segurança sobre as 24h da Meta, para não enviar texto livre no limite. */
 export { JANELA_CONVERSA_MS } from "@/lib/canal-envio";
 import { JANELA_CONVERSA_MS } from "@/lib/canal-envio";
+import { encerrarTodasAsSessoes } from "@/lib/renovacao-sessao";
 
 export function conversaAberta(ultimaMensagemEm: Date | null | undefined, agora = Date.now()): boolean {
   return Boolean(ultimaMensagemEm && agora - ultimaMensagemEm.getTime() < JANELA_CONVERSA_MS);
@@ -54,7 +55,7 @@ export async function enviarAcessoPeloApp(userId: string, origem: string, senhaD
     if (senhaDefinida) return; // o chamador já gravou
     await prisma.$transaction([
       prisma.user.update({ where: { id: user!.id }, data: { passwordHash: await hashPassword(dados.senha) } }),
-      prisma.refreshToken.updateMany({ where: { userId: user!.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+      prisma.refreshToken.updateMany(encerrarTodasAsSessoes(user!.id)),
     ]);
   }
 
