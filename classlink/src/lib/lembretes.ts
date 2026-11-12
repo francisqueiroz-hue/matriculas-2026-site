@@ -282,3 +282,36 @@ export function mensagemLembrete(pendencias: Pick<Pendencia, "descricao" | "url"
 export function primeiroNome(nome: string): string {
   return nome.trim().split(/\s+/)[0] || nome;
 }
+
+/** Contrato do ano letivo, com o aluno e os responsáveis que podem tê-lo pedido. */
+export interface ContratoDoAno {
+  anoLetivo: number;
+  alunoNome: string;
+  responsavelIds: string[];
+}
+
+function normalizarNome(nome: string): string {
+  return nome
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Uma rematrícula deixa de depender da escola assim que existe contrato do ano para a família:
+ * a renovação já foi feita (enviada, assinada, validada ou confirmada pela direção). Se ainda falta
+ * documento, o próprio contrato aparece como pendência (em conferência ou aguardando a via original).
+ * Vale pelo responsável que pediu (logado) ou, sem ele, pelo nome de um dos alunos da solicitação.
+ */
+export function rematriculaJaAtendida(
+  sol: { tipo: string; anoLetivo: number; responsavelId: string | null; alunoNome: string },
+  contratos: ContratoDoAno[],
+): boolean {
+  if (sol.tipo !== "REMATRICULA") return false;
+  const doAno = contratos.filter((c) => c.anoLetivo === sol.anoLetivo);
+  if (sol.responsavelId && doAno.some((c) => c.responsavelIds.includes(sol.responsavelId!))) return true;
+  const nomes = new Set(sol.alunoNome.split(",").map(normalizarNome).filter(Boolean));
+  return doAno.some((c) => nomes.has(normalizarNome(c.alunoNome)));
+}
