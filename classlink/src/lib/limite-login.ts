@@ -1,42 +1,22 @@
 import { createHmac } from "node:crypto";
 import type { LoginIdentifier } from "@/lib/login-identifier";
 
-/** 5 senhas erradas dentro de 15 minutos bloqueiam o login por 15 minutos. */
-export const MAX_FALHAS = 5;
-export const JANELA_MS = 15 * 60_000;
-export const BLOQUEIO_MS = 15 * 60_000;
+/** Quantas tentativas valem dentro da janela, e por quanto tempo o bloqueio dura. */
+export type Politica = { max: number; janelaMs: number; bloqueioMs: number };
 
-export type RegistroLogin = {
-  falhas: number;
-  primeiraFalhaEm: Date;
-  bloqueadoAte: Date | null;
-};
+/** Login por conta: 5 tentativas em 15 minutos; a 6ª já é bloqueada por 15 minutos. */
+export const POLITICA_LOGIN_CONTA: Politica = { max: 5, janelaMs: 15 * 60_000, bloqueioMs: 15 * 60_000 };
 
-export type SituacaoLogin = { bloqueado: false } | { bloqueado: true; segundos: number };
+/**
+ * Login por IP: só conta senha errada. O limite é folgado de propósito, porque a escola
+ * inteira pode sair por um mesmo IP; serve para barrar "password spraying" (uma senha
+ * comum testada em muitas contas) sem trancar quem digitou errado uma vez.
+ */
+export const POLITICA_LOGIN_IP: Politica = { max: 30, janelaMs: 15 * 60_000, bloqueioMs: 15 * 60_000 };
 
-export function situacaoLogin(reg: RegistroLogin | null | undefined, agora: Date): SituacaoLogin {
-  if (!reg?.bloqueadoAte) return { bloqueado: false };
-  const restanteMs = reg.bloqueadoAte.getTime() - agora.getTime();
-  if (restanteMs <= 0) return { bloqueado: false };
-  return { bloqueado: true, segundos: Math.ceil(restanteMs / 1000) };
-}
-
-/** Novo estado depois de uma falha de login. Bloqueio ou janela vencidos recomeçam a contagem. */
-export function registrarFalha(reg: RegistroLogin | null | undefined, agora: Date): RegistroLogin {
-  const bloqueioVencido = !!reg?.bloqueadoAte && reg.bloqueadoAte.getTime() <= agora.getTime();
-  const janelaVencida = !!reg && agora.getTime() - reg.primeiraFalhaEm.getTime() > JANELA_MS;
-
-  if (!reg || bloqueioVencido || janelaVencida) {
-    return { falhas: 1, primeiraFalhaEm: agora, bloqueadoAte: null };
-  }
-
-  const falhas = reg.falhas + 1;
-  return {
-    falhas,
-    primeiraFalhaEm: reg.primeiraFalhaEm,
-    bloqueadoAte: falhas >= MAX_FALHAS ? new Date(agora.getTime() + BLOQUEIO_MS) : null,
-  };
-}
+/** "Esqueci a senha": cada pedido troca a senha e dispara mensagem paga, então é bem restrito. */
+export const POLITICA_ESQUECI_CONTA: Politica = { max: 3, janelaMs: 60 * 60_000, bloqueioMs: 60 * 60_000 };
+export const POLITICA_ESQUECI_IP: Politica = { max: 10, janelaMs: 60 * 60_000, bloqueioMs: 60 * 60_000 };
 
 export function mensagemBloqueio(segundos: number): string {
   const minutos = Math.max(1, Math.ceil(segundos / 60));
@@ -44,9 +24,18 @@ export function mensagemBloqueio(segundos: number): string {
 }
 
 /**
- * Chave do contador: HMAC do identificador normalizado, para não gravar e-mail ou telefone
+ * Chave do contador: HMAC do identificador normalizado, para não gravar e-mail, telefone ou IP
  * em texto no banco (LGPD) e para o hash não ser desfeito por força bruta sem o segredo.
+ * O escopo ("login", "esqueci") separa os contadores de cada ação.
  */
+export function chaveTentativa(escopo: string, identifier: LoginIdentifier, segredo: string): string {
+  return createHmac("sha256", segredo).update(`${escopo}:${identifier.type}:${identifier.value}`).digest("hex");
+}
+
 export function chaveLogin(identifier: LoginIdentifier, segredo: string): string {
-  return createHmac("sha256", segredo).update(`login:${identifier.type}:${identifier.value}`).digest("hex");
+  return chaveTentativa("login", identifier, segredo);
+}
+
+export function chaveIp(escopo: string, ip: string, segredo: string): string {
+  return createHmac("sha256", segredo).update(`${escopo}:ip:${ip}`).digest("hex");
 }

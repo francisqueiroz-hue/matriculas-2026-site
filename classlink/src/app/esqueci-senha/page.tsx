@@ -10,15 +10,23 @@ export default function EsqueciSenhaPage() {
   const [identifier, setIdentifier] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [bloqueio, setBloqueio] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setBloqueio("");
     try {
       await apiJson("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ identifier }) });
+      setSent(true);
+    } catch (err) {
+      // Limite de pedidos: avisa de verdade. Qualquer outro erro mantém a resposta genérica
+      // (não revela se a conta existe).
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.startsWith("Muitas tentativas")) setBloqueio(msg);
+      else setSent(true);
     } finally {
       setLoading(false);
-      setSent(true);
     }
   }
 
@@ -74,6 +82,11 @@ export default function EsqueciSenhaPage() {
                   placeholder="voce@escola.com ou (21) 90000-0000"
                 />
               </div>
+              {bloqueio && (
+                <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {bloqueio}
+                </p>
+              )}
               <button
                 type="submit"
                 disabled={loading}
