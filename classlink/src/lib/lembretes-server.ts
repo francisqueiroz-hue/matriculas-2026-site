@@ -20,7 +20,9 @@ import {
   mensagemLembrete,
   planejarLembretes,
   primeiroNome,
+  rematriculaJaAtendida,
   type ConfigLembretes,
+  type ContratoDoAno,
   type Pendencia,
   type PlanoLembretes,
   type RegistroLembrete,
@@ -409,8 +411,25 @@ export async function pendenciasDaEscola(schoolId: string, diasInicio: number, a
     prisma.solicitacaoMatricula.findMany({
       where: { schoolId, status: "NOVA", createdAt: { lte: limite } },
       orderBy: { createdAt: "asc" },
-      select: { id: true, tipo: true, alunoNome: true, responsavelNome: true, createdAt: true },
+      select: { id: true, tipo: true, anoLetivo: true, responsavelId: true, alunoNome: true, responsavelNome: true, createdAt: true },
     }),
   ]);
-  return { contratos, solicitacoes };
+
+  // Rematrícula com contrato do ano já renovado não é pendência: a falta de documento aparece pelo contrato.
+  const anos = [...new Set(solicitacoes.filter((s) => s.tipo === "REMATRICULA").map((s) => s.anoLetivo))];
+  const contratosDoAno: ContratoDoAno[] = anos.length
+    ? (
+        await prisma.contrato.findMany({
+          where: { schoolId, anoLetivo: { in: anos } },
+          select: { anoLetivo: true, student: { select: { name: true, guardians: { select: { guardianId: true } } } } },
+        })
+      ).map((c) => ({ anoLetivo: c.anoLetivo, alunoNome: c.student.name, responsavelIds: c.student.guardians.map((g) => g.guardianId) }))
+    : [];
+
+  return {
+    contratos,
+    solicitacoes: solicitacoes
+      .filter((s) => !rematriculaJaAtendida(s, contratosDoAno))
+      .map(({ id, tipo, alunoNome, responsavelNome, createdAt }) => ({ id, tipo, alunoNome, responsavelNome, createdAt })),
+  };
 }
