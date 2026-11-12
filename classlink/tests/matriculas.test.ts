@@ -10,7 +10,9 @@ describe("página de matrículas dentro do ClassLink", () => {
   it("public/matriculas.html está em sincronia com site/index.html (rode npm run sync:matriculas)", () => {
     const site = readFileSync(path.join(root, "../site/index.html"), "utf8");
     const gerado = readFileSync(path.join(root, "public/matriculas.html"), "utf8");
-    expect(gerado).toBe(toClassLinkPage(site));
+    // No Windows o checkout pode converter LF em CRLF; compara sem diferença de quebra de linha.
+    const lf = (texto: string) => texto.replace(/\r\n/g, "\n");
+    expect(lf(gerado)).toBe(lf(toClassLinkPage(site)));
   });
 
   it("troca assets pelas logos do app e links do ClassLink por caminhos relativos na mesma aba", () => {

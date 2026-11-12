@@ -8,6 +8,7 @@
     "vercel-build": "node scripts/migrate-on-deploy.mjs && next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "db:seed": "tsx prisma/seed.ts",
     "sync:matriculas": "tsx scripts/sync-matriculas.ts",
