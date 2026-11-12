@@ -1,78 +1,83 @@
 import { describe, it, expect } from "vitest";
 import {
-  MAX_FALHAS,
-  JANELA_MS,
-  BLOQUEIO_MS,
-  situacaoLogin,
-  registrarFalha,
+  POLITICA_LOGIN_CONTA,
+  POLITICA_LOGIN_IP,
+  POLITICA_ESQUECI_CONTA,
+  POLITICA_ESQUECI_IP,
   mensagemBloqueio,
   chaveLogin,
-  type RegistroLogin,
+  chaveTentativa,
+  chaveIp,
 } from "@/lib/limite-login";
+import { ipDaRequisicao } from "@/lib/ip-requisicao";
 
-const t0 = new Date("2026-10-14T12:00:00Z");
-const depois = (ms: number) => new Date(t0.getTime() + ms);
-
-function falhar(reg: RegistroLogin | null, n: number, inicio = t0): RegistroLogin | null {
-  let atual = reg;
-  for (let i = 0; i < n; i++) atual = registrarFalha(atual, new Date(inicio.getTime() + i * 1000));
-  return atual;
-}
-
-describe("limite de tentativas de login", () => {
-  it("sem registro não bloqueia", () => {
-    expect(situacaoLogin(null, t0)).toEqual({ bloqueado: false });
+describe("políticas de limite", () => {
+  it("login por conta: 5 tentativas em 15 minutos, bloqueio de 15 minutos", () => {
+    expect(POLITICA_LOGIN_CONTA).toEqual({ max: 5, janelaMs: 15 * 60_000, bloqueioMs: 15 * 60_000 });
   });
 
-  it("não bloqueia antes do limite e bloqueia na 5ª falha", () => {
-    expect(situacaoLogin(falhar(null, MAX_FALHAS - 1), depois(10_000)).bloqueado).toBe(false);
-    const reg = falhar(null, MAX_FALHAS)!;
-    const s = situacaoLogin(reg, depois(10_000));
-    expect(s.bloqueado).toBe(true);
-    expect(reg.bloqueadoAte).not.toBeNull();
+  it("IP é mais folgado que a conta (a escola pode sair por um IP só)", () => {
+    expect(POLITICA_LOGIN_IP.max).toBeGreaterThan(POLITICA_LOGIN_CONTA.max);
   });
 
-  it("informa os segundos restantes, arredondando para cima", () => {
-    const reg = falhar(null, MAX_FALHAS)!; // última falha em t0+4s
-    const s = situacaoLogin(reg, depois(4_000 + 1));
-    expect(s).toEqual({ bloqueado: true, segundos: Math.ceil((BLOQUEIO_MS - 1) / 1000) });
+  it("esqueci a senha é bem restrito, e o IP um pouco mais folgado que a conta", () => {
+    expect(POLITICA_ESQUECI_CONTA.max).toBeLessThanOrEqual(3);
+    expect(POLITICA_ESQUECI_IP.max).toBeGreaterThan(POLITICA_ESQUECI_CONTA.max);
+    expect(POLITICA_ESQUECI_CONTA.bloqueioMs).toBeGreaterThanOrEqual(60 * 60_000);
   });
+});
 
-  it("libera depois do tempo de bloqueio", () => {
-    const reg = falhar(null, MAX_FALHAS)!;
-    expect(situacaoLogin(reg, depois(4_000 + BLOQUEIO_MS)).bloqueado).toBe(false);
-  });
-
-  it("após o bloqueio expirar, a contagem recomeça do zero", () => {
-    const reg = falhar(null, MAX_FALHAS)!;
-    const novo = registrarFalha(reg, depois(4_000 + BLOQUEIO_MS + 1000));
-    expect(novo.falhas).toBe(1);
-    expect(novo.bloqueadoAte).toBeNull();
-  });
-
-  it("falhas fora da janela de 15 minutos não se acumulam", () => {
-    const antigo = registrarFalha(null, t0);
-    const novo = registrarFalha(antigo, depois(JANELA_MS + 1));
-    expect(novo.falhas).toBe(1);
-  });
-
-  it("falhas dentro da janela se acumulam", () => {
-    const reg = falhar(null, 3)!;
-    expect(registrarFalha(reg, depois(60_000)).falhas).toBe(4);
-  });
-
-  it("mensagem fala em minutos, no singular e no plural", () => {
-    expect(mensagemBloqueio(30)).toBe("Muitas tentativas. Tente novamente em 1 minuto.");
+describe("mensagemBloqueio", () => {
+  it("arredonda para cima e usa singular/plural", () => {
+    expect(mensagemBloqueio(1)).toBe("Muitas tentativas. Tente novamente em 1 minuto.");
     expect(mensagemBloqueio(61)).toBe("Muitas tentativas. Tente novamente em 2 minutos.");
     expect(mensagemBloqueio(900)).toBe("Muitas tentativas. Tente novamente em 15 minutos.");
   });
+});
 
-  it("a chave é um hash estável que não contém o identificador", () => {
-    const a = chaveLogin({ type: "email", value: "pai@escola.com" }, "segredo");
-    expect(a).toBe(chaveLogin({ type: "email", value: "pai@escola.com" }, "segredo"));
-    expect(a).not.toContain("pai@escola.com");
-    expect(a).not.toBe(chaveLogin({ type: "email", value: "mae@escola.com" }, "segredo"));
-    expect(a).not.toBe(chaveLogin({ type: "email", value: "pai@escola.com" }, "outro"));
-    expect(a).toMatch(/^[0-9a-f]{64}$/);
+describe("chaves dos contadores", () => {
+  const email = { type: "email", value: "pai@escola.com" } as const;
+
+  it("é um HMAC hexadecimal que não contém o dado em texto", () => {
+    const chave = chaveLogin(email, "segredo");
+    expect(chave).toMatch(/^[0-9a-f]{64}$/);
+    expect(chave).not.toContain("pai");
+  });
+
+  it("depende do segredo e do identificador", () => {
+    expect(chaveLogin(email, "a")).not.toBe(chaveLogin(email, "b"));
+    expect(chaveLogin(email, "a")).not.toBe(chaveLogin({ type: "email", value: "outro@escola.com" }, "a"));
+  });
+
+  it("o mesmo identificador tem contadores separados para login e para esqueci a senha", () => {
+    expect(chaveTentativa("login", email, "s")).not.toBe(chaveTentativa("esqueci", email, "s"));
+    expect(chaveLogin(email, "s")).toBe(chaveTentativa("login", email, "s"));
+  });
+
+  it("chave por IP não repete a de conta e separa os escopos", () => {
+    expect(chaveIp("login", "1.2.3.4", "s")).toMatch(/^[0-9a-f]{64}$/);
+    expect(chaveIp("login", "1.2.3.4", "s")).not.toBe(chaveIp("esqueci", "1.2.3.4", "s"));
+    expect(chaveIp("login", "1.2.3.4", "s")).not.toBe(chaveIp("login", "1.2.3.5", "s"));
+  });
+});
+
+describe("ipDaRequisicao", () => {
+  const h = (o: Record<string, string>) => new Headers(o);
+
+  it("prefere o cabeçalho que a Vercel escreve", () => {
+    expect(ipDaRequisicao(h({ "x-vercel-forwarded-for": "9.9.9.9", "x-real-ip": "8.8.8.8", "x-forwarded-for": "7.7.7.7" }))).toBe("9.9.9.9");
+  });
+
+  it("cai para x-real-ip e depois para o primeiro de x-forwarded-for", () => {
+    expect(ipDaRequisicao(h({ "x-real-ip": "8.8.8.8", "x-forwarded-for": "7.7.7.7" }))).toBe("8.8.8.8");
+    expect(ipDaRequisicao(h({ "x-forwarded-for": "7.7.7.7, 10.0.0.1" }))).toBe("7.7.7.7");
+  });
+
+  it("sem IP devolve null (quem chama pula o limite por IP)", () => {
+    expect(ipDaRequisicao(h({}))).toBeNull();
+  });
+
+  it("ignora valor absurdamente longo", () => {
+    expect(ipDaRequisicao(h({ "x-real-ip": "a".repeat(200) }))).toBeNull();
   });
 });
