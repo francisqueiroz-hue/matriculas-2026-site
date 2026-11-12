@@ -27,6 +27,15 @@ export function situacaoRefresh(stored: RefreshArmazenado | null | undefined, ag
 }
 
 /**
+ * Reuso de um token que já foi trocado (revogado) fora da janela de tolerância, ainda dentro da
+ * validade e de conta ativa. Logout vence o token (expiresAt), então não cai aqui.
+ */
+export function reusoSuspeito(stored: RefreshArmazenado, agora: Date): boolean {
+  return Boolean(stored.revokedAt) && situacaoRefresh(stored, agora) === "invalido" &&
+    stored.user.active && !stored.user.deletedAt && stored.expiresAt.getTime() > agora.getTime();
+}
+
+/**
  * Endereço para onde o proxy manda quem abriu uma página do painel sem token de acesso
  * válido (o token dura 15 min). O cookie de renovação só é enviado a /api/auth, então a
  * renovação precisa acontecer numa rota desse caminho, e não no próprio proxy.

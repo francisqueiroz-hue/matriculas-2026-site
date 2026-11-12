@@ -10,9 +10,11 @@ import {
 } from "@/lib/auth";
 import { handleApiError } from "@/lib/http";
 import { TAMANHO_MAXIMO_CORPO_LOGOUT, lerTokenPushDoLogout } from "@/lib/logout-corpo";
+import { origemPermitida, respostaOrigemNegada } from "@/lib/origem-requisicao";
 
 export async function POST(request: NextRequest) {
   try {
+    if (!origemPermitida(request.headers)) return respostaOrigemNegada();
     const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
     const tokenHash = refreshToken ? hashRefreshToken(refreshToken) : null;
 

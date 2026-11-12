@@ -11,6 +11,7 @@ import { chaveIp, chaveTentativa, mensagemBloqueio, POLITICA_ESQUECI_CONTA, POLI
 import { contarTentativaSemFalhar } from "@/lib/limite-tentativas";
 import { ipDaRequisicao } from "@/lib/ip-requisicao";
 import { origemPublica } from "@/lib/push";
+import { origemPermitida, respostaOrigemNegada } from "@/lib/origem-requisicao";
 
 const MENSAGEM_PADRAO =
   "Se encontrarmos uma conta com esse e-mail ou telefone, enviamos uma nova senha por WhatsApp ou e-mail.";
@@ -29,6 +30,7 @@ const MENSAGEM_PADRAO =
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!origemPermitida(request.headers)) return respostaOrigemNegada();
     const body = forgotPasswordSchema.parse(await request.json());
     const identifier = resolveLoginIdentifier(body.identifier);
     if (!identifier) return NextResponse.json({ ok: true, message: MENSAGEM_PADRAO });

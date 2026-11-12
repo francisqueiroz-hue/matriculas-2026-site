@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   loginTentativa: { findUnique: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn(), updateMany: vi.fn() },
-  user: { findUnique: vi.fn(), findFirst: vi.fn() },
+  user: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   refreshToken: { create: vi.fn(), count: vi.fn() },
   message: { findUnique: vi.fn(), create: vi.fn() },
   conversation: { findUnique: vi.fn() },
@@ -12,6 +12,8 @@ vi.mock("@/lib/permissoes-mensagens", () => ({ conversaDaFamiliaComGestao: conve
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/auth", () => ({
   verifyPassword: vi.fn(),
+  hashPassword: vi.fn(async () => "hash-novo"),
+  precisaRehash: vi.fn(() => false),
   signAccessToken: vi.fn(async () => "access"),
   generateRefreshToken: vi.fn(() => ({ token: "r", tokenHash: "h", expiresAt: new Date() })),
   ACCESS_COOKIE: "a",
@@ -21,12 +23,12 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 import { POST } from "@/app/api/auth/login/route";
-import { verifyPassword } from "@/lib/auth";
+import { verifyPassword, precisaRehash } from "@/lib/auth";
 
-function req(identifier = "pai@escola.com", password = "x", ip?: string) {
+function req(identifier = "pai@escola.com", password = "x", ip?: string, extra: Record<string, string> = {}) {
   return new Request("http://t/api/auth/login", {
     method: "POST",
-    headers: ip ? { "x-real-ip": ip } : {},
+    headers: { ...(ip ? { "x-real-ip": ip } : {}), ...extra },
     body: JSON.stringify({ identifier, password }),
   }) as never;
 }
@@ -147,6 +149,45 @@ describe("POST /api/auth/login com limite de tentativas", () => {
     for (let i = 0; i < 40; i++) status.push((await POST(req(`aluno${i}@escola.com`, "Senha123", "203.0.113.7"))).status);
     expect(status.slice(0, 31).every((s) => s === 401)).toBe(true);
     expect(status.slice(31).every((s) => s === 429)).toBe(true);
+  });
+});
+
+describe("proteções extras do login", () => {
+  it("Origin de outro site: 403, sem contar tentativa nem olhar a senha", async () => {
+    const res = await POST(req("pai@escola.com", "x", undefined, { origin: "https://evil.example", host: "t" }));
+    expect(res.status).toBe(403);
+    expect(prismaMock.loginTentativa.upsert).not.toHaveBeenCalled();
+    expect(verifyPassword).not.toHaveBeenCalled();
+  });
+
+  it("Origin do próprio site passa", async () => {
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    const res = await POST(req("pai@escola.com", "x", undefined, { origin: "https://app.escola.com", host: "app.escola.com" }));
+    expect(res.status).toBe(200);
+  });
+
+  it("senha gigante: 400 antes de gastar bcrypt", async () => {
+    const res = await POST(req("pai@escola.com", "a".repeat(129)));
+    expect(res.status).toBe(400);
+    expect(verifyPassword).not.toHaveBeenCalled();
+  });
+
+  it("hash com custo antigo é trocado após login correto", async () => {
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    vi.mocked(precisaRehash).mockReturnValueOnce(true);
+    prismaMock.user.update.mockResolvedValue({});
+    const res = await POST(req());
+    expect(res.status).toBe(200);
+    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: "u1" }, data: { passwordHash: "hash-novo" } });
+  });
+
+  it("falha no rehash não derruba o login", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(verifyPassword).mockResolvedValue(true);
+    vi.mocked(precisaRehash).mockReturnValueOnce(true);
+    prismaMock.user.update.mockRejectedValue(new Error("db"));
+    expect((await POST(req())).status).toBe(200);
+    log.mockRestore();
   });
 });
 
