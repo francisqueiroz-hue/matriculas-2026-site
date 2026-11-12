@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { resolveLoginIdentifier } from "@/lib/login-identifier";
 import {
   verifyPassword,
+  hashPassword,
+  precisaRehash,
   signAccessToken,
   generateRefreshToken,
   ACCESS_COOKIE,
@@ -16,17 +18,20 @@ import { ehPrimeiroAcesso, enviarBoasVindasApp } from "@/lib/boas-vindas";
 import { chaveIp, chaveLogin, mensagemBloqueio, POLITICA_LOGIN_CONTA, POLITICA_LOGIN_IP } from "@/lib/limite-login";
 import { contarTentativaSemFalhar, estaBloqueada } from "@/lib/limite-tentativas";
 import { ipDaRequisicao } from "@/lib/ip-requisicao";
+import { origemPermitida, respostaOrigemNegada } from "@/lib/origem-requisicao";
 
 /** Hash bcrypt (custo 12) de uma senha aleatória descartada: só serve para igualar o tempo de resposta. */
 const HASH_FALSO = "$2b$12$FgtWwXqYU/7uCmSlQH3d3OQ8nmrHVPCXZLnVIArIMgRm88TQ/P2Sq";
 
 const loginSchema = z.object({
   identifier: z.string().min(3),
-  password: z.string().min(1),
+  // bcrypt só usa os 72 primeiros bytes; um teto evita gastar CPU com senhas gigantes.
+  password: z.string().min(1).max(128),
 });
 
 export async function POST(request: NextRequest) {
   try {
+    if (!origemPermitida(request.headers)) return respostaOrigemNegada();
     const body = loginSchema.parse(await request.json());
 
     const identifier = resolveLoginIdentifier(body.identifier);
@@ -81,6 +86,13 @@ export async function POST(request: NextRequest) {
     const validPassword = await verifyPassword(body.password, user.passwordHash);
     if (!validPassword) {
       return await falhouLogin();
+    }
+
+    // Hash antigo com custo de bcrypt menor que o atual: troca por um novo (a senha está em mãos agora).
+    if (precisaRehash(user.passwordHash)) {
+      await prisma.user
+        .update({ where: { id: user.id }, data: { passwordHash: await hashPassword(body.password) } })
+        .catch((e: unknown) => console.error("login: rehash da senha falhou", e));
     }
 
     // Login correto: zera o contador da conta.

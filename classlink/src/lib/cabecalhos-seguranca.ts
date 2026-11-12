@@ -30,6 +30,8 @@ export const CSP_COMPLETA = [
 ].join("; ");
 
 export const CABECALHOS_SEGURANCA: ReadonlyArray<{ key: string; value: string }> = [
+  // 1 ano, sem includeSubDomains/preload: não força HTTPS em subdomínios que não controlo aqui.
+  { key: "Strict-Transport-Security", value: "max-age=31536000" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

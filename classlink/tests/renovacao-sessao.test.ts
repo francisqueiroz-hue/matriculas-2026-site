@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { JANELA_REUSO_MS, caminhoParaRenovar, situacaoRefresh, type RefreshArmazenado } from "@/lib/renovacao-sessao";
+import { JANELA_REUSO_MS, caminhoParaRenovar, reusoSuspeito, situacaoRefresh, type RefreshArmazenado } from "@/lib/renovacao-sessao";
 
 // Estas rotas importam o banco só por meio do helper; ele é simulado aqui.
 const renovarSessao = vi.fn();
@@ -103,5 +103,18 @@ describe("GET /api/auth/renovar", () => {
       const res = await chamar(`https://app.test/api/auth/renovar?next=${encodeURIComponent(next)}`, "classlink_refresh=X");
       expect(res.headers.get("location")).toBe("https://app.test/dashboard");
     }
+  });
+});
+
+describe("reusoSuspeito", () => {
+  const velho = new Date(agora.getTime() - 3_600_000);
+  it("token já trocado fora da janela, ainda válido e de conta ativa: suspeito", () => {
+    expect(reusoSuspeito(base({ revokedAt: velho }), agora)).toBe(true);
+  });
+  it("token ativo, reuso recente, vencido (logout) ou de conta inativa: não é suspeito", () => {
+    expect(reusoSuspeito(base(), agora)).toBe(false);
+    expect(reusoSuspeito(base({ revokedAt: new Date(agora.getTime() - 1_000) }), agora)).toBe(false);
+    expect(reusoSuspeito(base({ revokedAt: velho, expiresAt: agora }), agora)).toBe(false);
+    expect(reusoSuspeito(base({ revokedAt: velho, user: { active: false, deletedAt: null } }), agora)).toBe(false);
   });
 });

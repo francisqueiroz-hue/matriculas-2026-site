@@ -26,7 +26,7 @@ export const linkGuardianSchema = z
     guardianName: z.string().min(1).max(150),
     guardianPhone: z.string().max(30).optional(),
     relation: z.string().max(50).optional(),
-    password: z.string().min(8).optional(),
+    password: z.string().min(8).max(72).optional(),
     /** Vincular a um responsável já cadastrado (ex.: segundo filho), sem criar outro login. */
     guardianId: z.string().min(1).optional(),
     /** Confirma que é outra pessoa, mesmo havendo responsável com nome parecido. */
@@ -50,7 +50,7 @@ export const createUserSchema = z
     name: z.string().trim().min(1).max(150),
     email: opcionalVazio(z.string().trim().email()),
     phone: opcionalVazio(z.string().trim().max(30)),
-    password: opcionalVazio(z.string().min(8)),
+    password: opcionalVazio(z.string().min(8).max(72)),
     funcao: z.enum(["DIRECAO", "COORDENACAO", "PROFESSOR", "AUXILIAR"]),
     classIds: z.array(z.string()).optional(),
   })
@@ -72,8 +72,8 @@ export const updateUserSchema = z.object({
 });
 
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
-  newPassword: z.string().min(8),
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(8).max(72),
 });
 
 export const forgotPasswordSchema = z.object({

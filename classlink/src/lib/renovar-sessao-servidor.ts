@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { signAccessToken, generateRefreshToken, hashRefreshToken } from "@/lib/auth";
-import { situacaoRefresh } from "@/lib/renovacao-sessao";
+import { reusoSuspeito, situacaoRefresh } from "@/lib/renovacao-sessao";
 
 /**
  * Troca um refresh token válido por um novo par (access + refresh), com rotação.
@@ -14,7 +14,15 @@ export async function renovarSessao(refreshToken: string, agora = new Date()) {
     include: { user: true },
   });
   const situacao = situacaoRefresh(stored, agora);
-  if (!stored || situacao === "invalido") return null;
+  if (!stored) return null;
+  if (situacao === "invalido") {
+    // Token já usado há mais que a janela de tolerância: pode ser cópia roubada. Encerra todas
+    // as sessões da pessoa; ela entra de novo e o ladrão fica de fora.
+    if (reusoSuspeito(stored, agora)) {
+      await prisma.refreshToken.updateMany({ where: { userId: stored.userId, revokedAt: null }, data: { revokedAt: agora } });
+    }
+    return null;
+  }
 
   if (situacao === "valido") {
     // Só revoga se ainda não estiver revogado: duas renovações simultâneas não se pisam.

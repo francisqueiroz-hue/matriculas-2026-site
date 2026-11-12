@@ -26,6 +26,9 @@ describe("cabeçalhos de segurança", () => {
     expect(ro).toContain("https://*.googleapis.com");
     expect(ro).not.toMatch(/(^|[ ;])\*([ ;]|$)/);
   });
+  it("força HTTPS por um ano (HSTS)", () => {
+    expect(valor("Strict-Transport-Security")).toBe("max-age=31536000");
+  });
   it("não repete cabeçalhos", () => {
     const chaves = CABECALHOS_SEGURANCA.map((h) => h.key);
     expect(new Set(chaves).size).toBe(chaves.length);

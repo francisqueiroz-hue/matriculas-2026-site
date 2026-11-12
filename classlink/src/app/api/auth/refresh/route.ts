@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { ACCESS_COOKIE, REFRESH_COOKIE, accessCookieOptions, refreshCookieOptions } from "@/lib/auth";
 import { handleApiError } from "@/lib/http";
 import { renovarSessao } from "@/lib/renovar-sessao-servidor";
+import { origemPermitida, respostaOrigemNegada } from "@/lib/origem-requisicao";
 
 export async function POST(request: NextRequest) {
   try {
+    if (!origemPermitida(request.headers)) return respostaOrigemNegada();
     const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
     if (!refreshToken) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 });

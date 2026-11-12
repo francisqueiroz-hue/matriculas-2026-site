@@ -118,6 +118,17 @@ describe("POST /api/auth/forgot-password", () => {
     expect(contarTentativaSemFalhar).toHaveBeenCalledTimes(2);
   });
 
+  it("Origin de outro site: 403 sem contar nada", async () => {
+    const r = new NextRequest("http://t/api/auth/forgot-password", {
+      method: "POST",
+      headers: { origin: "https://evil.example", host: "t" },
+      body: JSON.stringify({ identifier: "pai@escola.com" }),
+    });
+    const res = await POST(r);
+    expect(res.status).toBe(403);
+    expect(contarTentativaSemFalhar).not.toHaveBeenCalled();
+  });
+
   it("sem identificador válido: resposta genérica, sem contar nada", async () => {
     const res = await POST(req("sem-formato-valido"));
     expect(res.status).toBe(200);

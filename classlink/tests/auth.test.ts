@@ -69,3 +69,22 @@ describe("refresh token", () => {
     expect(a.token).not.toBe(b.token);
   });
 });
+
+describe("precisaRehash e algoritmo do JWT", () => {
+  it("hash de custo 12 não precisa de rehash; custo menor precisa; lixo não quebra", async () => {
+    const { precisaRehash } = await import("@/lib/auth");
+    const bcrypt = (await import("bcryptjs")).default;
+    expect(precisaRehash(await hashPassword("x1234567"))).toBe(false);
+    expect(precisaRehash(bcrypt.hashSync("x1234567", 8))).toBe(true);
+    expect(precisaRehash("nao-e-bcrypt")).toBe(false);
+  });
+
+  it("recusa token assinado com outro algoritmo (HS512)", async () => {
+    const { SignJWT } = await import("jose");
+    const token = await new SignJWT({ sub: "u1" })
+      .setProtectedHeader({ alg: "HS512" })
+      .setExpirationTime("5m")
+      .sign(new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!));
+    expect(await verifyAccessToken(token)).toBeNull();
+  });
+});
