@@ -7,6 +7,8 @@ const prismaMock = vi.hoisted(() => ({
 }));
 const verifyAccessToken = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
+const registrarErroServidor = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@/lib/erros-servidor", () => ({ registrarErroServidor }));
 vi.mock("@/lib/auth", () => ({
   ACCESS_COOKIE: "classlink_access",
   REFRESH_COOKIE: "classlink_refresh",
@@ -166,5 +168,45 @@ describe("POST /api/auth/logout", () => {
     expect(res.status).toBe(200);
     expect(console.error).toHaveBeenCalled();
     expect(prismaMock.refreshToken.updateMany).toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/auth/logout: falhas e corridas (casos 1 e 3 do PR #79)", () => {
+  it("banco fora do ar: apaga os cookies mesmo assim e avisa que a sessão não foi revogada", async () => {
+    prismaMock.refreshToken.findUnique.mockRejectedValue(new Error("banco indisponível"));
+    prismaMock.refreshToken.updateMany.mockRejectedValue(new Error("banco indisponível"));
+    const res = await POST(req());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, sessaoEncerrada: false });
+    const cookies = res.headers.getSetCookie().join("\n");
+    expect(cookies).toMatch(/classlink_access=;.*Max-Age=0/);
+    expect(cookies).toMatch(/classlink_refresh=;.*Max-Age=0/);
+    expect(registrarErroServidor).toHaveBeenCalled();
+  });
+
+  it("caminho normal responde sessaoEncerrada true e sem cache", async () => {
+    const res = await POST(req());
+    expect(await res.json()).toEqual({ ok: true, sessaoEncerrada: true });
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("token já trocado por uma renovação: vence também o substituto emitido naquela troca", async () => {
+    const revogadoEm = new Date(Date.now() - 3_000);
+    prismaMock.refreshToken.findUnique.mockResolvedValue({ userId: "u1", revokedAt: revogadoEm, expiresAt: new Date(Date.now() + 1e9) });
+    await POST(req());
+    const chamada = prismaMock.refreshToken.updateMany.mock.calls.find(([arg]) => arg.where.userId === "u1");
+    expect(chamada).toBeDefined();
+    const { where, data } = chamada![0];
+    expect(where.createdAt.gte.getTime()).toBeLessThanOrEqual(revogadoEm.getTime());
+    expect(where.createdAt.lte.getTime()).toBeGreaterThan(revogadoEm.getTime() + 15_000);
+    expect(data.expiresAt).toBeInstanceOf(Date);
+    expect(data.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it("token ainda não trocado: não mexe em outras sessões do usuário", async () => {
+    prismaMock.refreshToken.findUnique.mockResolvedValue({ userId: "u1", revokedAt: null, expiresAt: new Date(Date.now() + 1e9) });
+    await POST(req());
+    const outras = prismaMock.refreshToken.updateMany.mock.calls.filter(([arg]) => arg.where.userId !== undefined);
+    expect(outras).toHaveLength(0);
   });
 });

@@ -12,6 +12,7 @@ import { contarTentativaSemFalhar } from "@/lib/limite-tentativas";
 import { ipDaRequisicao } from "@/lib/ip-requisicao";
 import { origemPublica } from "@/lib/push";
 import { origemPermitida, respostaOrigemNegada } from "@/lib/origem-requisicao";
+import { encerrarTodasAsSessoes } from "@/lib/renovacao-sessao";
 
 const MENSAGEM_PADRAO =
   "Se encontrarmos uma conta com esse e-mail ou telefone, enviamos uma nova senha por WhatsApp ou e-mail.";
@@ -97,7 +98,7 @@ async function redefinirEEnviar(identifier: LoginIdentifier, origem: string) {
   if (entregue) {
     await prisma.$transaction([
       prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(temporaryPassword) } }),
-      prisma.refreshToken.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+      prisma.refreshToken.updateMany(encerrarTodasAsSessoes(user.id)),
     ]);
   }
 }

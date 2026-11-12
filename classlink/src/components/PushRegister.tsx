@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { requestPushToken } from "@/lib/firebase-client";
 import { apiFetch } from "@/lib/api-client";
+import { registrarPush } from "@/lib/registro-push";
 
 /**
  * Registra silenciosamente o token de push do dispositivo quando a permissão de
@@ -15,7 +16,7 @@ export function PushRegister() {
     requestPushToken(false)
       .then((token) => {
         if (!token) return;
-        return apiFetch("/api/push/register", { method: "POST", body: JSON.stringify({ token }) });
+        return registrarPush(() => apiFetch("/api/push/register", { method: "POST", body: JSON.stringify({ token }) }));
       })
       .catch(() => {
         // notificações são um extra; falha silenciosa não deve afetar o uso do app

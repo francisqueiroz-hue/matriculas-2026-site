@@ -27,6 +27,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/billing
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="boleto-${boleto.mesReferencia}.pdf"`,
+        // Dados pessoais e financeiros da família: nada de cache no aparelho ou no caminho.
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

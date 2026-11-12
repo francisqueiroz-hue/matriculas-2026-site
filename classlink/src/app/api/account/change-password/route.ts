@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/session";
 import { verifyPassword, hashPassword } from "@/lib/auth";
 import { handleApiError } from "@/lib/http";
 import { changePasswordSchema } from "@/lib/validators";
+import { encerrarTodasAsSessoes } from "@/lib/renovacao-sessao";
 
 /** Troca de senha pelo próprio usuário. Revoga as demais sessões (refresh tokens) por segurança. */
 export async function POST(request: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.$transaction([
       prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(body.newPassword) } }),
-      prisma.refreshToken.updateMany({ where: { userId: user.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+      prisma.refreshToken.updateMany(encerrarTodasAsSessoes(user.id)),
     ]);
 
     return NextResponse.json({ ok: true });
