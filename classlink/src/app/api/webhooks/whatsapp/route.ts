@@ -9,6 +9,7 @@ import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "
 import { ehPedidoDeAcesso } from "@/lib/acesso";
 import { mensagemIgnoravel } from "@/lib/whatsapp-ignorar";
 import { devolverEnvioFalho } from "@/lib/lembretes-server";
+import { registrarFalhaEntrega } from "@/lib/whatsapp-falhas";
 import { responderNumeroNaoCadastrado, responderPedidoDeAcesso } from "@/lib/pedido-acesso";
 import { corpoDaMidia, guardarMidiaRecebida, midiaDaMensagem } from "@/lib/whatsapp-midia";
 
@@ -116,6 +117,14 @@ export async function POST(request: NextRequest) {
           `${erro?.code ?? "?"} ${erro?.title ?? ""} ${erro?.error_data?.details ?? ""}`.trim(),
       );
       // Se era um lembrete automático, a falha não pode contar como um dos envios da família.
+      // Guarda a falha para a direção ver quem ficou sem receber e avisar a família de outro jeito.
+      await registrarFalhaEntrega({
+        mensagemId: falha.id,
+        telefone: falha.recipient_id ?? "",
+        codigo: erro?.code,
+        titulo: erro?.title,
+        detalhe: erro?.error_data?.details ?? erro?.message,
+      }).catch((err) => console.error("whatsapp: falha ao registrar entrega recusada", err));
       await devolverEnvioFalho(falha.id).catch((err) => console.error("lembretes: falha ao devolver envio", err));
     }
 
