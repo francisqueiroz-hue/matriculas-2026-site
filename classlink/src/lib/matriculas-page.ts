@@ -30,5 +30,5 @@ export function toClassLinkPage(siteHtml: string): string {
     throw new Error("Sobrou referência a assets/ na página de matrículas.");
   }
 
-  return html.replace(/^<!doctype html>\n?/i, (doctype) => doctype + GENERATED_HEADER);
+  return html.replace(/^<!doctype html>(?:\r?\n)?/i, (doctype) => doctype + GENERATED_HEADER);
 }
