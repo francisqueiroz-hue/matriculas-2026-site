@@ -7,43 +7,21 @@ import { notifyUsers } from "@/lib/push";
 import { getPublicoAlvo } from "@/lib/comunicados";
 import { separarAbertura } from "@/lib/comunicado-leitura";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
-import { exigirAlunoPublicavel, exigirTurmaPublicavel, turmasQueLeciona } from "@/lib/turmas-acesso";
+import { exigirAlunoPublicavel, exigirTurmaPublicavel } from "@/lib/turmas-acesso";
+import { visibilidadePorPublico } from "@/lib/escopo-acesso";
 
 export async function GET() {
   try {
     const session = await requireSession();
 
-    let visibilidadeOR: Array<Record<string, unknown>> | undefined;
-    // Responsável: alunos vinculados, para saber quantos filhos cada comunicado alcança.
-    let vinculos: { studentId: string; classId: string }[] = [];
-    if (session.role === "GUARDIAN") {
-      const links = await prisma.guardianStudent.findMany({
-        where: { guardianId: session.sub, student: { deletedAt: null } },
-        select: { studentId: true, student: { select: { classId: true } } },
-      });
-      vinculos = links.map((l) => ({ studentId: l.studentId, classId: l.student.classId }));
-      const classIds = [...new Set(links.map((l) => l.student.classId))];
-      const studentIds = links.map((l) => l.studentId);
-      // Comunicados individuais (audience STUDENT) só aparecem para o responsável do próprio aluno-alvo,
-      // nunca para os outros responsáveis da mesma turma.
-      visibilidadeOR = [
-        { audience: "SCHOOL" },
-        { audience: "CLASS", classId: { in: classIds } },
-        { audience: "STUDENT", alunoId: { in: studentIds } },
-      ];
-    } else if (session.role === "STAFF") {
-      const classIds = await turmasQueLeciona(session.sub);
-      visibilidadeOR = [
-        { audience: "SCHOOL" },
-        { audience: "CLASS", classId: { in: classIds } },
-        { audience: "STUDENT", classId: { in: classIds } },
-      ];
-    }
+    // Família: vínculos com os filhos, para saber quantos filhos cada comunicado alcança.
+    // Comunicados individuais (audience STUDENT) só aparecem para o responsável do próprio aluno-alvo.
+    const { condicoes, vinculos } = await visibilidadePorPublico(session);
 
     const comunicados = await prisma.comunicado.findMany({
       where: {
         schoolId: session.schoolId,
-        OR: visibilidadeOR,
+        OR: condicoes,
       },
       include: {
         class: { select: { id: true, name: true } },

@@ -2,20 +2,18 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
+import { alunosDaFamilia } from "@/lib/escopo-acesso";
 
 /** "Meus boletos" — todos os boletos dos alunos vinculados ao responsável logado. */
 export async function GET() {
   try {
     const session = await requireRole("GUARDIAN");
 
-    const links = await prisma.guardianStudent.findMany({
-      where: { guardianId: session.sub, student: { deletedAt: null } },
-      select: { studentId: true },
-    });
+    const filhos = await alunosDaFamilia(session.sub);
 
     const boletos = await prisma.boleto.findMany({
       // Cancelado pela escola (ex.: lançado em duplicidade) não aparece para a família.
-      where: { studentId: { in: links.map((l) => l.studentId) }, status: { not: "CANCELADO" } },
+      where: { studentId: { in: filhos.map((f) => f.studentId) }, status: { not: "CANCELADO" } },
       include: { student: { select: { id: true, name: true } } },
       orderBy: [{ mesReferencia: "desc" }],
     });
