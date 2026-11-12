@@ -391,10 +391,13 @@ function AvisoFamilia({ alunoId, ano, temResponsavel }: { alunoId: string; ano: 
       );
       setMensagem(r.mensagem);
       if (enviar) {
+        // Conta o que o envio aceitou, não só quem tem aparelho cadastrado.
         setStatus(
-          r.responsaveisComApp
-            ? `Notificação enviada a ${r.responsaveisComApp} de ${r.responsaveis} responsável(is) com o app. Para quem não tem o app, copie a mensagem para o WhatsApp.`
-            : "Nenhum responsável tem notificação ativa no app. Copie a mensagem e envie pelo WhatsApp.",
+          !r.responsaveisComApp
+            ? "Nenhum responsável tem notificação ativa no app. Copie a mensagem e envie pelo WhatsApp."
+            : !r.enviados
+              ? "A notificação não foi entregue a nenhum aparelho. Copie a mensagem e envie pelo WhatsApp."
+              : `Notificação entregue em ${r.enviados} aparelho(s) (${r.responsaveisComApp} de ${r.responsaveis} responsável(is) têm o app). Para quem não recebeu, copie a mensagem para o WhatsApp.`,
         );
       }
     } catch (err) {
