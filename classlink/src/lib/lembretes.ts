@@ -303,7 +303,7 @@ function normalizarNome(nome: string): string {
  * Uma rematrícula deixa de depender da escola assim que existe contrato do ano para a família:
  * a renovação já foi feita (enviada, assinada, validada ou confirmada pela direção). Se ainda falta
  * documento, o próprio contrato aparece como pendência (em conferência ou aguardando a via original).
- * Vale pelo responsável que pediu (logado) ou, sem ele, pelo nome de um dos alunos da solicitação.
+ * Vale pelo responsável que pediu (logado) ou, só sem ele, pelo nome de um dos alunos da solicitação.
  */
 export function rematriculaJaAtendida(
   sol: { tipo: string; anoLetivo: number; responsavelId: string | null; alunoNome: string },
@@ -311,7 +311,8 @@ export function rematriculaJaAtendida(
 ): boolean {
   if (sol.tipo !== "REMATRICULA") return false;
   const doAno = contratos.filter((c) => c.anoLetivo === sol.anoLetivo);
-  if (sol.responsavelId && doAno.some((c) => c.responsavelIds.includes(sol.responsavelId!))) return true;
+  // Pedido de responsável logado: vale só o vínculo (aluno homônimo de outra família não conta).
+  if (sol.responsavelId) return doAno.some((c) => c.responsavelIds.includes(sol.responsavelId!));
   const nomes = new Set(sol.alunoNome.split(",").map(normalizarNome).filter(Boolean));
   return doAno.some((c) => nomes.has(normalizarNome(c.alunoNome)));
 }

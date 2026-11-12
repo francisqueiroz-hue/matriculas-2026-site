@@ -1049,6 +1049,8 @@ enum MatriculaDocumentoTipo {
   CPF
   VACINACAO
   COMPROVANTE_RESIDENCIA
+  IDENTIDADE_RESPONSAVEL // documento de identidade do responsável
+  ATESTADO_MEDICO // atestado médico atualizado para o ano letivo
   HISTORICO_ESCOLAR
   LAUDO // voluntário e sensível: visível e editável só pela direção (ADMIN)
 }

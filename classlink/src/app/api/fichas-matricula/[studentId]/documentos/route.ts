@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
-import { alunoDaEscola, exigirEquipe } from "@/lib/ficha-matricula-acesso";
-import { atualizarDocumentoSchema, dadosDaAtualizacao, montarChecklist, podeVerTipo } from "@/lib/ficha-matricula";
+import { alunoDaEscola, etapasDoContrato, exigirEquipe } from "@/lib/ficha-matricula-acesso";
+import { atualizarDocumentoSchema, dadosDaAtualizacao, etapaDaFicha, montarChecklist, podeVerTipo, tiposVisiveis } from "@/lib/ficha-matricula";
 
 /** Marca/desmarca a entrega de um documento, ajusta prazo e observação (cria o item se não existir). */
 export async function PUT(request: NextRequest, ctx: RouteContext<"/api/fichas-matricula/[studentId]/documentos">) {
@@ -17,6 +17,10 @@ export async function PUT(request: NextRequest, ctx: RouteContext<"/api/fichas-m
     }
     const aluno = await alunoDaEscola(studentId, session.schoolId);
     if (!aluno) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
+    const etapa = etapaDaFicha(aluno.class?.name, (await etapasDoContrato(session.schoolId, entrada.anoLetivo, [studentId])).get(studentId));
+    if (!tiposVisiveis(session.papel, etapa).includes(entrada.tipo)) {
+      return NextResponse.json({ error: "Este documento não faz parte da lista desta etapa." }, { status: 400 });
+    }
 
     const chave = { studentId_anoLetivo_tipo: { studentId, anoLetivo: entrada.anoLetivo, tipo: entrada.tipo } };
     const atual = await prisma.matriculaDocumento.findUnique({ where: chave, select: { recebido: true, recebidoEm: true } });
@@ -28,7 +32,7 @@ export async function PUT(request: NextRequest, ctx: RouteContext<"/api/fichas-m
       create: { schoolId: session.schoolId, studentId, anoLetivo: entrada.anoLetivo, tipo: entrada.tipo, ...dados },
       select: { id: true, tipo: true, recebido: true, recebidoEm: true, prazo: true, observacao: true },
     });
-    const [item] = montarChecklist([salvo], session.papel).filter((i) => i.tipo === salvo.tipo);
+    const [item] = montarChecklist([salvo], session.papel, etapa).filter((i) => i.tipo === salvo.tipo);
     return NextResponse.json({ documento: item });
   } catch (error) {
     return handleApiError(error);

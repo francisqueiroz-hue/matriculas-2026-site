@@ -4,12 +4,13 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
-import { FINALIDADES, ROTULO_FINALIDADE, type Finalidade, type ItemChecklist, type TipoDocumento } from "@/lib/ficha-matricula";
+import { FINALIDADES, ROTULO_ETAPA, ROTULO_FINALIDADE, type Etapa, type Finalidade, type ItemChecklist, type TipoDocumento } from "@/lib/ficha-matricula";
 
 interface AlunoResumo {
   id: string;
   name: string;
   class: { id: string; name: string } | null;
+  etapa: Etapa;
   documentos: { entregues: number; exigidos: number; pendentes: number };
 }
 
@@ -27,6 +28,7 @@ interface Ficha {
   aluno: { id: string; name: string; turma: string | null };
   responsaveis: { id: string; name: string; relation: string | null }[];
   anoLetivo: number;
+  etapa: Etapa;
   papel: "ADMIN" | "STAFF";
   documentos: ItemChecklist[];
   consentimentos: Consentimento[];
@@ -181,7 +183,9 @@ function ListaAlunos({ ano, abrir }: { ano: number; abrir: (id: string) => void 
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-medium">{a.name}</span>
-                    <span className="block text-xs text-slate-500">{a.class?.name ?? "Sem turma"}</span>
+                    <span className="block text-xs text-slate-500">
+                      {a.class?.name ?? "Sem turma"} · {ROTULO_ETAPA[a.etapa]}
+                    </span>
                   </span>
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -231,10 +235,10 @@ function FichaAluno({ alunoId, ano, voltar }: { alunoId: string; ano: number; vo
           <div>
             <h2 className="text-lg font-semibold">{ficha.aluno.name}</h2>
             <p className="text-sm text-slate-500">
-              {ficha.aluno.turma ?? "Sem turma"} · Ano letivo {ficha.anoLetivo}
+              {ficha.aluno.turma ?? "Sem turma"} · Ano letivo {ficha.anoLetivo} · {ROTULO_ETAPA[ficha.etapa]}
             </p>
           </div>
-          <ChecklistDocumentos alunoId={alunoId} ano={ficha.anoLetivo} itens={ficha.documentos} />
+          <ChecklistDocumentos alunoId={alunoId} ano={ficha.anoLetivo} itens={ficha.documentos} temResponsavel={ficha.responsaveis.length > 0} />
           <Consentimentos alunoId={alunoId} ficha={ficha} recarregar={carregar} />
         </>
       )}
@@ -242,7 +246,17 @@ function FichaAluno({ alunoId, ano, voltar }: { alunoId: string; ano: number; vo
   );
 }
 
-function ChecklistDocumentos({ alunoId, ano, itens: iniciais }: { alunoId: string; ano: number; itens: ItemChecklist[] }) {
+function ChecklistDocumentos({
+  alunoId,
+  ano,
+  itens: iniciais,
+  temResponsavel,
+}: {
+  alunoId: string;
+  ano: number;
+  itens: ItemChecklist[];
+  temResponsavel: boolean;
+}) {
   const [itens, setItens] = useState(iniciais);
   const [salvando, setSalvando] = useState<TipoDocumento | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -341,7 +355,114 @@ function ChecklistDocumentos({ alunoId, ano, itens: iniciais }: { alunoId: strin
           );
         })}
       </ul>
+      {pendentes > 0 && (
+        // A chave muda quando a equipe marca um documento: a prévia fecha e é montada de novo.
+        <AvisoFamilia
+          key={itens.map((i) => `${i.tipo}:${i.recebido}`).join(",")}
+          alunoId={alunoId}
+          ano={ano}
+          temResponsavel={temResponsavel}
+        />
+      )}
     </section>
+  );
+}
+
+interface MensagemAviso {
+  titulo: string;
+  texto: string;
+  whatsapp: string;
+}
+
+/** Aviso dos documentos que faltam: prévia, cópia para o WhatsApp e envio no app (sempre pela equipe). */
+function AvisoFamilia({ alunoId, ano, temResponsavel }: { alunoId: string; ano: number; temResponsavel: boolean }) {
+  const [mensagem, setMensagem] = useState<MensagemAviso | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  async function chamar(enviar: boolean) {
+    setOcupado(true);
+    setErro(null);
+    try {
+      const r = await apiJson<{ mensagem: MensagemAviso; responsaveis: number; responsaveisComApp?: number; enviados?: number }>(
+        `/api/fichas-matricula/${alunoId}/aviso`,
+        { method: "POST", body: JSON.stringify({ anoLetivo: ano, enviar }) },
+      );
+      setMensagem(r.mensagem);
+      if (enviar) {
+        // Conta o que o envio aceitou, não só quem tem aparelho cadastrado.
+        setStatus(
+          !r.responsaveisComApp
+            ? "Nenhum responsável tem notificação ativa no app. Copie a mensagem e envie pelo WhatsApp."
+            : !r.enviados
+              ? "A notificação não foi entregue a nenhum aparelho. Copie a mensagem e envie pelo WhatsApp."
+              : `Notificação entregue em ${r.enviados} aparelho(s) (${r.responsaveisComApp} de ${r.responsaveis} responsável(is) têm o app). Para quem não recebeu, copie a mensagem para o WhatsApp.`,
+        );
+      }
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível montar o aviso");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function copiar() {
+    if (!mensagem) return;
+    try {
+      await navigator.clipboard.writeText(mensagem.whatsapp);
+      setStatus("Mensagem copiada. Cole no WhatsApp da família.");
+    } catch {
+      setErro("Não foi possível copiar. Selecione o texto e copie manualmente.");
+    }
+  }
+
+  const botao =
+    "rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800";
+
+  return (
+    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+      <p className="font-medium">Avisar a família dos documentos que faltam</p>
+      <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+        Nada é enviado automaticamente. Veja a mensagem antes; ela lista só os documentos não marcados como entregues.
+      </p>
+      {erro && (
+        <p className="mt-2 text-red-600" role="alert">
+          {erro}
+        </p>
+      )}
+      {!mensagem ? (
+        <button type="button" onClick={() => chamar(false)} disabled={ocupado} className={`mt-2 ${botao}`}>
+          Ver mensagem
+        </button>
+      ) : (
+        <>
+          <pre className="mt-2 whitespace-pre-wrap rounded-md bg-white p-2 font-sans text-sm dark:bg-slate-900">{mensagem.whatsapp}</pre>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" onClick={copiar} className={botao}>
+              Copiar para o WhatsApp
+            </button>
+            {temResponsavel && (
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={() => {
+                  if (confirm("Enviar a notificação no app para os responsáveis deste aluno?")) chamar(true);
+                }}
+                className={botao}
+              >
+                Enviar notificação no app
+              </button>
+            )}
+          </div>
+        </>
+      )}
+      {status && (
+        <p className="mt-2 text-xs text-slate-700 dark:text-slate-300" aria-live="polite">
+          {status}
+        </p>
+      )}
+    </div>
   );
 }
 

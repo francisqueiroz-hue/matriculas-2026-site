@@ -3,6 +3,10 @@ import {
   anoLetivoPadrao,
   atualizarDocumentoSchema,
   dadosDaAtualizacao,
+  DOCUMENTOS_EXIGIDOS,
+  documentosFaltantes,
+  etapaDaFicha,
+  mensagemDocumentosFaltantes,
   montarChecklist,
   registrarConsentimentoSchema,
   resumoDocumentos,
@@ -20,27 +24,53 @@ describe("ficha da matrícula — documentos", () => {
     const agora = new Date("2027-03-10T12:00:00Z");
     const itens = montarChecklist(
       [
-        { id: "d1", tipo: "CPF", recebido: true, recebidoEm: new Date("2027-02-01T12:00:00Z"), prazo: null, observacao: "cópia" },
+        { id: "d1", tipo: "CERTIDAO_NASCIMENTO", recebido: true, recebidoEm: new Date("2027-02-01T12:00:00Z"), prazo: null, observacao: "cópia" },
         { id: "d2", tipo: "VACINACAO", recebido: false, recebidoEm: null, prazo: new Date("2027-03-01T12:00:00Z"), observacao: null },
         { id: "d3", tipo: "LAUDO", recebido: false, recebidoEm: null, prazo: new Date("2027-03-01T12:00:00Z"), observacao: null },
       ],
       "ADMIN",
+      "EI",
       agora,
     );
-    expect(itens).toHaveLength(6);
-    expect(itens.find((i) => i.tipo === "CPF")).toMatchObject({ recebido: true, observacao: "cópia", atrasado: false });
+    expect(itens).toHaveLength(6); // 5 exigidos da educação infantil + laudo
+    expect(itens.find((i) => i.tipo === "CERTIDAO_NASCIMENTO")).toMatchObject({ recebido: true, observacao: "cópia", atrasado: false });
     expect(itens.find((i) => i.tipo === "VACINACAO")?.atrasado).toBe(true);
     // Laudo é voluntário: nunca "atrasado".
     expect(itens.find((i) => i.tipo === "LAUDO")).toMatchObject({ voluntario: true, atrasado: false });
-    expect(itens.find((i) => i.tipo === "CERTIDAO_NASCIMENTO")).toMatchObject({ recebido: false, prazo: null });
+    expect(itens.find((i) => i.tipo === "ATESTADO_MEDICO")).toMatchObject({ recebido: false, prazo: null });
   });
 
-  it("resumo conta 5 documentos exigidos — o laudo não entra", () => {
-    expect(resumoDocumentos([{ tipo: "CPF", recebido: true }, { tipo: "LAUDO", recebido: true }, { tipo: "VACINACAO", recebido: false }])).toEqual({
-      entregues: 1,
-      exigidos: 5,
-      pendentes: 4,
-    });
+  it("resumo: 5 exigidos na educação infantil, 6 no fundamental — laudo e CPF antigo não entram", () => {
+    const registros = [
+      { tipo: "CPF" as const, recebido: true },
+      { tipo: "LAUDO" as const, recebido: true },
+      { tipo: "VACINACAO" as const, recebido: true },
+    ];
+    expect(resumoDocumentos(registros, "EI")).toEqual({ entregues: 1, exigidos: 5, pendentes: 4 });
+    expect(resumoDocumentos(registros, "EF1")).toEqual({ entregues: 1, exigidos: 6, pendentes: 5 });
+  });
+
+  it("lista configurada: fundamental = infantil + histórico escolar da escola anterior", () => {
+    expect(DOCUMENTOS_EXIGIDOS.EI).toEqual(["CERTIDAO_NASCIMENTO", "VACINACAO", "COMPROVANTE_RESIDENCIA", "IDENTIDADE_RESPONSAVEL", "ATESTADO_MEDICO"]);
+    expect(DOCUMENTOS_EXIGIDOS.EF1).toEqual([...DOCUMENTOS_EXIGIDOS.EI, "HISTORICO_ESCOLAR"]);
+  });
+
+  it("etapa: contrato do ano, senão nome da turma", () => {
+    expect(etapaDaFicha("Maternal II", undefined)).toBe("EI");
+    expect(etapaDaFicha("3º Ano A", undefined)).toBe("EF1");
+    expect(etapaDaFicha("Pré II", "EF1")).toBe("EF1");
+    expect(etapaDaFicha("2º Ano", "EI")).toBe("EI");
+    expect(etapaDaFicha(null, "lixo")).toBe("EI");
+  });
+
+  it("aviso lista só os faltantes", () => {
+    const faltam = documentosFaltantes([{ tipo: "VACINACAO", recebido: true }, { tipo: "CERTIDAO_NASCIMENTO", recebido: false }], "EF1");
+    expect(faltam).toEqual(["CERTIDAO_NASCIMENTO", "COMPROVANTE_RESIDENCIA", "IDENTIDADE_RESPONSAVEL", "ATESTADO_MEDICO", "HISTORICO_ESCOLAR"]);
+    const m = mensagemDocumentosFaltantes("Ravi Silva", 2027, faltam);
+    expect(m.titulo).toBe("Documentos pendentes de Ravi");
+    expect(m.whatsapp).toContain("*Ravi Silva*");
+    expect(m.whatsapp).toContain("• Histórico escolar da escola anterior");
+    expect(m.texto).not.toContain("Caderneta");
   });
 
   it("recebidoEm acompanha a marcação e não muda ao salvar de novo", () => {

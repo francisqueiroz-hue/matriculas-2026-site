@@ -31,7 +31,11 @@ describe("rematriculaJaAtendida", () => {
     expect(rematriculaJaAtendida(sol({ responsavelId: "resp-gabrielly", alunoNome: "Lisie Souza" }), contratos)).toBe(false);
   });
 
-  it("pré-matrícula nunca é afetada", () => {
+  it("responsável logado sem contrato: aluno homônimo de outra família não conta", () => {
+    expect(rematriculaJaAtendida(sol({ responsavelId: "resp-outra", alunoNome: "Eduardo Moratório" }), contratos)).toBe(false);
+  });
+
+    it("pré-matrícula nunca é afetada", () => {
     expect(rematriculaJaAtendida(sol({ tipo: "PRE_MATRICULA" }), contratos)).toBe(false);
   });
 });
