@@ -8,6 +8,7 @@ import { notifyUsers } from "@/lib/push";
 import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "@/lib/whatsapp";
 import { ehPedidoDeAcesso } from "@/lib/acesso";
 import { mensagemIgnoravel } from "@/lib/whatsapp-ignorar";
+import { devolverEnvioFalho } from "@/lib/lembretes-server";
 import { responderNumeroNaoCadastrado, responderPedidoDeAcesso } from "@/lib/pedido-acesso";
 import { corpoDaMidia, guardarMidiaRecebida, midiaDaMensagem } from "@/lib/whatsapp-midia";
 
@@ -114,6 +115,8 @@ export async function POST(request: NextRequest) {
         `WhatsApp: entrega falhou para ${falha.recipient_id ?? "?"} (mensagem ${falha.id}): ` +
           `${erro?.code ?? "?"} ${erro?.title ?? ""} ${erro?.error_data?.details ?? ""}`.trim(),
       );
+      // Se era um lembrete automático, a falha não pode contar como um dos envios da família.
+      await devolverEnvioFalho(falha.id).catch((err) => console.error("lembretes: falha ao devolver envio", err));
     }
 
     for (const msg of mensagens) {
