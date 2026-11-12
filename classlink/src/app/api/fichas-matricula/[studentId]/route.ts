@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
-import { alunoDaEscola, exigirEquipe } from "@/lib/ficha-matricula-acesso";
-import { anoLetivoPadrao, anoLetivoSchema, montarChecklist, tiposVisiveis } from "@/lib/ficha-matricula";
+import { alunoDaEscola, etapasDoContrato, exigirEquipe } from "@/lib/ficha-matricula-acesso";
+import { anoLetivoPadrao, anoLetivoSchema, etapaDaFicha, montarChecklist, tiposVisiveis } from "@/lib/ficha-matricula";
 
 /** Ficha de um aluno: checklist de documentos do ano letivo e histórico de consentimentos. */
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/fichas-matricula/[studentId]">) {
@@ -15,10 +15,12 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/fichas-m
     const anoParam = request.nextUrl.searchParams.get("ano");
     const anoLetivo = anoParam ? anoLetivoSchema.parse(anoParam) : anoLetivoPadrao(aluno.class?.year);
 
+    const etapa = etapaDaFicha(aluno.class?.name, (await etapasDoContrato(session.schoolId, anoLetivo, [studentId])).get(studentId));
+
     const [registros, consentimentos] = await Promise.all([
       prisma.matriculaDocumento.findMany({
         // O laudo nem sai do banco para quem não é da direção.
-        where: { studentId, anoLetivo, tipo: { in: tiposVisiveis(session.papel) } },
+        where: { studentId, anoLetivo, tipo: { in: tiposVisiveis(session.papel, etapa) } },
         select: { id: true, tipo: true, recebido: true, recebidoEm: true, prazo: true, observacao: true },
       }),
       prisma.consentimentoLgpd.findMany({
@@ -40,8 +42,9 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/fichas-m
       aluno: { id: aluno.id, name: aluno.name, turma: aluno.class?.name ?? null },
       responsaveis: aluno.guardians.map((g) => ({ id: g.guardian.id, name: g.guardian.name, relation: g.relation })),
       anoLetivo,
+      etapa,
       papel: session.papel,
-      documentos: montarChecklist(registros, session.papel),
+      documentos: montarChecklist(registros, session.papel, etapa),
       consentimentos,
     });
   } catch (error) {

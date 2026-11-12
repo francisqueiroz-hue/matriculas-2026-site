@@ -7,7 +7,11 @@ const prismaMock = vi.hoisted(() => ({
   student: { findFirst: vi.fn(), findMany: vi.fn() },
   matriculaDocumento: { findMany: vi.fn(), findUnique: vi.fn(), upsert: vi.fn() },
   consentimentoLgpd: { findMany: vi.fn(), updateMany: vi.fn() },
+  contrato: { findMany: vi.fn() },
+  pushToken: { findMany: vi.fn() },
 }));
+const pushMock = vi.hoisted(() => ({ notifyUsers: vi.fn() }));
+vi.mock("@/lib/push", () => pushMock);
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 const sessaoMock = vi.hoisted(() => ({ atual: { sub: "u1", role: "ADMIN", schoolId: "s1" } as { sub: string; role: string; schoolId: string } }));
 vi.mock("@/lib/session", () => ({
@@ -32,6 +36,7 @@ import { GET as lista } from "@/app/api/fichas-matricula/route";
 import { GET as ficha } from "@/app/api/fichas-matricula/[studentId]/route";
 import { PUT as salvarDocumento } from "@/app/api/fichas-matricula/[studentId]/documentos/route";
 import { POST as registrar } from "@/app/api/fichas-matricula/[studentId]/consentimentos/route";
+import { POST as aviso } from "@/app/api/fichas-matricula/[studentId]/aviso/route";
 import { DELETE as revogar } from "@/app/api/fichas-matricula/[studentId]/consentimentos/[consentimentoId]/route";
 
 const ctx = { params: Promise.resolve({ studentId: "a1", consentimentoId: "c1" }) } as never;
@@ -51,6 +56,9 @@ beforeEach(() => {
   prismaMock.student.findFirst.mockResolvedValue(aluno);
   prismaMock.matriculaDocumento.findMany.mockResolvedValue([]);
   prismaMock.consentimentoLgpd.findMany.mockResolvedValue([]);
+  prismaMock.contrato.findMany.mockResolvedValue([]);
+  prismaMock.pushToken.findMany.mockResolvedValue([]);
+  pushMock.notifyUsers.mockResolvedValue({ aparelhos: 0, enviados: 0, erros: [] });
   prismaMock.$transaction.mockImplementation(async (fn: (t: typeof tx) => unknown) => fn(tx));
 });
 
@@ -96,12 +104,35 @@ describe("documentos", () => {
   it("marca como entregue gravando recebidoEm, na escola da sessão", async () => {
     prismaMock.matriculaDocumento.findUnique.mockResolvedValue(null);
     prismaMock.matriculaDocumento.upsert.mockImplementation(async (a: { create: Record<string, unknown> }) => ({ id: "d1", prazo: null, observacao: null, ...a.create }));
-    const res = await salvarDocumento(req("/api/fichas-matricula/a1/documentos", "PUT", { anoLetivo: 2027, tipo: "CPF", recebido: true }), ctx);
+    const res = await salvarDocumento(req("/api/fichas-matricula/a1/documentos", "PUT", { anoLetivo: 2027, tipo: "VACINACAO", recebido: true }), ctx);
     expect(res.status).toBe(200);
     const args = prismaMock.matriculaDocumento.upsert.mock.calls[0][0];
-    expect(args.where).toEqual({ studentId_anoLetivo_tipo: { studentId: "a1", anoLetivo: 2027, tipo: "CPF" } });
+    expect(args.where).toEqual({ studentId_anoLetivo_tipo: { studentId: "a1", anoLetivo: 2027, tipo: "VACINACAO" } });
     expect(args.create).toMatchObject({ schoolId: "s1", studentId: "a1", recebido: true });
     expect(args.create.recebidoEm).toBeInstanceOf(Date);
+  });
+
+  it("lista da educação infantil (Maternal): sem histórico escolar; documento fora da lista: 400", async () => {
+    const dados = await (await ficha(req("/api/fichas-matricula/a1"), ctx)).json();
+    expect(dados.etapa).toBe("EI");
+    expect(dados.documentos.map((d: { tipo: string }) => d.tipo)).toEqual([
+      "CERTIDAO_NASCIMENTO",
+      "VACINACAO",
+      "COMPROVANTE_RESIDENCIA",
+      "IDENTIDADE_RESPONSAVEL",
+      "ATESTADO_MEDICO",
+      "LAUDO",
+    ]);
+    const res = await salvarDocumento(req("/api/fichas-matricula/a1/documentos", "PUT", { anoLetivo: 2027, tipo: "HISTORICO_ESCOLAR", recebido: true }), ctx);
+    expect(res.status).toBe(400);
+    expect(prismaMock.matriculaDocumento.upsert).not.toHaveBeenCalled();
+  });
+
+  it("etapa do contrato do ano prevalece sobre a turma (Pré → 1º ano: pede histórico)", async () => {
+    prismaMock.contrato.findMany.mockResolvedValue([{ studentId: "a1", condicoes: { etapa: "EF1" } }]);
+    const dados = await (await ficha(req("/api/fichas-matricula/a1"), ctx)).json();
+    expect(dados.etapa).toBe("EF1");
+    expect(dados.documentos.map((d: { tipo: string }) => d.tipo)).toContain("HISTORICO_ESCOLAR");
   });
 
   it("entrada inválida: 400", async () => {
@@ -147,5 +178,40 @@ describe("consentimentos", () => {
     expect(args.where).toMatchObject({ id: "c1", studentId: "a1", schoolId: "s1", revogadoEm: null });
     expect(args.data.revogadoEm).toBeInstanceOf(Date);
     expect((await revogar(req("/x", "DELETE"), ctx)).status).toBe(404);
+  });
+});
+
+describe("aviso à família", () => {
+  it("prévia lista só o que falta e não envia nada", async () => {
+    prismaMock.matriculaDocumento.findMany.mockResolvedValue([{ tipo: "VACINACAO", recebido: true }]);
+    const res = await aviso(req("/api/fichas-matricula/a1/aviso", "POST", { anoLetivo: 2027 }), ctx);
+    expect(res.status).toBe(200);
+    const { mensagem } = await res.json();
+    expect(mensagem.whatsapp).toContain("Certidão de nascimento");
+    expect(mensagem.whatsapp).toContain("Atestado médico");
+    expect(mensagem.whatsapp).not.toContain("Caderneta de vacinação");
+    expect(pushMock.notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("envio: notifica os responsáveis do aluno", async () => {
+    prismaMock.pushToken.findMany.mockResolvedValue([{ userId: "g1" }]);
+    const res = await aviso(req("/api/fichas-matricula/a1/aviso", "POST", { anoLetivo: 2027, enviar: true }), ctx);
+    expect(res.status).toBe(200);
+    expect(pushMock.notifyUsers).toHaveBeenCalledWith(["g1"], expect.objectContaining({ title: "Documentos pendentes de Lia" }));
+    expect((await res.json()).responsaveisComApp).toBe(1);
+  });
+
+  it("tudo entregue: 400, sem envio", async () => {
+    prismaMock.matriculaDocumento.findMany.mockResolvedValue(
+      ["CERTIDAO_NASCIMENTO", "VACINACAO", "COMPROVANTE_RESIDENCIA", "IDENTIDADE_RESPONSAVEL", "ATESTADO_MEDICO"].map((tipo) => ({ tipo, recebido: true })),
+    );
+    const res = await aviso(req("/api/fichas-matricula/a1/aviso", "POST", { anoLetivo: 2027, enviar: true }), ctx);
+    expect(res.status).toBe(400);
+    expect(pushMock.notifyUsers).not.toHaveBeenCalled();
+  });
+
+  it("família não dispara aviso", async () => {
+    sessaoMock.atual = { sub: "g1", role: "GUARDIAN", schoolId: "s1" };
+    expect((await aviso(req("/api/fichas-matricula/a1/aviso", "POST", { anoLetivo: 2027, enviar: true }), ctx)).status).toBe(403);
   });
 });

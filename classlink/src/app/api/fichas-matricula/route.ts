@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
-import { exigirEquipe } from "@/lib/ficha-matricula-acesso";
-import { anoLetivoPadrao, anoLetivoSchema, resumoDocumentos, type TipoDocumento } from "@/lib/ficha-matricula";
+import { etapasDoContrato, exigirEquipe } from "@/lib/ficha-matricula-acesso";
+import { anoLetivoPadrao, anoLetivoSchema, etapaDaFicha, resumoDocumentos, type TipoDocumento } from "@/lib/ficha-matricula";
 
 /** Lista de alunos com o resumo de documentos entregues no ano letivo (padrão: ano corrente). */
 export async function GET(request: NextRequest) {
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const anoParam = request.nextUrl.searchParams.get("ano");
     const anoLetivo = anoParam ? anoLetivoSchema.parse(anoParam) : anoLetivoPadrao(null);
 
-    const [alunos, documentos] = await Promise.all([
+    const [alunos, documentos, etapas] = await Promise.all([
       prisma.student.findMany({
         where: { schoolId: session.schoolId, deletedAt: null },
         select: { id: true, name: true, class: { select: { id: true, name: true } } },
@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
         where: { schoolId: session.schoolId, anoLetivo },
         select: { studentId: true, tipo: true, recebido: true },
       }),
+      etapasDoContrato(session.schoolId, anoLetivo),
     ]);
 
     const porAluno = new Map<string, { tipo: TipoDocumento; recebido: boolean }[]>();
@@ -28,7 +29,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       anoLetivo,
-      alunos: alunos.map((a) => ({ ...a, documentos: resumoDocumentos(porAluno.get(a.id) ?? []) })),
+      alunos: alunos.map((a) => {
+        const etapa = etapaDaFicha(a.class?.name, etapas.get(a.id));
+        return { ...a, etapa, documentos: resumoDocumentos(porAluno.get(a.id) ?? [], etapa) };
+      }),
     });
   } catch (error) {
     return handleApiError(error);
