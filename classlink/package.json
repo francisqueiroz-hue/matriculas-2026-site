@@ -49,5 +49,8 @@
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.7"
   }
 }
