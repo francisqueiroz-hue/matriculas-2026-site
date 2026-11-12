@@ -31,7 +31,7 @@ vi.mock("@/lib/avisos-equipe", () => ({
   parametrosModeloAviso: (r: string, t: string, l: string) => [r, t, l],
 }));
 
-import { executarLembretesDaEscola } from "@/lib/lembretes-server";
+import { devolverEnvioFalho, executarLembretesDaEscola } from "@/lib/lembretes-server";
 
 const QUARTA = new Date("2026-11-04T13:00:00Z");
 const DOMINGO = new Date("2026-11-08T13:00:00Z");
@@ -71,6 +71,8 @@ beforeEach(() => {
   prismaMock.lembretePendencia.updateMany.mockResolvedValue({ count: 1 });
   prismaMock.user.findUnique.mockResolvedValue({ phone: "5521999990000", avisosWhatsApp: false, whatsappUltimaMensagemEm: null, _count: { pushTokens: 0 } });
   notifyUsers.mockResolvedValue({ aparelhos: 1, enviados: 1, erros: [] });
+  sendTemplate.mockResolvedValue({ externalId: "wamid.modelo" });
+  sendText.mockResolvedValue({ externalId: "wamid.texto" });
 });
 
 describe("executarLembretesDaEscola", () => {
@@ -95,7 +97,7 @@ describe("executarLembretesDaEscola", () => {
     expect(notifyUsers).toHaveBeenCalledTimes(2);
     expect(notifyUsers.mock.calls[0][1]).toMatchObject({ url: "/dashboard/contratos" });
     const registro = prismaMock.lembretePendencia.updateMany.mock.calls.find((c) => c[0].data.envios);
-    expect(registro?.[0].data).toEqual({ envios: { increment: 1 }, ultimoEnvioEm: QUARTA });
+    expect(registro?.[0].data).toEqual({ envios: { increment: 1 }, ultimoEnvioEm: QUARTA, ultimoEnvioMensagemId: null });
   });
 
   it("sem notificação no celular: vai pelo modelo aprovado do WhatsApp", async () => {
@@ -144,5 +146,34 @@ describe("executarLembretesDaEscola", () => {
     const aviso = notifyUsers.mock.calls[0][1] as { body: string };
     expect(aviso.body).toContain("pagar a mensalidade de Ana, que vence amanhã (05/11/2026)");
     expect(aviso.body).not.toMatch(/R\$/);
+  });
+
+  it("WhatsApp: guarda o id da mensagem no envio, para a falha de entrega poder devolvê-lo", async () => {
+    notifyUsers.mockResolvedValue({ aparelhos: 0, enviados: 0, erros: [] });
+    await executarLembretesDaEscola("s1", QUARTA);
+    const registro = prismaMock.lembretePendencia.updateMany.mock.calls.find((c) => c[0].data.envios);
+    expect(registro?.[0].data).toMatchObject({ envios: { increment: 1 }, ultimoEnvioMensagemId: "wamid.modelo" });
+  });
+
+  it("push: não guarda id de mensagem", async () => {
+    await executarLembretesDaEscola("s1", QUARTA);
+    const registro = prismaMock.lembretePendencia.updateMany.mock.calls.find((c) => c[0].data.envios);
+    expect(registro?.[0].data.ultimoEnvioMensagemId).toBeNull();
+  });
+});
+
+describe("devolverEnvioFalho (entrega recusada pela Meta, ex.: 131042)", () => {
+  it("devolve o envio gasto e libera nova tentativa", async () => {
+    prismaMock.lembretePendencia.updateMany.mockResolvedValue({ count: 2 });
+    await expect(devolverEnvioFalho("wamid.modelo")).resolves.toBe(2);
+    expect(prismaMock.lembretePendencia.updateMany).toHaveBeenCalledWith({
+      where: { ultimoEnvioMensagemId: "wamid.modelo", envios: { gt: 0 } },
+      data: { envios: { decrement: 1 }, ultimoEnvioEm: null, ultimoEnvioMensagemId: null },
+    });
+  });
+
+  it("mensagem que não era lembrete: não muda nada", async () => {
+    prismaMock.lembretePendencia.updateMany.mockResolvedValue({ count: 0 });
+    await expect(devolverEnvioFalho("wamid.outra")).resolves.toBe(0);
   });
 });

@@ -249,11 +249,17 @@ export async function planejarDaEscola(schoolId: string, agora = new Date()) {
 
 export type CanalLembrete = "push" | "whatsapp" | "nenhum";
 
+export interface ResultadoEnvioLembrete {
+  canal: CanalLembrete;
+  /** Id da mensagem no WhatsApp (só no canal "whatsapp"), para desfazer a contagem se a entrega falhar. */
+  mensagemId?: string;
+}
+
 /** Envia a mensagem única da família. Nunca lança: falha vira "nenhum" e tenta de novo amanhã. */
 export async function enviarLembreteFamilia(
   responsavelId: string,
   pendencias: Pendencia[],
-): Promise<CanalLembrete> {
+): Promise<ResultadoEnvioLembrete> {
   const { titulo, texto, url } = mensagemLembrete(pendencias);
   let push = 0;
   try {
@@ -261,32 +267,32 @@ export async function enviarLembreteFamilia(
   } catch (err) {
     console.error("lembretes: falha no push", err);
   }
-  if (push > 0) return "push";
+  if (push > 0) return { canal: "push" };
 
   // Sem notificação no celular: WhatsApp da escola, como já é feito com as mensagens.
   try {
-    if (!isWhatsAppConfigured()) return "nenhum";
+    if (!isWhatsAppConfigured()) return { canal: "nenhum" };
     const pessoa = await prisma.user.findUnique({
       where: { id: responsavelId },
       select: { phone: true, avisosWhatsApp: true, whatsappUltimaMensagemEm: true, _count: { select: { pushTokens: true } } },
     });
-    if (!pessoa) return "nenhum";
+    if (!pessoa) return { canal: "nenhum" };
     // Quem tem aparelho com push ativo e o envio falhou agora não recebe WhatsApp: tenta amanhã.
-    if (!deveAvisarPorWhatsApp({ avisosWhatsApp: pessoa.avisosWhatsApp, aparelhosComPush: pessoa._count.pushTokens })) return "nenhum";
+    if (!deveAvisarPorWhatsApp({ avisosWhatsApp: pessoa.avisosWhatsApp, aparelhosComPush: pessoa._count.pushTokens })) return { canal: "nenhum" };
     const telefone = pessoa.phone ? normalizePhoneBR(pessoa.phone) : null;
-    if (!telefone) return "nenhum";
+    if (!telefone) return { canal: "nenhum" };
     const link = `${origemPublica() ?? ""}${url}`;
     if (janelaWhatsApp(pessoa.whatsappUltimaMensagemEm).aberta) {
-      await sendWhatsAppTextMessage(telefone, `${titulo}\n\n${texto}\n${link}`);
-      return "whatsapp";
+      const { externalId } = await sendWhatsAppTextMessage(telefone, `${titulo}\n\n${texto}\n${link}`);
+      return { canal: "whatsapp", mensagemId: externalId };
     }
     const modelo = await modeloDisponivel("aviso");
-    if (!modelo) return "nenhum";
-    await sendWhatsAppTemplateMessage(telefone, modelo, parametrosModeloAviso("Secretaria", texto, link));
-    return "whatsapp";
+    if (!modelo) return { canal: "nenhum" };
+    const { externalId } = await sendWhatsAppTemplateMessage(telefone, modelo, parametrosModeloAviso("Secretaria", texto, link));
+    return { canal: "whatsapp", mensagemId: externalId };
   } catch (err) {
     console.error("lembretes: falha no WhatsApp", err);
-    return "nenhum";
+    return { canal: "nenhum" };
   }
 }
 
@@ -328,7 +334,7 @@ export async function executarLembretesDaEscola(schoolId: string, agora = new Da
   const lote = plano.envios.slice(0, MAX_FAMILIAS_POR_EXECUCAO);
   await executarComLimite(
     lote.map((envio) => async () => {
-      const canal = await enviarLembreteFamilia(envio.responsavelId, envio.pendencias);
+      const { canal, mensagemId } = await enviarLembreteFamilia(envio.responsavelId, envio.pendencias);
       if (canal === "nenhum") {
         resultado.semCanal++;
         return;
@@ -342,12 +348,25 @@ export async function executarLembretesDaEscola(schoolId: string, agora = new Da
           responsavelId: envio.responsavelId,
           OR: envio.pendencias.map((p) => ({ tipo: p.tipo, referenciaId: p.referenciaId })),
         },
-        data: { envios: { increment: 1 }, ultimoEnvioEm: agora },
+        data: { envios: { increment: 1 }, ultimoEnvioEm: agora, ultimoEnvioMensagemId: mensagemId ?? null },
       });
     }),
     4,
   );
   return resultado;
+}
+
+/**
+ * A Meta avisou, pelo webhook de status, que a entrega de um lembrete falhou (ex.: 131042, conta
+ * com cobrança em aberto): devolve o envio que ela gastou e libera nova tentativa no próximo cron.
+ * Devolve quantas pendências foram acertadas (0 se a mensagem não era um lembrete).
+ */
+export async function devolverEnvioFalho(mensagemId: string): Promise<number> {
+  const { count } = await prisma.lembretePendencia.updateMany({
+    where: { ultimoEnvioMensagemId: mensagemId, envios: { gt: 0 } },
+    data: { envios: { decrement: 1 }, ultimoEnvioEm: null, ultimoEnvioMensagemId: null },
+  });
+  return count;
 }
 
 /** Cria as linhas das pendências novas, reabre as que voltaram e fecha as resolvidas. */

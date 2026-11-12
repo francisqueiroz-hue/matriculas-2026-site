@@ -1162,12 +1162,16 @@ model LembretePendencia {
   pendenteDesde DateTime
   envios        Int       @default(0)
   ultimoEnvioEm DateTime?
+  // Id da mensagem do WhatsApp do último envio: a Meta aceita o envio e só depois avisa, pelo
+  // webhook de status, se a entrega falhou. Com o id, a falha devolve o lembrete que ela gastou.
+  ultimoEnvioMensagemId String?
   resolvidoEm   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([tipo, referenciaId, responsavelId])
+  @@index([ultimoEnvioMensagemId])
   @@index([schoolId, resolvidoEm])
   @@index([responsavelId])
 }
