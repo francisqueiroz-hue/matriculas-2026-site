@@ -6,6 +6,7 @@ import { configLembretesSchema } from "@/lib/validators";
 import { planejarDaEscola, pendenciasDaEscola } from "@/lib/lembretes-server";
 import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { ehDomingo } from "@/lib/lembretes";
+import { resumoFalhasRecentes } from "@/lib/whatsapp-falhas";
 
 /**
  * Resumo para a direção: configuração, pendências das famílias (com quantos lembretes já
@@ -47,7 +48,10 @@ export async function GET() {
       familias.set(a.responsavelId, familia);
     }
 
-    const escola = await pendenciasDaEscola(session.schoolId, config.diasInicio, agora);
+    const [escola, entregas] = await Promise.all([
+      pendenciasDaEscola(session.schoolId, config.diasInicio, agora),
+      resumoFalhasRecentes(session.schoolId, agora),
+    ]);
 
     return NextResponse.json({
       config,
@@ -56,6 +60,7 @@ export async function GET() {
       familiasNoProximoEnvio: plano.envios.length,
       familias: [...familias.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
       escola,
+      entregas,
     });
   } catch (error) {
     return handleApiError(error);

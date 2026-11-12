@@ -1175,3 +1175,20 @@ model LembretePendencia {
   @@index([schoolId, resolvidoEm])
   @@index([responsavelId])
 }
+
+// Entrega recusada pela Meta depois de aceitar o envio (webhook de status "failed"), ex.: 131042
+// (cobrança em aberto), 131047 (fora da janela de 24h), 131026 (número sem WhatsApp). Serve para a
+// direção ver que famílias não receberam e poder avisá-las por outro meio.
+model WhatsappFalha {
+  id         String   @id @default(cuid())
+  mensagemId String   @unique
+  schoolId   String?
+  userId     String?
+  telefone   String
+  codigo     Int?
+  titulo     String?
+  detalhe    String?
+  createdAt  DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+}

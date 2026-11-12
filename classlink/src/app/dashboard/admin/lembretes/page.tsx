@@ -23,6 +23,7 @@ interface Familia {
   pendencias: PendenciaFamilia[];
 }
 interface Dados {
+  entregas: { total: number; pessoas: number; motivo: string | null; cobrancaPendente: boolean; ultimas: { nome: string; codigo: number | null; em: string }[] };
   config: ConfigLembretes;
   domingo: boolean;
   totalPendencias: number;
@@ -123,6 +124,25 @@ function Conteudo() {
 
       {dados && config && (
         <>
+          {dados.entregas.total > 0 && (
+            <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+              <p className="font-semibold">
+                O WhatsApp não entregou {dados.entregas.total} {dados.entregas.total === 1 ? "mensagem" : "mensagens"} nas últimas 48 horas
+                {dados.entregas.pessoas > 0 && ` (${dados.entregas.pessoas} ${dados.entregas.pessoas === 1 ? "pessoa" : "pessoas"})`}.
+              </p>
+              {dados.entregas.motivo && <p className="mt-1">{dados.entregas.motivo}</p>}
+              <p className="mt-1">
+                Esses lembretes não foram gastos: o ClassLink tenta de novo no próximo envio. Enquanto isso, avise as famílias abaixo por telefone ou pelo app.
+              </p>
+              <ul className="mt-2 list-disc pl-5 text-xs">
+                {dados.entregas.ultimas.map((u, i) => (
+                  <li key={i}>
+                    {u.nome} — {formatarDataHora(new Date(u.em))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <div className={`rounded-xl border p-3 ${dados.config.ativos ? "border-emerald-300 bg-emerald-50" : "border-amber-300 bg-amber-50"}`}>
               <p className="text-lg font-bold">{dados.config.ativos ? "Ligado" : "Desligado"}</p>
