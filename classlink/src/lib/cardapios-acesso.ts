@@ -1,8 +1,9 @@
-import { prisma } from "@/lib/prisma";
 import { AuthError } from "@/lib/session";
 import { perfilDoUsuario } from "@/lib/permissoes-mensagens";
 import { getSignedMediaUrl } from "@/lib/firebase-storage";
 import { dateParaData, type ConteudoCardapio } from "@/lib/cardapios";
+import { turmasDaFamilia } from "@/lib/escopo-acesso";
+import { turmasQueLeciona } from "@/lib/turmas-acesso";
 
 /** Cardápios são cadastrados pela gestão (direção e coordenação). */
 export async function exigirGestaoCardapio(userId: string) {
@@ -13,17 +14,9 @@ export async function exigirGestaoCardapio(userId: string) {
 
 /** Turmas que o usuário acompanha (família: dos filhos; professor: em que dá aula). null = todas. */
 export async function turmasVisiveis(session: { sub: string; role: string }): Promise<string[] | null> {
-  if (session.role === "GUARDIAN") {
-    const links = await prisma.guardianStudent.findMany({
-      where: { guardianId: session.sub, student: { deletedAt: null } },
-      select: { student: { select: { classId: true } } },
-    });
-    return [...new Set(links.map((l) => l.student.classId))];
-  }
-  if (session.role === "STAFF" && (await perfilDoUsuario(session.sub)) !== "gestao") {
-    const aulas = await prisma.classTeacher.findMany({ where: { teacherId: session.sub }, select: { classId: true } });
-    return aulas.map((a) => a.classId);
-  }
+  if (session.role === "GUARDIAN") return turmasDaFamilia(session.sub);
+  // Coordenação (gestão) vê os cardápios de todas as turmas; professor só os das suas.
+  if (session.role === "STAFF" && (await perfilDoUsuario(session.sub)) !== "gestao") return turmasQueLeciona(session.sub);
   return null;
 }
 
