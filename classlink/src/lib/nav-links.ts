@@ -3,6 +3,7 @@ import { usePathname } from "next/navigation";
 import type { SessionUser } from "@/lib/types";
 import { apiJson } from "@/lib/api-client";
 import { situacaoDoComunicado } from "@/lib/comunicados-situacao";
+import { ehDirecao } from "@/lib/equipe";
 import { telaBloqueada } from "@/lib/visibilidade";
 
 export interface NavLink {
@@ -163,14 +164,29 @@ const guiaLink: NavLink = {
   icon: "M12 21a9 9 0 100-18 9 9 0 000 18z M9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4 M12 17h.01",
 };
 
-/** Notas fica visível só para direção (ADMIN) e coordenação (STAFF com isCoordenacao). */
-export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao" | "areasBloqueadas">): NavLink[] {
-  // Áreas desligadas pela direção (Configurações) somem do menu; o servidor também bloqueia.
+/** Abas da administração que só a direção vê: financeiro, contratos (com valores), lembretes de cobrança e Configurações (visibilidade). */
+export const ABAS_SO_DIRECAO = [
+  "/dashboard/admin/contratos",
+  "/dashboard/admin/financeiro",
+  "/dashboard/admin/lembretes",
+  "/dashboard/admin/configuracoes",
+];
+
+/**
+ * Notas fica visível só para direção/secretaria (ADMIN) e coordenação (STAFF com isCoordenacao).
+ * Financeiro, Contratos, Lembretes e Configurações só para a direção (o servidor também bloqueia).
+ * Áreas desligadas pela direção em Configurações somem do menu (o servidor também bloqueia).
+ */
+export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao" | "funcao" | "areasBloqueadas">): NavLink[] {
   return linksDoPerfil(user).filter((l) => !telaBloqueada(l.href, user.areasBloqueadas));
 }
 
-function linksDoPerfil(user: Pick<SessionUser, "role" | "isCoordenacao">): NavLink[] {
-  if (user.role === "ADMIN") return [...baseLinks, notasLink, ...adminLinks, fichasLink, guiaLink];
+function linksDoPerfil(user: Pick<SessionUser, "role" | "isCoordenacao" | "funcao">): NavLink[] {
+  if (user.role === "ADMIN") {
+    const direcao = ehDirecao({ role: user.role, funcao: user.funcao ?? null });
+    const admin = direcao ? adminLinks : adminLinks.filter((l) => !ABAS_SO_DIRECAO.includes(l.href));
+    return [...baseLinks, notasLink, ...admin, fichasLink, guiaLink];
+  }
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks, guiaLink];
   if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, guiaLink];
   if (user.role === "STAFF") return [...baseLinks, fichasLink, guiaLink];

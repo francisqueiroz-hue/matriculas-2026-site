@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { agoraNoFusoDaEscola, mesReferenciaAtual } from "@/lib/billing";
@@ -17,7 +17,7 @@ const MAX_LINHAS = 3000;
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const hoje = agoraNoFusoDaEscola();
     const params = request.nextUrl.searchParams;
     const ano = hoje.getFullYear();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AdminGuard } from "@/components/AdminGuard";
+import { DirecaoGuard } from "@/components/DirecaoGuard";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
 import {
@@ -246,8 +246,8 @@ function Conteudo() {
 
 export default function ConfiguracoesPage() {
   return (
-    <AdminGuard>
+    <DirecaoGuard>
       <Conteudo />
-    </AdminGuard>
+    </DirecaoGuard>
   );
 }

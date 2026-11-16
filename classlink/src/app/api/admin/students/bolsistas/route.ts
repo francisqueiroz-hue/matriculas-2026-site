@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { marcarBolsistasSchema } from "@/lib/validators";
 import { alteracoesFinanceiro } from "@/lib/historico-cadastro";
@@ -12,7 +12,7 @@ import { alteracoesFinanceiro } from "@/lib/historico-cadastro";
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const { studentIds } = marcarBolsistasSchema.parse(await request.json());
 
     const marcados = await prisma.$transaction(async (tx) => {

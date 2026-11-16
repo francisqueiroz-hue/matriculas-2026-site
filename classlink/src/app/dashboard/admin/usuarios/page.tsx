@@ -3,18 +3,25 @@
 import { useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiJson } from "@/lib/api-client";
+import { useCurrentUser } from "@/components/UserContext";
+import { ehDirecao } from "@/lib/equipe";
 
-type Funcao = "DIRECAO" | "COORDENACAO" | "PROFESSOR" | "AUXILIAR";
+type Funcao = "DIRECAO" | "SECRETARIA" | "COORDENACAO" | "PROFESSOR" | "AUXILIAR";
+
+/** Funções com perfil de administração (sem turmas vinculadas). */
+const SEM_TURMAS: Funcao[] = ["DIRECAO", "SECRETARIA"];
 
 const FUNCAO_LABEL: Record<Funcao, string> = {
   DIRECAO: "Direção",
+  SECRETARIA: "Secretaria",
   COORDENACAO: "Coordenação",
   PROFESSOR: "Professor(a)",
   AUXILIAR: "Auxiliar",
 };
 
 const FUNCAO_DICA: Record<Funcao, string> = {
-  DIRECAO: "Acesso total à administração da escola.",
+  DIRECAO: "Acesso total à administração da escola, inclusive financeiro, mensalidades e contratos.",
+  SECRETARIA: "Administra cadastros, turmas, acessos, matrículas e comunicados. Não vê financeiro, mensalidades nem contratos.",
   COORDENACAO: "Publica nas turmas, conversa com as famílias e lança notas.",
   PROFESSOR: "Publica e conversa com as famílias das turmas em que leciona.",
   AUXILIAR: "Mesmo acesso de professor(a), nas turmas em que atua.",
@@ -86,6 +93,10 @@ function SeletorTurmas({ classes, value, onChange }: { classes: ClassOption[]; v
 }
 
 function UsuariosContent() {
+  // Só a direção dá a função Direção (o servidor também confere).
+  const eu = useCurrentUser();
+  const souDirecao = ehDirecao({ role: eu.role, funcao: eu.funcao ?? null });
+  const funcoesPermitidas = (Object.keys(FUNCAO_LABEL) as Funcao[]).filter((f) => souDirecao || f !== "DIRECAO");
   const [users, setUsers] = useState<UserItem[] | null>(null);
   const [classes, setClasses] = useState<ClassOption[]>([]);
 
@@ -135,7 +146,7 @@ function UsuariosContent() {
           phone,
           email,
           funcao,
-          classIds: funcao === "DIRECAO" ? undefined : classIds,
+          classIds: SEM_TURMAS.includes(funcao) ? undefined : classIds,
         }),
       });
       setCriado({ texto: textoAcesso(`${data.user.name} cadastrado(a) como ${FUNCAO_LABEL[funcao]}.`, data) });
@@ -201,7 +212,7 @@ function UsuariosContent() {
           phone: editPhone,
           funcao: editFuncao,
           nomeParaFamilias: editNomeFamilias.trim() || null,
-          ...(editFuncao !== "DIRECAO" ? { classIds: editClassIds } : {}),
+          ...(!SEM_TURMAS.includes(editFuncao) ? { classIds: editClassIds } : {}),
         }),
       });
       setEditingId(null);
@@ -240,7 +251,7 @@ function UsuariosContent() {
             Função
           </label>
           <select id="funcao-nova" value={funcao} onChange={(e) => setFuncao(e.target.value as Funcao)} className={campo}>
-            {(Object.keys(FUNCAO_LABEL) as Funcao[]).map((f) => (
+            {funcoesPermitidas.map((f) => (
               <option key={f} value={f}>
                 {FUNCAO_LABEL[f]}
               </option>
@@ -251,7 +262,7 @@ function UsuariosContent() {
           {FUNCAO_DICA[funcao]} Informe o celular ou o e-mail (pelo menos um); sem e-mail, o login é feito pelo celular.
         </p>
 
-        {funcao !== "DIRECAO" && <SeletorTurmas classes={classes} value={classIds} onChange={setClassIds} />}
+        {!SEM_TURMAS.includes(funcao) && <SeletorTurmas classes={classes} value={classIds} onChange={setClassIds} />}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
@@ -292,7 +303,7 @@ function UsuariosContent() {
                   <label className="text-xs text-slate-500">
                     Função
                     <select value={editFuncao} onChange={(e) => setEditFuncao(e.target.value as Funcao)} className={`mt-1 block ${campo}`}>
-                      {(Object.keys(FUNCAO_LABEL) as Funcao[]).map((f) => (
+                      {funcoesPermitidas.map((f) => (
                         <option key={f} value={f}>
                           {FUNCAO_LABEL[f]}
                         </option>
@@ -310,7 +321,7 @@ function UsuariosContent() {
                     />
                   </label>
                 </div>
-                {editFuncao !== "DIRECAO" && <SeletorTurmas classes={classes} value={editClassIds} onChange={setEditClassIds} />}
+                {!SEM_TURMAS.includes(editFuncao) && <SeletorTurmas classes={classes} value={editClassIds} onChange={setEditClassIds} />}
                 <div className="flex items-center gap-3">
                   <button type="submit" className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">
                     Salvar

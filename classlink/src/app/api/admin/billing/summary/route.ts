@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { mesReferenciaAtual, agoraNoFusoDaEscola } from "@/lib/billing";
 import { statusEfetivo, type StatusBoleto } from "@/lib/baixa-boleto";
@@ -8,7 +8,7 @@ import { statusEfetivo, type StatusBoleto } from "@/lib/baixa-boleto";
 /** Painel simples: quantos boletos foram pagos vs. pendentes no mês corrente. */
 export async function GET() {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const hoje = agoraNoFusoDaEscola();
     const mesReferencia = mesReferenciaAtual(hoje);
 

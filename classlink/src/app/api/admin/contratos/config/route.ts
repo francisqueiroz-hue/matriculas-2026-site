@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
 import { carregarConfig } from "@/lib/contrato-modelo/servidor";
@@ -15,7 +15,7 @@ function anoDa(request: NextRequest) {
 /** Configuração do contrato do ano (valores, parcelas, hora excedente, dados da escola). */
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const anoLetivo = anoDa(request);
     const { config, salva, atualizadaEm } = await carregarConfig(session.schoolId, anoLetivo);
     return NextResponse.json({ anoLetivo, config, salva, atualizadaEm, pendencias: pendenciasConfig(config) });
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 /** Salva a configuração (pode ficar incompleta; o envio é que exige tudo preenchido). */
 export async function PUT(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const anoLetivo = anoDa(request);
     // O dia do vencimento não é escolhido no painel: é sempre 05.
     const config = comVencimentoFixo(configContratoSchema.parse(await request.json()));

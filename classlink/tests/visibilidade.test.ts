@@ -106,7 +106,7 @@ import { NextRequest } from "next/server";
 
 const perfil = (role: string, extra: Record<string, unknown> = {}) => {
   sessao.atual = { sub: "u1", role, schoolId: "s1", name: "Fulana" };
-  prismaMock.user.findUnique.mockResolvedValue({ active: true, deletedAt: null, isCoordenacao: false, funcao: role === "ADMIN" ? "DIRECAO" : null, name: "Fulana", ...extra });
+  prismaMock.user.findUnique.mockResolvedValue({ active: true, deletedAt: null, isCoordenacao: false, role, funcao: role === "ADMIN" ? "DIRECAO" : null, name: "Fulana", ...extra });
 };
 const put = (corpo: unknown) =>
   putConfig(new NextRequest("http://x/api/admin/visibilidade", { method: "PUT", body: JSON.stringify(corpo), headers: { "content-type": "application/json" } }));
@@ -217,5 +217,17 @@ describe("tela Configurações (API)", () => {
     await put({ area: "MURAL", papel: "FAMILIAS", liberado: true });
     expect(prismaMock.visibilidadeHistorico.create).not.toHaveBeenCalled();
     expect((await put({ area: "XYZ", papel: "FAMILIAS", liberado: true })).status).toBe(400);
+  });
+});
+
+describe("secretaria (administração sem ser direção)", () => {
+  it("não lê nem muda as Configurações", async () => {
+    vi.clearAllMocks();
+    perfil("ADMIN", { funcao: "SECRETARIA" });
+    expect((await getConfig()).status).toBe(403);
+    expect((await put({ area: "MURAL", papel: "FAMILIAS", liberado: false })).status).toBe(403);
+    expect(prismaMock.visibilidadeArea.upsert).not.toHaveBeenCalled();
+    const menu = getNavLinks({ role: "ADMIN", isCoordenacao: false, funcao: "SECRETARIA" }).map((l) => l.href);
+    expect(menu).not.toContain("/dashboard/admin/configuracoes");
   });
 });

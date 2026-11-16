@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { exigirDirecaoSeAdmin, requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import type { ContratoStatus } from "@/lib/contratos";
 import { MODELO_CONTRATO_2027, valoresDoContrato } from "@/lib/contrato-modelo/tipos";
@@ -54,6 +54,8 @@ export async function GET(request: NextRequest) {
   try {
     const session = await requireRole("GUARDIAN", "ADMIN");
     await exigirArea(session, "CONTRATOS");
+    // Da administração, só a direção vê contratos e boletos (valores).
+    await exigirDirecaoSeAdmin(session);
 
     if (session.role === "GUARDIAN") {
       const contratos = await prisma.contrato.findMany({

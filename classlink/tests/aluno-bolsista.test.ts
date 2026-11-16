@@ -10,6 +10,9 @@ const tx = vi.hoisted(() => ({
 const prismaMock = vi.hoisted(() => ({ $transaction: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/session", () => ({
+  // Rotas só da direção: aqui a sessão simulada já é da direção (ver tests/direcao-acesso.test.ts).
+  requireDirecao: async () => (await import("@/lib/session")).requireRole("ADMIN"),
+  exigirDirecaoSeAdmin: async () => undefined,
   requireRole: vi.fn(async () => ({ sub: "u1", role: "ADMIN", schoolId: "s1", name: "Direção" })),
   AuthError: class AuthError extends Error {},
 }));

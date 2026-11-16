@@ -25,7 +25,7 @@ vi.mock("@/lib/session", () => {
       super(m);
     }
   }
-  return { AuthError, requireRole: (...r: string[]) => requireRole(...r) };
+  return { AuthError, requireRole: (...r: string[]) => requireRole(...r), requireDirecao: () => requireRole("ADMIN") };
 });
 
 import { GET } from "@/app/api/admin/contratos/[id]/assinatura/route";

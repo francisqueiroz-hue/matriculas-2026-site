@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AdminGuard } from "@/components/AdminGuard";
+import { DirecaoGuard } from "@/components/DirecaoGuard";
 import { apiJson } from "@/lib/api-client";
 import { celulaCsv, diasDeAtraso, encargosPrevistos } from "@/lib/conferencia-baixas";
 
@@ -540,8 +540,8 @@ function ConferenciaContent() {
 
 export default function ConferenciaBaixasPage() {
   return (
-    <AdminGuard>
+    <DirecaoGuard>
       <ConferenciaContent />
-    </AdminGuard>
+    </DirecaoGuard>
   );
 }

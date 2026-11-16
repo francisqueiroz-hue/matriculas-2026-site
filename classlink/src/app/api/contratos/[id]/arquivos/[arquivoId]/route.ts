@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { AuthError, requireRole } from "@/lib/session";
+import { AuthError, exigirDirecaoSeAdmin, requireRole } from "@/lib/session";
 import { caminhoParaRenovar } from "@/lib/renovacao-sessao";
 import { handleApiError } from "@/lib/http";
 import { nomeArquivoPdfSeguro } from "@/lib/contratos";
@@ -18,6 +18,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/contrato
   try {
     const session = await requireRole("GUARDIAN", "ADMIN");
     await exigirArea(session, "CONTRATOS");
+    // Da administração, só a direção vê contratos e boletos (valores).
+    await exigirDirecaoSeAdmin(session);
     const { id, arquivoId } = await ctx.params;
 
     const contrato = await carregarContratoComAcesso(id, session);

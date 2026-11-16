@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
 import { carregarConfig } from "@/lib/contrato-modelo/servidor";
@@ -12,7 +12,7 @@ import { MODELO_CONTRATO_2027 } from "@/lib/contrato-modelo/tipos";
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const anoLetivo = Number(request.nextUrl.searchParams.get("ano")) || CAMPANHA_REMATRICULA.ano;
     const { config } = await carregarConfig(session.schoolId, anoLetivo);
     const pdf = await gerarContrato2027({

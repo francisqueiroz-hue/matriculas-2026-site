@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AdminGuard } from "@/components/AdminGuard";
+import { DirecaoGuard } from "@/components/DirecaoGuard";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
 import { LIMITES, ROTULO_TIPO_LEMBRETE, TIPOS_LEMBRETE, type ConfigLembretes, type LembreteTipo, type SituacaoPendencia } from "@/lib/lembretes";
@@ -260,8 +260,8 @@ function Conteudo() {
 
 export default function LembretesPage() {
   return (
-    <AdminGuard>
+    <DirecaoGuard>
       <Conteudo />
-    </AdminGuard>
+    </DirecaoGuard>
   );
 }

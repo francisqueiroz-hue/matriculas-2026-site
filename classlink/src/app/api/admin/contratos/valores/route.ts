@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
@@ -56,7 +56,7 @@ function conferir(c: Contrato) {
  */
 export async function GET() {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const contratos = await contratosDoAno(session.schoolId);
     const linhas = contratos.map((c) => {
       const { conf, assinado } = conferir(c);
@@ -87,7 +87,7 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     // Corpo opcional { ids }: atualiza só esses contratos (botão no cartão de cada aluno).
     const corpo = (await request.json().catch(() => null)) as { ids?: unknown } | null;
     const ids = Array.isArray(corpo?.ids) ? new Set(corpo.ids.filter((v): v is string => typeof v === "string")) : null;

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AdminGuard } from "@/components/AdminGuard";
+import { DirecaoGuard } from "@/components/DirecaoGuard";
 import { apiJson } from "@/lib/api-client";
 
 interface Summary {
@@ -364,8 +364,8 @@ function FinanceiroContent() {
 
 export default function FinanceiroAdminPage() {
   return (
-    <AdminGuard>
+    <DirecaoGuard>
       <FinanceiroContent />
-    </AdminGuard>
+    </DirecaoGuard>
   );
 }
