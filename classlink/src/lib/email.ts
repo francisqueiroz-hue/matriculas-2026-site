@@ -22,6 +22,30 @@ function apiBase() {
   return process.env.MAILGUN_REGION === "eu" ? "https://api.eu.mailgun.net" : "https://api.mailgun.net";
 }
 
+/** Espera máxima pela resposta do Mailgun: sem limite, uma lentidão dele prende a tela de quem envia. */
+export const TEMPO_LIMITE_EMAIL_MS = 15_000;
+
+/** POST ao Mailgun com tempo limite; demora ou queda de rede vira erro com mensagem clara. */
+async function postarNoMailgun(domain: string, apiKey: string, form: URLSearchParams): Promise<Response> {
+  try {
+    return await fetch(`${apiBase()}/v3/${domain}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + Buffer.from(`api:${apiKey}`).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: form.toString(),
+      signal: AbortSignal.timeout(TEMPO_LIMITE_EMAIL_MS),
+    });
+  } catch (err) {
+    const nome = err instanceof Error ? err.name : "";
+    if (nome === "TimeoutError" || nome === "AbortError") {
+      throw new Error("O serviço de e-mail não respondeu a tempo");
+    }
+    throw new Error("Não foi possível falar com o serviço de e-mail");
+  }
+}
+
 /** Endereço de resposta que codifica o id da conversa — usado para rotear a resposta do responsável de volta a ela. */
 export function replyToForConversation(conversationId: string) {
   const domain = env("MAILGUN_DOMAIN");
@@ -45,16 +69,9 @@ export async function sendEmailMessage(input: {
   form.set("text", input.text);
   form.set("h:Reply-To", replyToForConversation(input.conversationId));
 
-  const response = await fetch(`${apiBase()}/v3/${domain}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: "Basic " + Buffer.from(`api:${apiKey}`).toString("base64"),
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: form.toString(),
-  });
+  const response = await postarNoMailgun(domain, apiKey, form);
 
-  const data = await response.json();
+  const data = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(data?.message ?? "Falha ao enviar e-mail");
   }
@@ -76,14 +93,7 @@ export async function sendPlainEmail(input: { to: string; subject: string; text:
   form.set("subject", input.subject);
   form.set("text", input.text);
 
-  const response = await fetch(`${apiBase()}/v3/${domain}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: "Basic " + Buffer.from(`api:${apiKey}`).toString("base64"),
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: form.toString(),
-  });
+  const response = await postarNoMailgun(domain, apiKey, form);
 
   if (!response.ok) {
     const data = await response.json().catch(() => null);

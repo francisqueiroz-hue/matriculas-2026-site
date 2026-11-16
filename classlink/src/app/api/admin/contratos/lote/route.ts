@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
+import { executarComLimite } from "@/lib/concorrencia";
 import { responsaveisDoAluno, sha256Hex } from "@/lib/contratos-server";
 import { carregarConfig } from "@/lib/contrato-modelo/servidor";
 import { gerarContrato2027 } from "@/lib/contrato-modelo/gerar";
@@ -19,6 +20,8 @@ import {
 
 // Um PDF por aluno (~0,3 s cada): folga para a turma inteira de uma vez.
 export const maxDuration = 60;
+
+const AVISOS_SIMULTANEOS = 5;
 
 /**
  * Envia o contrato guardado no app para vários alunos de uma vez, já pronto para assinar.
@@ -54,6 +57,9 @@ export async function POST(request: NextRequest) {
     const ipOrigem = getClientIp(request);
 
     const criados: { id: string; studentId: string; nome: string }[] = [];
+    // Avisos às famílias saem depois da resposta: uma lentidão do serviço de notificação
+    // não pode segurar (nem derrubar no meio) o envio da turma inteira.
+    const avisos: Array<() => Promise<unknown>> = [];
     const ignorados: { studentId: string; nome: string; motivo: string }[] = [];
 
     for (const item of body.itens) {
@@ -152,12 +158,18 @@ export async function POST(request: NextRequest) {
       });
       jaTem.add(aluno.id);
       criados.push({ id: contrato.id, studentId: aluno.id, nome: aluno.name });
-      await notifyUsers(await responsaveisDoAluno(aluno.id), {
-        title: "Contrato de matrícula 2027",
-        body: `O contrato de ${aluno.name.split(" ")[0]} está no app para assinar — grátis pelo gov.br ou à mão.`,
-        url: "/dashboard/contratos",
-      }).catch((err) => console.error("push notify failed", err));
+      const alunoId = aluno.id;
+      const primeiroNome = aluno.name.split(" ")[0];
+      avisos.push(async () => {
+        await notifyUsers(await responsaveisDoAluno(alunoId), {
+          title: "Contrato de matrícula 2027",
+          body: `O contrato de ${primeiroNome} está no app para assinar — grátis pelo gov.br ou à mão.`,
+          url: "/dashboard/contratos",
+        }).catch((err) => console.error("push notify failed", err));
+      });
     }
+
+    if (avisos.length > 0) after(() => executarComLimite(avisos, AVISOS_SIMULTANEOS));
 
     return NextResponse.json({ criados, ignorados }, { status: criados.length > 0 ? 201 : 200 });
   } catch (error) {

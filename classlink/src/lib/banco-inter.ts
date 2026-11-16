@@ -110,6 +110,9 @@ function mtlsAgent(): https.Agent {
   return agentCache;
 }
 
+/** Espera máxima por uma resposta do Banco Inter (sem isso, uma lentidão do banco segura a emissão do mês inteiro). */
+export const TEMPO_LIMITE_INTER_MS = 20_000;
+
 function request<T>(options: {
   method: string;
   path: string;
@@ -139,6 +142,9 @@ function request<T>(options: {
         });
       },
     );
+    req.setTimeout(TEMPO_LIMITE_INTER_MS, () => {
+      req.destroy(new Error("O Banco Inter não respondeu a tempo"));
+    });
     req.on("error", reject);
     if (options.body) req.write(options.body);
     req.end();
