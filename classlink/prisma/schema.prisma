@@ -130,6 +130,8 @@ model School {
   matriculaDocumentos   MatriculaDocumento[]
   consentimentosLgpd    ConsentimentoLgpd[]
   lembretesPendencia    LembretePendencia[]
+  fichasSaude           FichaSaude[]
+  pessoasAutorizadas    PessoaAutorizada[]
 }
 
 model User {
@@ -327,6 +329,8 @@ model Student {
   contratos              Contrato[]
   documentosMatricula    MatriculaDocumento[]
   consentimentosLgpd     ConsentimentoLgpd[]
+  fichaSaude             FichaSaude?
+  pessoasAutorizadas     PessoaAutorizada[]
 
   @@index([schoolId])
   @@index([classId])
@@ -1104,6 +1108,59 @@ model ConsentimentoLgpd {
   consentidoPor User?   @relation(fields: [consentidoPorId], references: [id], onDelete: SetNull)
 
   @@index([studentId, finalidade])
+  @@index([schoolId])
+}
+
+// ─── Ficha de saúde e pessoas autorizadas a buscar a criança ─────────────────────
+
+// Dados de saúde do aluno (dado sensível, LGPD art. 11): só existem com consentimento ativo da
+// finalidade DADO_DE_SAUDE. Leem: direção, coordenação e a família do aluno. Editam: a escola
+// e a família. Alteração feita pela família marca a ficha para a escola conferir
+// (pendenteConferenciaDesde) e avisa direção e coordenação. Toda mudança vai para o histórico
+// (AlteracaoCadastro, entidade "ALUNO_SAUDE").
+model FichaSaude {
+  id                       String    @id @default(cuid())
+  schoolId                 String
+  studentId                String    @unique
+  alergias                 String?
+  medicamentos             String? // uso contínuo ou em caso de crise
+  condicoes                String? // doenças, condições e cuidados especiais
+  restricoesAlimentares    String?
+  orientacoesEmergencia    String? // o que fazer numa emergência (ex.: usar a bombinha)
+  atualizadoEm             DateTime  @updatedAt
+  atualizadoPorNome        String?
+  // Alteração feita pela família que a escola ainda não conferiu (null = nada pendente).
+  pendenteConferenciaDesde DateTime?
+  alteradoPelaFamiliaPor   String?
+  conferidoEm              DateTime?
+  conferidoPorNome         String?
+  createdAt                DateTime  @default(now())
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, pendenteConferenciaDesde])
+}
+
+// Pessoa autorizada a buscar a criança na saída. Remover preenche removidoEm (o registro
+// fica para o histórico de quem estava autorizado e quando deixou de estar).
+model PessoaAutorizada {
+  id            String    @id @default(cuid())
+  schoolId      String
+  studentId     String
+  nome          String
+  parentesco    String?
+  telefone      String?
+  documento     String? // RG ou CPF, para a escola conferir na saída
+  observacao    String?
+  criadoEm      DateTime  @default(now())
+  criadoPorNome String
+  removidoEm    DateTime?
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, removidoEm])
   @@index([schoolId])
 }
 

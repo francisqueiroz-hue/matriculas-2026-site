@@ -4,6 +4,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { apiJson } from "@/lib/api-client";
 import { filtrarAlunos, idadeEmAnos, linkLigar, linkWhatsApp, telefoneParaExibir } from "@/lib/busca-aluno";
+import { CAMPOS_SAUDE, ROTULO_CAMPO_SAUDE } from "@/lib/ficha-saude";
+import type { FichaSaudeResposta } from "@/components/FichaSaudeEditor";
 
 export interface AlunoConsulta {
   id: string;
@@ -82,6 +84,7 @@ export function BuscaAluno({
       aria-label="Buscar aluno"
       className="rounded-xl border border-indigo-200 bg-white p-3 shadow-sm dark:border-indigo-900 dark:bg-slate-900"
     >
+      <FichasAlteradasPelaFamilia />
       <label htmlFor={`${idLista}-campo`} className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
         Buscar aluno
       </label>
@@ -237,7 +240,12 @@ function CartaoAluno({ aluno, onVerCadastro }: { aluno: AlunoConsulta; onVerCada
         </ul>
       )}
 
+      <ResumoSaude key={aluno.id} alunoId={aluno.id} />
+
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <Link href={`/dashboard/saude?aluno=${aluno.id}`} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+          Saúde e autorizados
+        </Link>
         <Link href={`/dashboard/fichas?aluno=${aluno.id}`} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
           Ficha da matrícula
         </Link>
@@ -248,5 +256,111 @@ function CartaoAluno({ aluno, onVerCadastro }: { aluno: AlunoConsulta; onVerCada
         )}
       </div>
     </article>
+  );
+}
+
+/**
+ * Aviso no app para direção e coordenação: fichas de saúde que a família alterou e a escola ainda
+ * não conferiu. Fica até alguém tocar em "Conferi e atualizei os protocolos" na ficha.
+ */
+function FichasAlteradasPelaFamilia() {
+  const [pendentes, setPendentes] = useState<{ alunoId: string; aluno: string; turma: string | null; por: string | null }[]>([]);
+  useEffect(() => {
+    apiJson<{ pendentes?: { alunoId: string; aluno: string; turma: string | null; por: string | null }[] }>("/api/saude")
+      .then((d) => setPendentes(d.pendentes ?? []))
+      .catch(() => setPendentes([]));
+  }, []);
+  if (pendentes.length === 0) return null;
+  return (
+    <div role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+      <p className="font-semibold">
+        {pendentes.length === 1 ? "1 ficha de saúde alterada pela família" : `${pendentes.length} fichas de saúde alteradas pela família`}: confira e atualize os protocolos.
+      </p>
+      <ul className="mt-1 space-y-0.5">
+        {pendentes.map((p) => (
+          <li key={p.alunoId}>
+            <Link href={`/dashboard/saude?aluno=${p.alunoId}`} className="font-medium underline">
+              {p.aluno}
+            </Link>
+            {p.turma && <span> · {p.turma}</span>}
+            {p.por && <span className="text-amber-800 dark:text-amber-200"> · por {p.por}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Saúde e autorizados no cartão de emergência. Carregado só quando o cartão abre (o dado sensível
+ * não vem na lista da busca). Sem consentimento, os dados de saúde não aparecem.
+ */
+function ResumoSaude({ alunoId }: { alunoId: string }) {
+  const [dados, setDados] = useState<FichaSaudeResposta | null>(null);
+  const [erro, setErro] = useState(false);
+  useEffect(() => {
+    let ativo = true;
+    apiJson<FichaSaudeResposta>(`/api/alunos/${alunoId}/saude`)
+      .then((d) => ativo && setDados(d))
+      .catch(() => ativo && setErro(true));
+    return () => {
+      ativo = false;
+    };
+  }, [alunoId]);
+
+  if (erro) return <p className="mt-3 text-xs text-red-600">Não foi possível carregar a saúde e os autorizados.</p>;
+  if (!dados) return <p className="mt-3 text-xs text-slate-500">Carregando saúde e autorizados...</p>;
+
+  const preenchidos = dados.saude ? CAMPOS_SAUDE.filter((c) => dados.saude?.[c]) : [];
+  return (
+    <>
+      <h3 className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Saúde</h3>
+      {dados.conferencia?.pendenteDesde && (
+        <p className="mt-1 text-xs font-semibold text-amber-800 dark:text-amber-200">Alterada pela família, ainda não conferida pela escola.</p>
+      )}
+      {!dados.consentimento ? (
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Sem consentimento LGPD para dados de saúde. Pergunte à família.</p>
+      ) : preenchidos.length === 0 ? (
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Nenhuma informação de saúde registrada.</p>
+      ) : (
+        <dl className="mt-1 space-y-1.5">
+          {preenchidos.map((c) => (
+            <div
+              key={c}
+              className={`rounded-md p-2 text-sm ${c === "alergias" ? "border border-red-300 bg-red-50 text-red-950 dark:border-red-800 dark:bg-red-950 dark:text-red-100" : "bg-white dark:bg-slate-900"}`}
+            >
+              <dt className="text-xs font-semibold uppercase tracking-wide">{c === "alergias" ? "⚠ Alergias" : ROTULO_CAMPO_SAUDE[c]}</dt>
+              <dd className="whitespace-pre-line">{dados.saude?.[c]}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      <h3 className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Autorizados a buscar (além dos responsáveis)</h3>
+      {dados.autorizados.length === 0 ? (
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Ninguém além dos responsáveis.</p>
+      ) : (
+        <ul className="mt-1 space-y-1.5">
+          {dados.autorizados.map((a) => {
+            const ligar = linkLigar(a.telefone);
+            return (
+              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white p-2 text-sm dark:bg-slate-900">
+                <span>
+                  <span className="font-medium">{a.nome}</span>
+                  {a.parentesco && <span className="text-slate-500"> ({a.parentesco})</span>}
+                  {a.documento && <span className="block text-xs text-slate-500">Documento: {a.documento}</span>}
+                  {a.observacao && <span className="block text-xs text-slate-500">{a.observacao}</span>}
+                </span>
+                {ligar && a.telefone && (
+                  <a href={ligar} className="inline-flex min-h-9 items-center rounded-md border border-emerald-600 px-3 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    Ligar {telefoneParaExibir(a.telefone)}
+                  </a>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
   );
 }

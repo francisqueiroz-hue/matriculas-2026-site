@@ -51,6 +51,11 @@ const guardianLinks: NavLink[] = [
     icon: "M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z M3 10h18 M7 15h3",
   },
   { href: "/dashboard/contratos", label: "Contratos", icon: "M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z M14 3v5h5 M9 13h6 M9 17h4" },
+  {
+    href: "/dashboard/saude",
+    label: "Saúde e autorizados",
+    icon: "M12 21s-7-4.5-9.5-9A5.5 5.5 0 0112 6a5.5 5.5 0 019.5 6c-2.5 4.5-9.5 9-9.5 9z M12 10v5 M9.5 12.5h5",
+  },
 ];
 
 const adminLinks: NavLink[] = [
@@ -121,6 +126,7 @@ const GRUPO_POR_HREF: Record<string, string> = {
   "/dashboard/boletim": "Meu(s) filho(s)",
   "/dashboard/financeiro": "Meu(s) filho(s)",
   "/dashboard/contratos": "Meu(s) filho(s)",
+  "/dashboard/saude": "Meu(s) filho(s)",
   "/dashboard/notas": "Pedagógico",
   "/dashboard/fichas": "Secretaria",
   "/dashboard/alunos": "Secretaria",
