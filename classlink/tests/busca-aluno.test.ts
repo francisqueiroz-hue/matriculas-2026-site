@@ -84,7 +84,11 @@ describe("menu", () => {
 });
 
 // ─── Rota: quem pode consultar ────────────────────────────────────────────────
-const prismaMock = vi.hoisted(() => ({ student: { findMany: vi.fn() }, user: { findUnique: vi.fn() } }));
+const prismaMock = vi.hoisted(() => ({
+  student: { findMany: vi.fn() },
+  user: { findUnique: vi.fn() },
+  visibilidadeArea: { findUnique: vi.fn(async () => null) },
+}));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 const sessao = vi.hoisted(() => ({ atual: null as null | { sub: string; role: string; schoolId: string } }));
 vi.mock("@/lib/auth", () => ({ ACCESS_COOKIE: "c", verifyAccessToken: vi.fn(async () => sessao.atual) }));

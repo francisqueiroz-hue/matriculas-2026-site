@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { filtroDeVisibilidade, turmasVisiveisNoMural } from "@/lib/visibilidade-posts";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Lista de quem já visualizou o aviso ("visto por"), visível para staff/admin. */
 export async function GET(_request: Request, ctx: RouteContext<"/api/posts/[id]/reads">) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "MURAL");
     const { id: postId } = await ctx.params;
 
     // Professor só vê quem leu os avisos das suas turmas (e da escola toda).

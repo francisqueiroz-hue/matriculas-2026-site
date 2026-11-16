@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ONDE_GESTAO, cargoParaExibir, perfilDoUsuario } from "@/lib/permissoes-mensagens";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Colegas com quem o usuário pode iniciar uma conversa interna (regras em
@@ -12,6 +13,7 @@ import { ONDE_GESTAO, cargoParaExibir, perfilDoUsuario } from "@/lib/permissoes-
 export async function GET() {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "MENSAGENS");
     const perfil = await perfilDoUsuario(session.sub);
     const contatos = await prisma.user.findMany({
       where: {

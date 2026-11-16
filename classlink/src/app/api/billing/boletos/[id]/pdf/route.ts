@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { exigirDirecaoSeAdmin, requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { baixarPdfCobranca } from "@/lib/banco-inter";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Baixa o PDF do boleto sob demanda direto da API do Inter — não guardamos o PDF em repouso. */
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/billing/boletos/[id]/pdf">) {
   try {
     const session = await requireRole("GUARDIAN", "ADMIN");
+    await exigirArea(session, "FINANCEIRO");
     // Da administração, só a direção vê contratos e boletos (valores).
     await exigirDirecaoSeAdmin(session);
     const { id } = await ctx.params;

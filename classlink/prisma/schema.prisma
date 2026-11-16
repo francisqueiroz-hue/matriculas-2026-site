@@ -1194,3 +1194,33 @@ model WhatsappFalha {
 
   @@index([schoolId, createdAt])
 }
+
+// Visibilidade por perfil (tela Configurações, só a direção). Guarda apenas o que a direção mudou:
+// sem linha, vale o padrão definido no código (src/lib/visibilidade.ts). `area` e `papel` são
+// texto de propósito: novas áreas entram só no código. O servidor confere a cada pedido.
+model VisibilidadeArea {
+  id              String   @id @default(cuid())
+  schoolId        String
+  area            String
+  papel           String
+  liberado        Boolean
+  atualizadoPorId String?
+  updatedAt       DateTime @updatedAt
+
+  @@unique([schoolId, area, papel])
+}
+
+// Registro de cada mudança de visibilidade (quem, quando, o quê), para a direção conferir e para
+// prestar contas (LGPD, art. 37). Nunca é apagado pela tela. O nome é guardado como estava no dia.
+model VisibilidadeHistorico {
+  id        String   @id @default(cuid())
+  schoolId  String
+  area      String
+  papel     String
+  liberado  Boolean
+  autorId   String?
+  autorNome String
+  createdAt DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+}

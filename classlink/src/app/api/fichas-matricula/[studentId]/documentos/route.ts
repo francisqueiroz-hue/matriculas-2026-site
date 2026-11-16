@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { alunoDaEscola, etapasDoContrato, exigirEquipe } from "@/lib/ficha-matricula-acesso";
 import { atualizarDocumentoSchema, dadosDaAtualizacao, etapaDaFicha, montarChecklist, podeVerTipo, tiposVisiveis } from "@/lib/ficha-matricula";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Marca/desmarca a entrega de um documento, ajusta prazo e observação (cria o item se não existir). */
 export async function PUT(request: NextRequest, ctx: RouteContext<"/api/fichas-matricula/[studentId]/documentos">) {
   try {
     const session = await exigirEquipe();
+    await exigirArea(session, "FICHAS");
     const { studentId } = await ctx.params;
     const entrada = atualizarDocumentoSchema.parse(await request.json());
 

@@ -6,10 +6,12 @@ import { createEventSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { exigirTurmaPublicavel } from "@/lib/turmas-acesso";
 import { turmasQueAcompanha } from "@/lib/escopo-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "AGENDA");
     const from = request.nextUrl.searchParams.get("from");
     const to = request.nextUrl.searchParams.get("to");
 
@@ -36,6 +38,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "AGENDA");
     const body = createEventSchema.parse(await request.json());
 
     if (body.classId) {

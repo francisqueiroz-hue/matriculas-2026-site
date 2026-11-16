@@ -7,6 +7,7 @@ import { ErroDeUsuario } from "@/lib/erros";
 import { isBlobConfigured } from "@/lib/blob-storage";
 import { CONTRATO_MAX_BYTES, caminhoContratoValido, podeEnviarAssinado } from "@/lib/contratos";
 import { carregarContratoComAcesso } from "@/lib/contratos-server";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Contrato assinado acima de 4 MB: autoriza o navegador do responsável a enviar o PDF direto
@@ -17,6 +18,7 @@ import { carregarContratoComAcesso } from "@/lib/contratos-server";
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/contratos/[id]/assinado/envio">) {
   try {
     const session = await requireRole("GUARDIAN");
+    await exigirArea(session, "CONTRATOS");
     const { id } = await ctx.params;
 
     const contrato = await carregarContratoComAcesso(id, session);

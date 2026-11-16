@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { dataParaDate, dateParaData, somarDias } from "@/lib/cardapios";
 import { exigirGestaoCardapio } from "@/lib/cardapios-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 const schema = z.object({ semanas: z.number().int().min(1).max(12) });
 
@@ -15,6 +16,7 @@ const schema = z.object({ semanas: z.number().int().min(1).max(12) });
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/cardapios/[id]/duplicar">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "CARDAPIO");
     await exigirGestaoCardapio(session.sub);
     const { id } = await ctx.params;
     const { semanas } = schema.parse(await request.json());

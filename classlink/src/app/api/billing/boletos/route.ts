@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { alunosDaFamilia } from "@/lib/escopo-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** "Meus boletos" — todos os boletos dos alunos vinculados ao responsável logado. */
 export async function GET() {
   try {
     const session = await requireRole("GUARDIAN");
+    await exigirArea(session, "FINANCEIRO");
 
     const filhos = await alunosDaFamilia(session.sub);
 

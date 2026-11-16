@@ -5,10 +5,12 @@ import { handleApiError } from "@/lib/http";
 import { getPublicoAlvo } from "@/lib/comunicados";
 import { registrarAbertura, separarAbertura } from "@/lib/comunicado-leitura";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunicados/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "COMUNICADOS");
     const { id } = await ctx.params;
 
     const comunicado = await prisma.comunicado.findFirst({
@@ -78,6 +80,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/comunic
 export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/comunicados/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "COMUNICADOS");
     const { id } = await ctx.params;
 
     const comunicado = await prisma.comunicado.findFirst({ where: { id, schoolId: session.schoolId } });

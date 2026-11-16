@@ -8,6 +8,8 @@ export interface SessionUser {
   schoolId: string;
   schoolName: string;
   isCoordenacao: boolean;
+  /** Áreas desligadas pela direção para este perfil (tela Configurações). Some do menu e da tela. */
+  areasBloqueadas?: string[];
   /** Função na equipe (Direção, Secretaria...). Só a Direção vê financeiro e contratos. */
   funcao?: FuncaoEquipe | null;
 }

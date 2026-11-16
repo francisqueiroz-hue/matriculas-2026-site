@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // confere o conteúdo antes de registrar o envio.
 
 const blob = vi.hoisted(() => ({ issueSignedToken: vi.fn(), get: vi.fn(), put: vi.fn(), del: vi.fn() }));
+// Visibilidade por perfil (Configurações) testada em visibilidade.test.ts; aqui, tudo liberado.
+vi.mock("@/lib/visibilidade-server", () => ({ exigirArea: async () => {} }));
 vi.mock("@vercel/blob", () => blob);
 const cliente = vi.hoisted(() => ({ handleUploadPresigned: vi.fn() }));
 vi.mock("@vercel/blob/client", () => cliente);

@@ -4,11 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { filtroDeVisibilidade, turmasVisiveisNoMural } from "@/lib/visibilidade-posts";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Confirma a leitura do aviso pelo usuário atual (idempotente). */
 export async function POST(_request: NextRequest, ctx: RouteContext<"/api/posts/[id]/read">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MURAL");
     const { id: postId } = await ctx.params;
 
     // Só avisos que a pessoa pode ver: confirmar leitura de aviso de outra turma é 404.

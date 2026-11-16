@@ -7,6 +7,8 @@ const prismaMock = vi.hoisted(() => ({
   respostaComunicado: { findMany: vi.fn(), count: vi.fn() },
   comunicadoLeitura: { upsert: vi.fn(), findMany: vi.fn() },
 }));
+// Visibilidade por perfil (Configurações) testada em visibilidade.test.ts; aqui, tudo liberado.
+vi.mock("@/lib/visibilidade-server", () => ({ exigirArea: async () => {} }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@prisma/client", () => ({ Prisma: {} }));
 const sessaoMock = vi.hoisted(() => ({ atual: { sub: "g1", role: "GUARDIAN", schoolId: "s1" } as { sub: string; role: string; schoolId: string } }));

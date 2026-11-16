@@ -7,10 +7,12 @@ import { handleApiError } from "@/lib/http";
 import { assertTeamConversationParticipant } from "@/lib/messaging";
 import { exigirPodeConversar, exigirPodeExcluirConversa } from "@/lib/permissoes-mensagens";
 import { notifyUsers } from "@/lib/push";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/team-messages/conversations/[id]">) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "MENSAGENS");
     const { id } = await ctx.params;
     const participante = await assertTeamConversationParticipant(id, session.sub);
     await exigirPodeConversar(participante.userAId, participante.userBId);
@@ -46,6 +48,7 @@ const sendSchema = z.object({ body: z.string().min(1).max(4000) });
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/team-messages/conversations/[id]">) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "MENSAGENS");
     const { id } = await ctx.params;
     const conversation = await assertTeamConversationParticipant(id, session.sub);
     // Regra da escola: professores/auxiliares só com a direção/coordenação (inclusive conversas antigas).
@@ -86,6 +89,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/team-me
 export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/team-messages/conversations/[id]">) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "MENSAGENS");
     const { id } = await ctx.params;
     await assertTeamConversationParticipant(id, session.sub);
     await exigirPodeExcluirConversa(session.sub);
