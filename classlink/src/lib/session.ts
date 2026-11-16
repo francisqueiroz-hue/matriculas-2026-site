@@ -37,14 +37,14 @@ export async function requireRole(...roles: AccessTokenPayload["role"][]) {
  * responsável. isCoordenacao é checado direto no banco (não fica no JWT) para que
  * uma revogação de acesso valha imediatamente, sem esperar o token expirar.
  */
-export async function requireCoordenacaoOuAdmin() {
+export async function requireCoordenacaoOuAdmin(mensagem = "Apenas direção ou coordenação podem lançar notas") {
   const session = await requireSession();
   if (session.role === "ADMIN") return session;
   if (session.role === "STAFF") {
     const user = await prisma.user.findUnique({ where: { id: session.sub }, select: { isCoordenacao: true } });
     if (user?.isCoordenacao) return session;
   }
-  throw new AuthError("Apenas direção ou coordenação podem lançar notas", 403);
+  throw new AuthError(mensagem, 403);
 }
 
 /**
