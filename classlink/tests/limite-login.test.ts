@@ -12,8 +12,12 @@ import {
 import { ipDaRequisicao } from "@/lib/ip-requisicao";
 
 describe("políticas de limite", () => {
-  it("login por conta: 5 tentativas em 15 minutos, bloqueio de 15 minutos", () => {
-    expect(POLITICA_LOGIN_CONTA).toEqual({ max: 5, janelaMs: 15 * 60_000, bloqueioMs: 15 * 60_000 });
+  it("login por conta: 5 tentativas em 15 minutos, bloqueio de 5 minutos", () => {
+    expect(POLITICA_LOGIN_CONTA).toEqual({ max: 5, janelaMs: 15 * 60_000, bloqueioMs: 5 * 60_000 });
+  });
+
+  it("login por IP: mesmo bloqueio curto de 5 minutos", () => {
+    expect(POLITICA_LOGIN_IP.bloqueioMs).toBe(5 * 60_000);
   });
 
   it("IP é mais folgado que a conta (a escola pode sair por um IP só)", () => {
@@ -31,6 +35,7 @@ describe("mensagemBloqueio", () => {
   it("arredonda para cima e usa singular/plural", () => {
     expect(mensagemBloqueio(1)).toBe("Muitas tentativas. Tente novamente em 1 minuto.");
     expect(mensagemBloqueio(61)).toBe("Muitas tentativas. Tente novamente em 2 minutos.");
+    expect(mensagemBloqueio(300)).toBe("Muitas tentativas. Tente novamente em 5 minutos.");
     expect(mensagemBloqueio(900)).toBe("Muitas tentativas. Tente novamente em 15 minutos.");
   });
 });
