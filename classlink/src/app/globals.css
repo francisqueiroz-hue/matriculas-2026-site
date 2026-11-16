@@ -25,10 +25,11 @@
   --color-indigo-950: #271f4d;
 }
 
-/* Tema das famílias (contas de responsável). Cores mais vivas, tiradas dos
-   logos do Espaço Kids e do Instituto Fokus. Vale só dentro de `.tema-familia`,
-   que o layout do painel aplica apenas para o papel GUARDIAN: as telas da
-   direção e dos professores continuam com a paleta acima.
+/* Tema das famílias. Cores mais vivas, tiradas dos logos do Espaço Kids e do
+   Instituto Fokus. Vale dentro de `.tema-familia`, que o layout do painel
+   aplica a TODAS as contas (famílias, direção, coordenação e professores),
+   para a equipe ver o app com as mesmas cores que os pais veem. A paleta
+   acima continua valendo fora do painel (login, guia, páginas públicas).
    Contraste conferido (WCAG AA, mínimo 4,5:1): branco sobre #8418c2 = 7,3:1;
    #6d12a3 sobre branco = 9,3:1; etiquetas abaixo entre 6,5:1 e 8,5:1.
    O laranja #f08a3c só aparece como borda/faixa, nunca como cor de texto
