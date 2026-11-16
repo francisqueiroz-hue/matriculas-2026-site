@@ -144,7 +144,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   }
 
   return (
-    <article ref={cartaoRef} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <article ref={cartaoRef} data-cartao-mural className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold">{current.title}</h3>
