@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/AdminGuard", () => ({ AdminGuard: ({ children }: { children: unknown }) => children }));
+vi.mock("@/components/DirecaoGuard", () => ({ DirecaoGuard: ({ children }: { children: unknown }) => children }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: unknown }) => createElement("a", { href }, children as never) }));
 
 const linha = (id: string, aluno: string, extra: object = {}) => ({

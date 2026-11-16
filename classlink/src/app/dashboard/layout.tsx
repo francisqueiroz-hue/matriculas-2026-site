@@ -24,6 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       role: true,
       schoolId: true,
       isCoordenacao: true,
+      funcao: true,
       school: { select: { name: true } },
     },
   });
@@ -39,6 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         schoolId: user.schoolId,
         schoolName: user.school.name,
         isCoordenacao: user.isCoordenacao,
+        funcao: user.funcao,
       }}
     >
       <AvisosMensagensProvider>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { agoraNoFusoDaEscola } from "@/lib/billing";
@@ -38,7 +38,7 @@ const schema = z.discriminatedUnion("acao", [
  */
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/billing/boletos/[id]">) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const { id } = await ctx.params;
     const body = schema.parse(await request.json());
 

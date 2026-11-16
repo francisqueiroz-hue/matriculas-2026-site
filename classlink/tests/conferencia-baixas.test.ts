@@ -16,6 +16,9 @@ vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 type Sessao = { sub: string; name: string; role: string; schoolId: string };
 const sessaoMock = vi.hoisted(() => ({ atual: { sub: "u1", name: "Diretora Ana", role: "ADMIN", schoolId: "s1" } as Sessao }));
 vi.mock("@/lib/session", () => ({
+  // Rotas só da direção: aqui a sessão simulada já é da direção (ver tests/direcao-acesso.test.ts).
+  requireDirecao: async () => (await import("@/lib/session")).requireRole("ADMIN"),
+  exigirDirecaoSeAdmin: async () => undefined,
   requireRole: vi.fn(async (...roles: string[]) => {
     if (!roles.includes(sessaoMock.atual.role)) {
       const { AuthError } = await import("@/lib/session");

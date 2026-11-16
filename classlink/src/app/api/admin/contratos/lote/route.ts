@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
@@ -34,7 +34,7 @@ const AVISOS_SIMULTANEOS = 5;
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const body = envioLoteSchema.parse(await request.json());
     if (body.anoLetivo !== 2027) {
       return NextResponse.json({ error: "O modelo de contrato guardado no app é o de 2027." }, { status: 400 });

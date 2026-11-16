@@ -1,4 +1,4 @@
-import type { Role } from "@prisma/client";
+import type { FuncaoEquipe, Role } from "@prisma/client";
 
 export interface SessionUser {
   id: string;
@@ -8,4 +8,6 @@ export interface SessionUser {
   schoolId: string;
   schoolName: string;
   isCoordenacao: boolean;
+  /** Função na equipe (Direção, Secretaria...). Só a Direção vê financeiro e contratos. */
+  funcao?: FuncaoEquipe | null;
 }

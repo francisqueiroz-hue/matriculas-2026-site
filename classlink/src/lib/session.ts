@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { ACCESS_COOKIE, verifyAccessToken, type AccessTokenPayload } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ehDirecao, MENSAGEM_SO_DIRECAO } from "@/lib/equipe";
 
 /** Lê e valida o access token do cookie da requisição atual. Retorna null se ausente/inválido. */
 export async function getSession(): Promise<AccessTokenPayload | null> {
@@ -44,6 +45,27 @@ export async function requireCoordenacaoOuAdmin() {
     if (user?.isCoordenacao) return session;
   }
   throw new AuthError("Apenas direção ou coordenação podem lançar notas", 403);
+}
+
+/**
+ * Financeiro (mensalidades, boletos, baixas, conferência), contratos com valores e lembretes de
+ * cobrança: só a direção. A função é lida do banco (não fica no JWT), para que trocar alguém de
+ * Direção para Secretaria valha na hora, sem esperar o token expirar.
+ */
+export async function requireDirecao() {
+  const session = await requireRole("ADMIN");
+  await exigirDirecaoSeAdmin(session);
+  return session;
+}
+
+/**
+ * Rotas compartilhadas com as famílias (ex.: PDF do boleto, arquivo do contrato): a família
+ * passa pela checagem de vínculo da própria rota; quem é da administração precisa ser direção.
+ */
+export async function exigirDirecaoSeAdmin(session: Pick<AccessTokenPayload, "sub" | "role">) {
+  if (session.role !== "ADMIN") return;
+  const user = await prisma.user.findUnique({ where: { id: session.sub }, select: { role: true, funcao: true } });
+  if (!user || !ehDirecao(user)) throw new AuthError(MENSAGEM_SO_DIRECAO, 403);
 }
 
 export class AuthError extends Error {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AdminGuard } from "@/components/AdminGuard";
+import { DirecaoGuard } from "@/components/DirecaoGuard";
 import { apiJson } from "@/lib/api-client";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
 import { MODELO_CONTRATO_2027, formatarDinheiro, type ValoresContrato as Valores } from "@/lib/contrato-modelo/tipos";
@@ -877,8 +877,8 @@ function ContratosContent() {
 
 export default function ContratosAdminPage() {
   return (
-    <AdminGuard>
+    <DirecaoGuard>
       <ContratosContent />
-    </AdminGuard>
+    </DirecaoGuard>
   );
 }

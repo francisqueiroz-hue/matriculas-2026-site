@@ -17,11 +17,13 @@ enum Role {
   GUARDIAN // responsável (pai/mãe/tutor)
 }
 
-// Função na equipe (só ADMIN/STAFF). Define o perfil: DIRECAO → ADMIN; COORDENACAO →
-// STAFF com isCoordenacao; PROFESSOR e AUXILIAR → STAFF. Nulo em cadastros antigos (a
-// função é deduzida do perfil).
+// Função na equipe (só ADMIN/STAFF). Define o perfil: DIRECAO → ADMIN; SECRETARIA → ADMIN
+// sem financeiro/contratos (ver lib/equipe.ts, ehDirecao); COORDENACAO → STAFF com
+// isCoordenacao; PROFESSOR e AUXILIAR → STAFF. Nulo em cadastros antigos (a função é deduzida
+// do perfil).
 enum FuncaoEquipe {
   DIRECAO
+  SECRETARIA
   COORDENACAO
   PROFESSOR
   AUXILIAR

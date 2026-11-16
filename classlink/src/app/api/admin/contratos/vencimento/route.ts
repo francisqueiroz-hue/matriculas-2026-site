@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
@@ -27,7 +27,7 @@ export const maxDuration = 60;
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const pendentes = await prisma.contrato.findMany({
       where: {
         schoolId: session.schoolId,

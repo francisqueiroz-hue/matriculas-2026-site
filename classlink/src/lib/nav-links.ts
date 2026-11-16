@@ -3,6 +3,7 @@ import { usePathname } from "next/navigation";
 import type { SessionUser } from "@/lib/types";
 import { apiJson } from "@/lib/api-client";
 import { situacaoDoComunicado } from "@/lib/comunicados-situacao";
+import { ehDirecao } from "@/lib/equipe";
 
 export interface NavLink {
   href: string;
@@ -149,9 +150,19 @@ const guiaLink: NavLink = {
   icon: "M12 21a9 9 0 100-18 9 9 0 000 18z M9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4 M12 17h.01",
 };
 
-/** Notas fica visível só para direção (ADMIN) e coordenação (STAFF com isCoordenacao). */
-export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao">): NavLink[] {
-  if (user.role === "ADMIN") return [...baseLinks, notasLink, ...adminLinks, fichasLink, guiaLink];
+/** Abas da administração que só a direção vê: financeiro, contratos (com valores) e lembretes de cobrança. */
+export const ABAS_SO_DIRECAO = ["/dashboard/admin/contratos", "/dashboard/admin/financeiro", "/dashboard/admin/lembretes"];
+
+/**
+ * Notas fica visível só para direção/secretaria (ADMIN) e coordenação (STAFF com isCoordenacao).
+ * Financeiro, Contratos e Lembretes só para a direção (o servidor também bloqueia).
+ */
+export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao" | "funcao">): NavLink[] {
+  if (user.role === "ADMIN") {
+    const direcao = ehDirecao({ role: user.role, funcao: user.funcao ?? null });
+    const admin = direcao ? adminLinks : adminLinks.filter((l) => !ABAS_SO_DIRECAO.includes(l.href));
+    return [...baseLinks, notasLink, ...admin, fichasLink, guiaLink];
+  }
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks, guiaLink];
   if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, fichasLink, guiaLink];
   if (user.role === "STAFF") return [...baseLinks, fichasLink, guiaLink];
