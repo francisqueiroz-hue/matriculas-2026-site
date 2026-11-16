@@ -29,6 +29,8 @@ interface DisplayMessage {
   /** Quando a outra pessoa abriu a mensagem (gravado pelo servidor). */
   readAt?: string | null;
   anexo?: Anexo | null;
+  /** O WhatsApp recusou a entrega (só a equipe vê): motivo, para reenviar pelo ClassLink. */
+  falhaWhatsApp?: string | null;
   sender: { id: string; name: string; role: string };
 }
 
@@ -37,7 +39,7 @@ interface GuardianConversationResponse {
     id: string;
     staff: { id: string; name: string };
     guardian: { id: string; name: string; phone: string | null; email: string | null };
-    janelaWhatsApp?: { aberta: boolean; ate: string | null; avisoPorModelo?: boolean };
+    janelaWhatsApp?: { aberta: boolean; ate: string | null; avisoPorModelo?: boolean; bloqueio?: string | null };
   };
   messages: {
     id: string;
@@ -46,6 +48,7 @@ interface GuardianConversationResponse {
     createdAt: string;
     readAt: string | null;
     anexo: Anexo | null;
+    falhaWhatsApp?: string | null;
     sender: { id: string; name: string; role: string };
   }[];
 }
@@ -145,6 +148,7 @@ function ConversationPageInner() {
             aberta: res.conversation.janelaWhatsApp?.aberta ?? false,
             ate: res.conversation.janelaWhatsApp?.ate ? new Date(res.conversation.janelaWhatsApp.ate) : null,
             avisoPorModelo: res.conversation.janelaWhatsApp?.avisoPorModelo ?? false,
+            bloqueio: res.conversation.janelaWhatsApp?.bloqueio ?? null,
           },
           souStaffNaConversa,
           messages: res.messages,
@@ -182,7 +186,7 @@ function ConversationPageInner() {
     setSendError(null);
     setEnvioInfo(null);
     try {
-      type Resposta = { message: DisplayMessage; avisoPeloWhatsApp?: boolean };
+      type Resposta = { message: DisplayMessage; avisoPeloWhatsApp?: boolean; aviso?: string | null };
       const path = isEquipe ? `/api/team-messages/conversations/${id}` : `/api/messages/conversations/${id}`;
       const payload = isEquipe ? { body } : { body, channel };
       const res =
@@ -198,7 +202,9 @@ function ConversationPageInner() {
       const message: DisplayMessage = isEquipe ? { ...res.message, channel: null } : res.message;
       setData((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev));
       reiniciarConsulta(); // conversa ativa: volta a consultar no ritmo rápido
-      if (res.avisoPeloWhatsApp) {
+      if (res.aviso) {
+        setEnvioInfo(res.aviso);
+      } else if (res.avisoPeloWhatsApp) {
         setEnvioInfo("Mensagem enviada pelo ClassLink. A família foi avisada no WhatsApp, com um link para abrir.");
       }
       return true;
@@ -340,6 +346,19 @@ function ConversationPageInner() {
                   {m.channel && m.channel !== "APP" && <span>· via {CANAL_LABEL[m.channel]}</span>}
                 </p>
                 {mine && <ReciboMensagem canal={m.channel} readAt={m.readAt} />}
+                {mine && m.falhaWhatsApp && (
+                  <div className="mt-1 rounded-md bg-white/95 px-2 py-1 text-[11px] text-red-700">
+                    <p>⚠ Não entregue no WhatsApp: {m.falhaWhatsApp}</p>
+                    <button
+                      type="button"
+                      disabled={sending}
+                      onClick={() => void enviarMensagem(m.body, "APP")}
+                      className="mt-1 rounded border border-red-300 px-2 py-0.5 font-semibold hover:bg-red-50 disabled:opacity-60"
+                    >
+                      Reenviar pelo ClassLink
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -347,6 +366,11 @@ function ConversationPageInner() {
         <div ref={bottomRef} />
       </div>
 
+      {podeUsarFuncoesDeResponsavel && data.janelaWhatsApp.bloqueio && (
+        <p role="status" className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          {data.janelaWhatsApp.bloqueio}
+        </p>
+      )}
       {sendError && <p className="mt-2 text-xs text-red-600">{sendError}</p>}
       {envioInfo && (
         <p role="status" className="mt-2 text-xs text-emerald-700">
@@ -420,7 +444,9 @@ function ConversationPageInner() {
               Canal: WhatsApp
               {!guardianTemTelefone
                 ? " (sem telefone)"
-                : !whatsappDisponivel(data.janelaWhatsApp)
+                : data.janelaWhatsApp.bloqueio
+                  ? " (fora do ar)"
+                  : !whatsappDisponivel(data.janelaWhatsApp)
                   ? " (indisponível agora)"
                   : !data.janelaWhatsApp.aberta
                     ? " (aviso com link)"

@@ -62,33 +62,57 @@ export function telefoneEmLista(telefone: string, existentes: ReadonlyArray<stri
   return existentes.some((outro) => Boolean(outro) && samePhoneBR(outro as string, telefone));
 }
 
-export async function sendWhatsAppTextMessage(toPhone: string, body: string): Promise<{ externalId: string }> {
+/** Tempo máximo de espera pela Meta: sem isso, uma lentidão da Graph API deixava a tela "Enviando…" presa. */
+export const WHATSAPP_TEMPO_LIMITE_MS = 15_000;
+
+/** Erro de envio devolvido pela Meta (ou tempo esgotado), com o código para explicar a causa à equipe. */
+export class ErroWhatsApp extends Error {
+  constructor(
+    message: string,
+    readonly codigo: number | null,
+  ) {
+    super(message);
+    this.name = "ErroWhatsApp";
+  }
+}
+
+/** Envia um objeto de mensagem à Cloud API com tempo limite e erro legível (inclusive resposta que não é JSON). */
+async function postarMensagem(payload: Record<string, unknown>, falhaPadrao: string): Promise<{ externalId: string }> {
   const phoneNumberId = env("WHATSAPP_PHONE_NUMBER_ID");
   const token = env("WHATSAPP_API_TOKEN");
 
-  const response = await fetch(`${apiBaseUrl()}/${phoneNumberId}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: toPhone,
-      type: "text",
-      text: { body },
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl()}/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(WHATSAPP_TEMPO_LIMITE_MS),
+    });
+  } catch (err) {
+    const tempo = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+    throw new ErroWhatsApp(tempo ? "O WhatsApp não respondeu a tempo" : `${falhaPadrao}: sem conexão com a Meta`, null);
+  }
 
-  const data = await response.json();
+  const data = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = data?.error?.message ?? "Falha ao enviar mensagem no WhatsApp";
-    throw new Error(message);
+    const codigo = typeof data?.error?.code === "number" ? data.error.code : null;
+    throw new ErroWhatsApp(data?.error?.message ?? `${falhaPadrao} (HTTP ${response.status})`, codigo);
   }
 
   const externalId: string | undefined = data?.messages?.[0]?.id;
-  if (!externalId) throw new Error("WhatsApp não retornou o id da mensagem enviada");
+  if (!externalId) throw new ErroWhatsApp("WhatsApp não retornou o id da mensagem enviada", null);
   return { externalId };
+}
+
+export async function sendWhatsAppTextMessage(toPhone: string, body: string): Promise<{ externalId: string }> {
+  return postarMensagem(
+    { messaging_product: "whatsapp", to: toPhone, type: "text", text: { body } },
+    "Falha ao enviar mensagem no WhatsApp",
+  );
 }
 
 /**
@@ -121,27 +145,7 @@ export async function sendWhatsAppTemplateMessage(
   bodyParams: string[],
   quickReplyPayloads: string[] = [],
 ): Promise<{ externalId: string }> {
-  const phoneNumberId = env("WHATSAPP_PHONE_NUMBER_ID");
-  const token = env("WHATSAPP_API_TOKEN");
-
-  const response = await fetch(`${apiBaseUrl()}/${phoneNumberId}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(buildTemplatePayload(toPhone, template, bodyParams, quickReplyPayloads)),
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    const message = data?.error?.message ?? "Falha ao enviar modelo no WhatsApp";
-    throw new Error(message);
-  }
-
-  const externalId: string | undefined = data?.messages?.[0]?.id;
-  if (!externalId) throw new Error("WhatsApp não retornou o id da mensagem enviada");
-  return { externalId };
+  return postarMensagem(buildTemplatePayload(toPhone, template, bodyParams, quickReplyPayloads), "Falha ao enviar modelo no WhatsApp");
 }
 
 /**

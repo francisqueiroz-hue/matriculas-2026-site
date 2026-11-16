@@ -9,6 +9,7 @@ const prismaMock = vi.hoisted(() => ({
   message: { findUnique: vi.fn(), create: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
   user: { update: vi.fn(), findMany: vi.fn() },
   conversation: { findUniqueOrThrow: vi.fn() },
+  whatsappFalha: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null), upsert: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@prisma/client", () => ({ Prisma: {} }));
@@ -225,5 +226,30 @@ describe("conversa entrega o anexo à tela", () => {
     expect(texto.anexo).toBeNull();
     expect(JSON.stringify(json)).not.toContain("MID1");
     expect(comFoto.anexoCaminho).toBeUndefined();
+  });
+
+  it("mensagem recusada pelo WhatsApp aparece para a equipe com o motivo; canal bloqueado por cobrança", async () => {
+    vi.stubEnv("WHATSAPP_API_TOKEN", "t");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "123");
+    prismaMock.conversation.findUniqueOrThrow.mockResolvedValue({
+      id: "conv1",
+      staffId: "staff1",
+      guardianId: "g1",
+      staff: { id: "staff1", name: "Direção", role: "ADMIN" },
+      guardian: { id: "g1", name: "Ana", phone: "21987654321", email: null, whatsappUltimaMensagemEm: new Date() },
+    });
+    prismaMock.message.findMany.mockResolvedValue([
+      { ...base, id: "m1", senderId: "staff1", externalId: "wamid.X", body: "Reunião amanhã", anexoTipo: null, anexoMime: null, anexoNome: null, anexoCaminho: null, anexoMediaId: null },
+    ]);
+    prismaMock.message.updateMany.mockResolvedValue({});
+    prismaMock.whatsappFalha.findMany.mockResolvedValue([{ mensagemId: "wamid.X", codigo: 131042 }] as never);
+    prismaMock.whatsappFalha.findFirst.mockResolvedValue({ createdAt: new Date() } as never);
+
+    const res = await conversa(new NextRequest("https://app.escola/api/messages/conversations/conv1"), { params: Promise.resolve({ id: "conv1" }) });
+    const json = await res.json();
+    expect(json.messages[0].falhaWhatsApp).toMatch(/Pagamento pendente/);
+    expect(json.messages[0].externalId).toBeUndefined();
+    expect(json.conversation.janelaWhatsApp.bloqueio).toMatch(/pagamento pendente/);
+    vi.unstubAllEnvs();
   });
 });

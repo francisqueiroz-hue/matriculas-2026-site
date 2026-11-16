@@ -14,6 +14,8 @@ export interface JanelaWhatsApp {
   ate: Date | null;
   /** WhatsApp configurado: com a janela fechada, o ClassLink avisa a família por um modelo aprovado. */
   avisoPorModelo?: boolean;
+  /** WhatsApp da escola recusando tudo (ex.: pagamento pendente na Meta): explicação para a equipe. */
+  bloqueio?: string | null;
 }
 
 export function janelaWhatsApp(ultimaMensagemEm: Date | null | undefined, agora = Date.now()): JanelaWhatsApp {
@@ -24,7 +26,7 @@ export function janelaWhatsApp(ultimaMensagemEm: Date | null | undefined, agora 
 
 /** Dá para usar o canal WhatsApp: janela aberta (texto livre) ou, fechada, o aviso padrão com link. */
 export function whatsappDisponivel(janela: JanelaWhatsApp | undefined): boolean {
-  return Boolean(janela && (janela.aberta || janela.avisoPorModelo));
+  return Boolean(janela && !janela.bloqueio && (janela.aberta || janela.avisoPorModelo));
 }
 
 export const MENSAGEM_JANELA_FECHADA =
@@ -45,6 +47,7 @@ export function explicacaoDoCanal(canal: CanalEnvio, janela: JanelaWhatsApp): st
   if (canal === "EMAIL") {
     return "Vai para o e-mail da família. O e-mail não informa se foi aberto.";
   }
+  if (janela.bloqueio) return janela.bloqueio;
   if (!janela.aberta || !janela.ate) {
     if (janela.avisoPorModelo) {
       return (
