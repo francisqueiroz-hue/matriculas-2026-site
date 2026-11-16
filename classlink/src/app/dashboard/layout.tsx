@@ -42,18 +42,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
       }}
     >
       <AvisosMensagensProvider>
-        <Navbar />
-        <PushRegister />
-        <div className="flex flex-1">
-          <Sidebar />
-          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-            <IosInstallBanner />
-            <AndroidInstallBanner />
-            <ConviteAtivarAvisos />
-            <ContratosPendentesBanner />
-            <RematriculaBanner />
-            {children}
-          </main>
+        {/* Contas de família usam um tema mais colorido (ver `.tema-familia` em
+            globals.css); direção e professores ficam com a paleta padrão. */}
+        <div className={`flex flex-1 flex-col ${user.role === "GUARDIAN" ? "tema-familia" : ""}`}>
+          <Navbar />
+          <PushRegister />
+          <div className="flex flex-1">
+            <Sidebar />
+            <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+              <IosInstallBanner />
+              <AndroidInstallBanner />
+              <ConviteAtivarAvisos />
+              <ContratosPendentesBanner />
+              <RematriculaBanner />
+              {children}
+            </main>
+          </div>
         </div>
       </AvisosMensagensProvider>
     </UserProvider>

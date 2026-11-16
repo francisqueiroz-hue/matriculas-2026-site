@@ -56,13 +56,17 @@ function ComunicadoCard({ c, situacao }: { c: ComunicadoItem; situacao?: Situaca
   return (
     <Link
       href={`/dashboard/comunicados/${c.id}`}
+      data-tipo-comunicado={c.tipo}
       className={`block rounded-xl border bg-white p-4 shadow-sm hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-slate-900 dark:hover:bg-slate-800 ${
         situacao === "PENDENTE" ? "border-amber-300 dark:border-amber-800" : "border-slate-200 dark:border-slate-800"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+          <span
+            data-etiqueta-tipo={c.tipo}
+            className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+          >
             {TIPO_LABEL[c.tipo]}
           </span>
           <h3 className="mt-1 font-semibold">{c.titulo}</h3>

@@ -24,3 +24,56 @@
   --color-indigo-900: #3f3579;
   --color-indigo-950: #271f4d;
 }
+
+/* Tema das famílias (contas de responsável). Cores mais vivas, tiradas dos
+   logos do Espaço Kids e do Instituto Fokus. Vale só dentro de `.tema-familia`,
+   que o layout do painel aplica apenas para o papel GUARDIAN: as telas da
+   direção e dos professores continuam com a paleta acima.
+   Contraste conferido (WCAG AA, mínimo 4,5:1): branco sobre #8418c2 = 7,3:1;
+   #6d12a3 sobre branco = 9,3:1; etiquetas abaixo entre 6,5:1 e 8,5:1.
+   O laranja #f08a3c só aparece como borda/faixa, nunca como cor de texto
+   (daria 2,5:1). A cor nunca é o único sinal: o nome do tipo continua escrito. */
+.tema-familia {
+  --color-indigo-50: #faf5ff;
+  --color-indigo-100: #f3e8fd;
+  --color-indigo-200: #e7cffa;
+  --color-indigo-300: #d3a6f4;
+  --color-indigo-400: #b86eec;
+  --color-indigo-500: #9c3fdd;
+  --color-indigo-600: #8418c2;
+  --color-indigo-700: #6d12a3;
+  --color-indigo-800: #5a1086;
+  --color-indigo-900: #490e6c;
+  --color-indigo-950: #2d0547;
+  background-color: #fbf7ff;
+}
+
+/* Faixa roxo → laranja sob o cabeçalho do celular. */
+.tema-familia > header {
+  border-bottom: 4px solid transparent;
+  border-image: linear-gradient(90deg, #8418c2, #f08a3c) 1;
+}
+
+.tema-familia main h1 {
+  color: #6d12a3;
+}
+
+/* Comunicados: uma cor por assunto (etiqueta + borda esquerda do cartão). */
+.tema-familia [data-tipo-comunicado] {
+  border-left-width: 6px;
+}
+.tema-familia [data-tipo-comunicado="AUTORIZACAO_PASSEIO"] { border-left-color: #22a356; }
+.tema-familia [data-tipo-comunicado="CONFIRMACAO_REUNIAO"] { border-left-color: #2f6fe0; }
+.tema-familia [data-tipo-comunicado="CIRCULAR"] { border-left-color: #f08a3c; }
+.tema-familia [data-etiqueta-tipo="AUTORIZACAO_PASSEIO"] { background-color: #d9f5e3; color: #14532d; }
+.tema-familia [data-etiqueta-tipo="CONFIRMACAO_REUNIAO"] { background-color: #dbeafe; color: #1e3a8a; }
+.tema-familia [data-etiqueta-tipo="CIRCULAR"] { background-color: #fde6d3; color: #8a3a0c; }
+
+/* Mural: borda esquerda alternando roxo e laranja. */
+.tema-familia [data-cartao-mural] {
+  border-left-width: 6px;
+  border-left-color: #8418c2;
+}
+.tema-familia [data-cartao-mural]:nth-child(even) {
+  border-left-color: #f08a3c;
+}
