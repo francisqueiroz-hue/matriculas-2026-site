@@ -99,3 +99,20 @@ it("aviso à escola diz o que a família mudou", () => {
   expect(a.title).toBe("Ficha de saúde de Lia atualizada pela família");
   expect(a.body).toBe("Ana Souza alterou: alergias, pessoas autorizadas a buscar. Confira e atualize os protocolos da escola.");
 });
+
+describe("menu", async () => {
+  const { agruparLinks, getNavLinks } = await import("@/lib/nav-links");
+  const temSaude = (u: Parameters<typeof getNavLinks>[0]) => getNavLinks(u).some((l) => l.href === "/dashboard/saude");
+  it("direção, coordenação e família têm 'Saúde e autorizados'; professor não", () => {
+    expect(temSaude({ role: "ADMIN", isCoordenacao: false, funcao: "DIRECAO" })).toBe(true);
+    expect(temSaude({ role: "STAFF", isCoordenacao: true })).toBe(true);
+    expect(temSaude({ role: "GUARDIAN", isCoordenacao: false })).toBe(true);
+    expect(temSaude({ role: "STAFF", isCoordenacao: false })).toBe(false);
+  });
+  it("na escola fica em Secretaria; na família, em Meu(s) filho(s)", () => {
+    const secao = (u: Parameters<typeof getNavLinks>[0]) =>
+      agruparLinks(getNavLinks(u)).find((g) => g.links.some((l) => l.href === "/dashboard/saude"))?.titulo;
+    expect(secao({ role: "ADMIN", isCoordenacao: false, funcao: "DIRECAO" })).toBe("Secretaria");
+    expect(secao({ role: "GUARDIAN", isCoordenacao: false })).toBe("Meu(s) filho(s)");
+  });
+});

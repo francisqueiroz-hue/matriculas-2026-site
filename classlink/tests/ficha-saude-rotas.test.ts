@@ -160,6 +160,27 @@ describe("salvar", () => {
     expect(tx.consentimentoLgpd.create.mock.calls[0][0].data).toMatchObject({ consentidoPorId: "g1", consentidoPorNome: "Ana Souza" });
   });
 
+  it("escola registra aceite em papel de quem não tem conta no app, pelo nome", async () => {
+    prismaMock.consentimentoLgpd.findFirst.mockResolvedValue(null);
+    prismaMock.fichaSaude.findUnique.mockResolvedValue(null);
+    const r = await PUT(
+      req("PUT", {
+        ficha: { alergias: "camarão" },
+        consentimento: { aceito: true, versaoTexto: VERSAO_TERMO_SAUDE, consentidoPorNome: "  Rosa   Lima  " },
+      }),
+      ctx,
+    );
+    expect(r.status).toBe(200);
+    expect(tx.consentimentoLgpd.create.mock.calls[0][0].data).toMatchObject({ consentidoPorId: null, consentidoPorNome: "Rosa Lima" });
+    expect(tx.fichaSaude.upsert.mock.calls[0][0].create).toMatchObject({ alergias: "camarão" });
+  });
+
+  it("escola sem dizer quem assinou: 400", async () => {
+    prismaMock.consentimentoLgpd.findFirst.mockResolvedValue(null);
+    const r = await PUT(req("PUT", { consentimento: { aceito: true, versaoTexto: VERSAO_TERMO_SAUDE } }), ctx);
+    expect(r.status).toBe(400);
+  });
+
   it("alteração da escola não avisa nem marca 'a conferir'", async () => {
     await PUT(req("PUT", { ficha: { alergias: "leite e ovo" } }), ctx);
     expect(tx.fichaSaude.upsert.mock.calls[0][0].update.pendenteConferenciaDesde).toBeUndefined();

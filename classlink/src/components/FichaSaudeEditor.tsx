@@ -10,6 +10,7 @@ import {
   LIMITE_AUTORIZADOS,
   ROTULO_CAMPO_SAUDE,
   ROTULO_HISTORICO_SAUDE,
+  fichaTemDados,
   TERMO_SAUDE,
   type FichaSaudeDados,
 } from "@/lib/ficha-saude";
@@ -39,6 +40,8 @@ export interface FichaSaudeResposta {
 const dataHora = (iso: string) =>
   new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }).format(new Date(iso));
 
+const OUTRA_PESSOA = "__outra__";
+
 const autorizadoVazio = (): Autorizado => ({ nome: "", parentesco: null, telefone: null, documento: null, observacao: null });
 
 /**
@@ -52,6 +55,9 @@ export function FichaSaudeEditor({ alunoId }: { alunoId: string }) {
   const [autorizados, setAutorizados] = useState<Autorizado[]>([]);
   const [aceite, setAceite] = useState(false);
   const [quemAssinou, setQuemAssinou] = useState("");
+  /** Escola: nome digitado de quem assinou, quando não é um responsável com conta no app. */
+  const [nomeAssinou, setNomeAssinou] = useState("");
+  const [destacarTermo, setDestacarTermo] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: "ok" | "erro"; texto: string } | null>(null);
   const idBase = useId();
@@ -65,6 +71,8 @@ export function FichaSaudeEditor({ alunoId }: { alunoId: string }) {
         setAutorizados(d.autorizados);
         setAceite(false);
         setQuemAssinou("");
+        setNomeAssinou("");
+        setDestacarTermo(false);
       })
       .catch((e) => setErro(e instanceof Error ? e.message : "Não foi possível carregar a ficha"));
   }, [alunoId]);
@@ -75,22 +83,35 @@ export function FichaSaudeEditor({ alunoId }: { alunoId: string }) {
 
   const escola = dados.papel === "ESCOLA";
   const temConsentimento = !!dados.consentimento;
-  const podeEditarSaude = temConsentimento || aceite;
+  const outraPessoa = quemAssinou === OUTRA_PESSOA;
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     if (!dados) return;
-    if (aceite && escola && !quemAssinou) {
-      setAviso({ tipo: "erro", texto: "Escolha o responsável que assinou o termo." });
+    // Os campos de saúde ficam sempre abertos; o que se exige é a autorização antes de salvar.
+    if (fichaTemDados(ficha) && !temConsentimento && !aceite) {
+      setDestacarTermo(true);
+      setAviso({
+        tipo: "erro",
+        texto: escola
+          ? "Para salvar as informações de saúde, marque no quadro de autorização quem assinou o termo."
+          : "Para salvar as informações de saúde, marque \"Li e autorizo\" no quadro de autorização.",
+      });
+      document.getElementById(`${idBase}-termo`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (aceite && escola && (!quemAssinou || (outraPessoa && nomeAssinou.trim().length < 3))) {
+      setDestacarTermo(true);
+      setAviso({ tipo: "erro", texto: outraPessoa ? "Digite o nome de quem assinou o termo." : "Escolha quem assinou o termo." });
       return;
     }
     setSalvando(true);
     setAviso(null);
     try {
       const corpo = {
-        ...(podeEditarSaude && { ficha }),
+        ficha,
         autorizados: autorizados.filter((a) => a.id || a.nome.trim() || a.telefone),
-        ...(aceite && { consentimento: { aceito: true, versaoTexto: dados.versaoTermo, ...(escola && { consentidoPorId: quemAssinou }) } }),
+        ...(aceite && { consentimento: { aceito: true, versaoTexto: dados.versaoTermo, ...(escola && (outraPessoa ? { consentidoPorNome: nomeAssinou.trim() } : { consentidoPorId: quemAssinou })) } }),
       };
       const r = await apiJson<{ alterado: boolean }>(`/api/alunos/${alunoId}/saude`, { method: "PUT", body: JSON.stringify(corpo) });
       setAviso({
@@ -169,7 +190,14 @@ export function FichaSaudeEditor({ alunoId }: { alunoId: string }) {
             )}
           </div>
         ) : (
-          <div className="mt-2 rounded-lg border-2 border-indigo-300 bg-indigo-50 p-3 text-sm dark:border-indigo-800 dark:bg-indigo-950">
+          <div
+            className={`mt-2 rounded-lg border-2 p-3 text-sm ${destacarTermo && !aceite ? "border-red-500 bg-red-50 dark:bg-red-950" : "border-indigo-300 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950"}`}
+          >
+            <p className="mb-2 font-semibold">
+              {escola
+                ? "Para guardar informações de saúde, registre a autorização assinada pela família:"
+                : "Para guardar informações de saúde, leia e marque a autorização:"}
+            </p>
             {TERMO_SAUDE.map((p) => (
               <p key={p} className="mb-2 last:mb-0">
                 {p}
@@ -178,7 +206,7 @@ export function FichaSaudeEditor({ alunoId }: { alunoId: string }) {
             <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">Base legal: Lei 13.709/2018 (LGPD), arts. 11, I, e 14, § 1º. Versão do termo: {dados.versaoTermo}.</p>
             {escola && (
               <label className="mt-3 block text-sm">
-                Responsável que assinou o termo em papel
+                Quem assinou o termo em papel
                 <select
                   value={quemAssinou}
                   onChange={(e) => setQuemAssinou(e.target.value)}
@@ -191,21 +219,34 @@ export function FichaSaudeEditor({ alunoId }: { alunoId: string }) {
                       {r.relation ? ` (${r.relation})` : ""}
                     </option>
                   ))}
+                  <option value={OUTRA_PESSOA}>Outra pessoa responsável (digitar o nome)</option>
                 </select>
+                {outraPessoa && (
+                  <input
+                    value={nomeAssinou}
+                    onChange={(e) => setNomeAssinou(e.target.value)}
+                    maxLength={120}
+                    placeholder="Nome completo de quem assinou"
+                    aria-label="Nome completo de quem assinou o termo"
+                    className="mt-2 block w-full rounded-md border border-slate-300 px-2 py-2 dark:border-slate-700 dark:bg-slate-800"
+                  />
+                )}
               </label>
             )}
             <label className="mt-3 flex items-start gap-2 font-medium">
               <input type="checkbox" checked={aceite} onChange={(e) => setAceite(e.target.checked)} className="mt-1 h-4 w-4" />
-              {escola ? "O responsável acima assinou este termo em papel (guarde a via assinada)." : "Li e autorizo, como responsável pela criança."}
+              {escola ? "Confirmo que a pessoa acima assinou este termo em papel (guardar a via assinada)." : "Li e autorizo, como responsável pela criança."}
             </label>
           </div>
         )}
       </section>
 
       {/* ─── Saúde ─── */}
-      <fieldset disabled={!podeEditarSaude} className="space-y-3 rounded-xl border border-rose-200 p-3 disabled:opacity-60 dark:border-rose-900">
+      <fieldset className="space-y-3 rounded-xl border border-rose-200 p-3 dark:border-rose-900">
         <legend className="px-1 font-semibold text-rose-800 dark:text-rose-300">Saúde</legend>
-        {!podeEditarSaude && <p className="text-sm text-slate-500">Para preencher, marque o consentimento acima.</p>}
+        {!temConsentimento && !aceite && (
+          <p className="text-xs text-slate-500">Pode preencher; ao salvar, é preciso ter a autorização marcada acima.</p>
+        )}
         {CAMPOS_SAUDE.map((c) => (
           <label key={c} className="block text-sm">
             <span className="font-medium">{ROTULO_CAMPO_SAUDE[c]}</span>
