@@ -306,13 +306,19 @@ export interface ResultadoExecucao {
   porWhatsApp: number;
   semCanal: number;
   resolvidas: number;
+  /** Famílias que ficaram para a próxima execução porque o tempo da rotina acabou. */
+  adiadas: number;
 }
 
 /**
  * Execução diária para uma escola: registra pendências novas (para contar os dias), marca as
  * resolvidas e, se a escola ativou e não é domingo, envia uma mensagem por família pronta.
  */
-export async function executarLembretesDaEscola(schoolId: string, agora = new Date()): Promise<ResultadoExecucao> {
+export async function executarLembretesDaEscola(
+  schoolId: string,
+  agora = new Date(),
+  opcoes: { encerrarEm?: number } = {},
+): Promise<ResultadoExecucao> {
   const { config, registros, plano } = await planejarDaEscola(schoolId, agora);
   const domingo = ehDomingo(agora);
   const resultado: ResultadoExecucao = {
@@ -325,6 +331,7 @@ export async function executarLembretesDaEscola(schoolId: string, agora = new Da
     porWhatsApp: 0,
     semCanal: 0,
     resolvidas: plano.resolvidos.length,
+    adiadas: 0,
   };
 
   await registrarSituacao(schoolId, plano, registros, agora);
@@ -334,6 +341,12 @@ export async function executarLembretesDaEscola(schoolId: string, agora = new Da
   const lote = plano.envios.slice(0, MAX_FAMILIAS_POR_EXECUCAO);
   await executarComLimite(
     lote.map((envio) => async () => {
+      // A rotina tem tempo máximo na Vercel: perto do fim, não começa família nova. Quem
+      // ficou de fora não foi marcado como avisado e recebe na próxima execução.
+      if (opcoes.encerrarEm !== undefined && Date.now() >= opcoes.encerrarEm) {
+        resultado.adiadas++;
+        return;
+      }
       const { canal, mensagemId } = await enviarLembreteFamilia(envio.responsavelId, envio.pendencias);
       if (canal === "nenhum") {
         resultado.semCanal++;

@@ -100,6 +100,18 @@ describe("executarLembretesDaEscola", () => {
     expect(registro?.[0].data).toEqual({ envios: { increment: 1 }, ultimoEnvioEm: QUARTA, ultimoEnvioMensagemId: null });
   });
 
+  it("tempo da rotina acabando: não começa família nova e ela fica para o próximo dia", async () => {
+    const r = await executarLembretesDaEscola("s1", QUARTA, { encerrarEm: Date.now() - 1 });
+    expect(r).toMatchObject({ familiasProntas: 2, enviadas: 0, adiadas: 2 });
+    expect(notifyUsers).not.toHaveBeenCalled();
+    expect(prismaMock.lembretePendencia.updateMany.mock.calls.some((c) => c[0].data.envios)).toBe(false);
+  });
+
+  it("com tempo de sobra: envia normalmente e nada fica adiado", async () => {
+    const r = await executarLembretesDaEscola("s1", QUARTA, { encerrarEm: Date.now() + 60_000 });
+    expect(r).toMatchObject({ enviadas: 2, adiadas: 0 });
+  });
+
   it("sem notificação no celular: vai pelo modelo aprovado do WhatsApp", async () => {
     notifyUsers.mockResolvedValue({ aparelhos: 0, enviados: 0, erros: [] });
     const r = await executarLembretesDaEscola("s1", QUARTA);
