@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { cadastrarModelos, consultarModelo, limparCacheModelos, wabaId } from "@/lib/whatsapp-modelos";
 
-/** Situação dos modelos de mensagem do ClassLink na Meta. */
+/** Situação dos modelos de mensagem do FokusApp na Meta. */
 export async function GET() {
   try {
     await requireRole("ADMIN");

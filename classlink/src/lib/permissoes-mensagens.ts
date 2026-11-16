@@ -4,7 +4,7 @@ import { AuthError } from "@/lib/session";
 import { FUNCAO_LABEL, funcaoDoUsuario } from "@/lib/equipe";
 
 /**
- * Quem conversa com quem nas Mensagens do ClassLink (regra da escola):
+ * Quem conversa com quem nas Mensagens do FokusApp (regra da escola):
  *  - gestão (direção e coordenação): envia e responde para todos — famílias e equipe;
  *  - professores e auxiliares: só com a gestão (nunca com famílias nem entre si);
  *  - famílias: só com a gestão (nunca com professores).

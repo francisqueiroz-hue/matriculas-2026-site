@@ -12,7 +12,7 @@ import { BotaoImprimir } from "./BotaoImprimir";
 const PRIMEIRO_ACESSO = [
   {
     titulo: "Abra o link",
-    texto: "Abra o endereço do ClassLink (o link que a escola enviou) pelo navegador do celular (Chrome no Android, Safari no iPhone) ou do computador. Não precisa baixar nada da loja de aplicativos.",
+    texto: "Abra o endereço do FokusApp (o link que a escola enviou) pelo navegador do celular (Chrome no Android, Safari no iPhone) ou do computador. Não precisa baixar nada da loja de aplicativos.",
   },
   {
     titulo: "Entre com seu telefone (ou e-mail) e a senha provisória",
@@ -33,10 +33,10 @@ const INSTALACAO = [
     aparelho: "Android (Samsung, Motorola, Xiaomi…)",
     icone: "🤖",
     passos: [
-      "Abra o ClassLink no Google Chrome e entre com seu acesso.",
-      "Se aparecer o aviso \"Instale o ClassLink na tela do seu celular\", toque em Instalar e pronto.",
+      "Abra o FokusApp no Google Chrome e entre com seu acesso.",
+      "Se aparecer o aviso \"Instale o FokusApp na tela do seu celular\", toque em Instalar e pronto.",
       "Se o aviso não aparecer: toque nos três pontinhos (⋮), no canto de cima, e escolha \"Adicionar à tela inicial\" ou \"Instalar app\". Confirme em Instalar.",
-      "O ícone do ClassLink aparece junto com os outros aplicativos. Abra sempre por ele.",
+      "O ícone do FokusApp aparece junto com os outros aplicativos. Abra sempre por ele.",
       "Quando o celular perguntar, toque em \"Permitir\" para receber as notificações.",
     ],
   },
@@ -45,10 +45,10 @@ const INSTALACAO = [
     icone: "🍎",
     destaque: "No iPhone, os avisos só chegam com o app instalado na Tela de Início.",
     passos: [
-      "Abra o ClassLink no Safari (não funciona pelo Chrome nem pelo navegador do Instagram/WhatsApp) e entre com seu acesso.",
+      "Abra o FokusApp no Safari (não funciona pelo Chrome nem pelo navegador do Instagram/WhatsApp) e entre com seu acesso.",
       "Toque no botão Compartilhar (o quadrado com uma seta para cima). Se não encontrar, toque nos três pontinhos (⋯) e depois em Compartilhar.",
       "Role a lista e toque em \"Adicionar à Tela de Início\". Depois toque em Adicionar.",
-      "Feche o Safari e abra o ClassLink pelo ícone novo da Tela de Início.",
+      "Feche o Safari e abra o FokusApp pelo ícone novo da Tela de Início.",
       "Toque em Minha conta e ative as notificações neste aparelho. Quando o iPhone perguntar, toque em \"Permitir\".",
     ],
     nota: "É preciso iPhone com iOS 16.4 ou mais recente. Para conferir: Ajustes › Geral › Sobre › Versão do iOS.",
@@ -57,9 +57,9 @@ const INSTALACAO = [
     aparelho: "Computador (Windows ou Mac)",
     icone: "💻",
     passos: [
-      "Abra o ClassLink no Google Chrome ou no Microsoft Edge e entre com seu acesso.",
+      "Abra o FokusApp no Google Chrome ou no Microsoft Edge e entre com seu acesso.",
       "Na barra de endereço, clique no ícone de instalar (um monitor com uma seta, ou um sinal de +) e depois em Instalar.",
-      "Se o ícone não aparecer, use o menu do navegador (⋮ ou ⋯) e procure \"Instalar ClassLink\" ou \"Instalar este site como aplicativo\".",
+      "Se o ícone não aparecer, use o menu do navegador (⋮ ou ⋯) e procure \"Instalar FokusApp\" ou \"Instalar este site como aplicativo\".",
       "Também dá para usar sem instalar: é só salvar o endereço nos favoritos.",
     ],
   },
@@ -137,7 +137,7 @@ const DUVIDAS = [
   },
   {
     pergunta: "Não estou recebendo as notificações.",
-    resposta: "Abra Minha conta e veja o quadro de notificações: ele diz o que falta e tem um botão para testar. No iPhone, confirme que você abre o ClassLink pelo ícone da Tela de Início, e não pelo Safari.",
+    resposta: "Abra Minha conta e veja o quadro de notificações: ele diz o que falta e tem um botão para testar. No iPhone, confirme que você abre o FokusApp pelo ícone da Tela de Início, e não pelo Safari.",
   },
   {
     pergunta: "Quais arquivos posso enviar nas Mensagens?",
@@ -179,8 +179,8 @@ function ListaNumerada({ itens }: { itens: string[] }) {
 }
 
 export const metadata = {
-  title: "Guia da família — ClassLink",
-  description: "Como entrar, instalar o app no celular ou computador e usar cada área do ClassLink.",
+  title: "Guia da família — FokusApp",
+  description: "Como entrar, instalar o app no celular ou computador e usar cada área do FokusApp.",
 };
 
 export default function GuiaPage() {
@@ -194,10 +194,13 @@ export default function GuiaPage() {
         </div>
 
         <div className="mb-10 text-center">
-          <h1 className="mb-2 text-3xl font-bold text-slate-900">Guia da família ClassLink</h1>
+          <h1 className="mb-2 text-3xl font-bold text-slate-900">Guia da família FokusApp</h1>
           <p className="mx-auto max-w-md text-slate-500">
             Como entrar, instalar o app no celular ou no computador e usar cada área. Leva poucos minutos, e você só faz
             a instalação uma vez.
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+            O FokusApp é o novo nome do ClassLink: mesmo endereço, mesmo acesso e mesma senha.
           </p>
           {/* No papel/PDF os botões somem: fica o endereço para digitar. */}
           <p className="mt-4 hidden text-sm font-semibold text-indigo-700 print:block">
@@ -208,7 +211,7 @@ export default function GuiaPage() {
               href="/login"
               className="mt-6 inline-block rounded-lg bg-indigo-600 px-8 py-3 font-semibold text-white transition hover:bg-indigo-700"
             >
-              Entrar no ClassLink
+              Entrar no FokusApp
             </a>
             <a
               href={linkPedirAcesso()}
@@ -257,7 +260,7 @@ export default function GuiaPage() {
         <section id="instalar" className="mb-12 scroll-mt-6">
           <h2 className="mb-1 text-xl font-bold text-slate-900">2. Instalar o app</h2>
           <p className="mb-6 text-sm text-slate-500">
-            O ClassLink é instalado direto pelo navegador, sem loja de aplicativos e sem ocupar quase nada de espaço. Escolha
+            O FokusApp é instalado direto pelo navegador, sem loja de aplicativos e sem ocupar quase nada de espaço. Escolha
             o seu aparelho:
           </p>
           <div className="space-y-6">
@@ -324,7 +327,7 @@ export default function GuiaPage() {
         <div className="break-inside-avoid rounded-xl bg-indigo-50 p-6 text-center">
           <h2 className="mb-1 font-bold text-slate-900">Ficou com alguma dúvida?</h2>
           <p className="mx-auto mb-4 max-w-xs text-sm text-slate-600">
-            Qualquer dificuldade para entrar ou usar o ClassLink, é só chamar a secretaria. Estamos aqui pra ajudar.
+            Qualquer dificuldade para entrar ou usar o FokusApp, é só chamar a secretaria. Estamos aqui pra ajudar.
           </p>
           <a
             href="https://wa.me/5521964699441"

@@ -9,7 +9,7 @@ const bodySchema = z.object({ ids: z.array(z.string().min(1)).min(1).max(300) })
 
 /**
  * Envia o acesso de uma ou várias pessoas (famílias ou equipe) pelo WhatsApp da escola,
- * pelo próprio ClassLink — convite com o botão ACESSO ou, com a conversa aberta, login e
+ * pelo próprio FokusApp — convite com o botão ACESSO ou, com a conversa aberta, login e
  * senha direto. Cada pessoa recebe o resultado individual.
  */
 export async function POST(request: NextRequest) {

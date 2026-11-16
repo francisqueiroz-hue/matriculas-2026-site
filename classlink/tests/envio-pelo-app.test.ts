@@ -14,7 +14,7 @@ describe("janela de conversa de 24h", () => {
   });
 });
 
-describe("modelos cadastrados pelo ClassLink", () => {
+describe("modelos cadastrados pelo FokusApp", () => {
   it("convite é de utilidade, sem senha e com o botão ACESSO", () => {
     const p = payloadCriacao("convite");
     expect(p.category).toBe("UTILITY");

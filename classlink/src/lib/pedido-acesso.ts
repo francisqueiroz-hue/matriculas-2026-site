@@ -26,7 +26,7 @@ export async function responderPedidoDeAcesso(
   if (!usuario?.active || usuario.deletedAt) {
     await sendWhatsAppTextMessage(
       telefone,
-      "Olá! Não encontramos um acesso ativo ao ClassLink para este número. Por favor, fale com a secretaria da escola.",
+      "Olá! Não encontramos um acesso ativo ao FokusApp para este número. Por favor, fale com a secretaria da escola.",
     );
     return;
   }
@@ -49,6 +49,6 @@ export async function responderPedidoDeAcesso(
 export async function responderNumeroNaoCadastrado(telefone: string): Promise<void> {
   await sendWhatsAppTextMessage(
     telefone,
-    "Olá! Não encontramos um cadastro no ClassLink com este número de WhatsApp. Por favor, fale com a secretaria da escola para conferir o telefone cadastrado.",
+    "Olá! Não encontramos um cadastro no FokusApp com este número de WhatsApp. Por favor, fale com a secretaria da escola para conferir o telefone cadastrado.",
   );
 }

@@ -137,7 +137,7 @@ class Documento {
     this.pdf = await PDFDocument.create();
     this.pdf.setTitle("Contrato de Prestação de Serviços Educacionais 2027");
     this.pdf.setAuthor("Espaço Kids Creche Escola Ltda");
-    this.pdf.setCreator("ClassLink");
+    this.pdf.setCreator("FokusApp");
     this.f = {
       times: await this.pdf.embedFont(StandardFonts.TimesRoman),
       timesBold: await this.pdf.embedFont(StandardFonts.TimesRomanBold),
@@ -496,8 +496,8 @@ export async function gerarContrato2027(entrada: EntradaContrato): Promise<Uint8
   doc.y += 4;
   doc.texto(
     !emBranco && data
-      ? `Escolhas feitas pelo responsável no aplicativo ClassLink em ${data.toLocaleDateString("pt-BR")}, uma a uma, sem opção pré-marcada.`
-      : "Marque à mão, ou faça as escolhas no aplicativo ClassLink (opção \"Preencher meus dados\"). Linha sem marcação = NÃO AUTORIZADO.",
+      ? `Escolhas feitas pelo responsável no aplicativo FokusApp em ${data.toLocaleDateString("pt-BR")}, uma a uma, sem opção pré-marcada.`
+      : "Marque à mão, ou faça as escolhas no aplicativo FokusApp (opção \"Preencher meus dados\"). Linha sem marcação = NÃO AUTORIZADO.",
     X0,
     doc.y,
     f.helvOblique,

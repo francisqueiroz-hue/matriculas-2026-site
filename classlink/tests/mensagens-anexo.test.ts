@@ -223,7 +223,7 @@ describe("arquivo grande enviado direto ao armazenamento", () => {
 });
 
 describe("direção envia a declaração para a família", () => {
-  it("com arquivo, o canal é sempre o ClassLink (nada sai pelo WhatsApp)", async () => {
+  it("com arquivo, o canal é sempre o FokusApp (nada sai pelo WhatsApp)", async () => {
     Object.assign(sessao, { sub: "staff1", role: "ADMIN" });
     const form = { body: "Segue a declaração solicitada", channel: "WHATSAPP", file: new File([PDF], "declaracao.pdf", { type: "application/pdf" }) };
     const res = await POST(multipart(form), ctx());

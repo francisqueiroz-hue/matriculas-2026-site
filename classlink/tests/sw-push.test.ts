@@ -19,8 +19,8 @@ const PAYLOAD = {
 };
 const janela = (visibilityState: string, focused: boolean, url = "https://app.escola.com.br/dashboard"): Janela => ({ visibilityState, focused, url });
 
-describe("service worker: push com o ClassLink aberto", () => {
-  it("ClassLink visível no computador, mas sem foco: o service worker mostra a notificação", () => {
+describe("service worker: push com o FokusApp aberto", () => {
+  it("FokusApp visível no computador, mas sem foco: o service worker mostra a notificação", () => {
     const aviso = notificacaoComJanelaVisivel(PAYLOAD, [janela("visible", false)]);
     expect(aviso?.titulo).toBe("WhatsApp de Maria");
     expect(aviso?.opcoes.body).toBe("Bom dia, a Ana vai faltar");
@@ -29,7 +29,7 @@ describe("service worker: push com o ClassLink aberto", () => {
     expect(aviso?.opcoes.renotify).toBe(true);
   });
 
-  it("pessoa olhando o ClassLink (janela com foco): mostra SILENCIOSA — push sem notificação faz o iPhone cancelar os avisos", () => {
+  it("pessoa olhando o FokusApp (janela com foco): mostra SILENCIOSA — push sem notificação faz o iPhone cancelar os avisos", () => {
     for (const janelas of [[janela("visible", true)], [janela("visible", false), janela("visible", true)]]) {
       const aviso = notificacaoComJanelaVisivel(PAYLOAD, janelas);
       expect(aviso?.titulo).toBe("WhatsApp de Maria");

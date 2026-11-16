@@ -96,7 +96,7 @@ async function mostrarNotificacao(msg: UltimaMensagem, total: number) {
 
 /**
  * Acompanha as mensagens não lidas em todo o painel: contador no menu, número no título
- * da aba ("(2) ClassLink"), notificação do navegador com som quando a aba não está em
+ * da aba ("(2) FokusApp"), notificação do navegador com som quando a aba não está em
  * foco e um aviso na tela quando a mensagem chega em outra página. Funciona sem Firebase.
  */
 export function AvisosMensagensProvider({ children }: { children: React.ReactNode }) {
@@ -140,7 +140,7 @@ export function AvisosMensagensProvider({ children }: { children: React.ReactNod
     if (atento) {
       setAviso(dados.ultima);
     } else {
-      // Aba oculta OU janela visível sem foco (no computador, o ClassLink aberto atrás de
+      // Aba oculta OU janela visível sem foco (no computador, o FokusApp aberto atrás de
       // outro programa): o aviso dentro da página ninguém veria, então vai para o sistema.
       void mostrarNotificacao(dados.ultima, dados.total);
     }
@@ -298,7 +298,7 @@ export function ConviteAtivarAvisos() {
 
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
-      <p>🔔 Ative os avisos para saber na hora quando chegar uma mensagem, mesmo com o ClassLink fechado. (Dá para ativar depois em Minha conta.)</p>
+      <p>🔔 Ative os avisos para saber na hora quando chegar uma mensagem, mesmo com o FokusApp fechado. (Dá para ativar depois em Minha conta.)</p>
       <div className="flex shrink-0 gap-2">
         <button
           type="button"

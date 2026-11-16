@@ -96,7 +96,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
       create: { guardianId: guardian.id, studentId, relation: body.relation },
     });
 
-    // Ao criar o acesso, envia pelo WhatsApp da escola (pelo próprio ClassLink): convite
+    // Ao criar o acesso, envia pelo WhatsApp da escola (pelo próprio FokusApp): convite
     // com o botão ACESSO ou, se a conversa estiver aberta, login e senha direto.
     const envio = temporaryPassword ? await enviarAcessoPeloApp(guardian.id, request.nextUrl.origin, temporaryPassword) : null;
 

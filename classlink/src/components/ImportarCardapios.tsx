@@ -26,7 +26,7 @@ interface Turma {
   name: string;
 }
 
-/** Pacotes que já vêm no ClassLink (cardápios enviados pela escola). */
+/** Pacotes que já vêm no FokusApp (cardápios enviados pela escola). */
 const PACOTES: { id: string; titulo: string; pacote: Pacote }[] = [
   { id: "out-dez-2026", titulo: "Cardápios de 12/10 a 18/12/2026 (nutricionista)", pacote: pacoteOutDez2026 as Pacote },
 ];
@@ -94,7 +94,7 @@ export function ImportarCardapios({
       if (p?.versao !== 1 || !Array.isArray(p.semanas) || !Array.isArray(p.segmentos)) throw new Error();
       escolher(p);
     } catch {
-      setErro("Arquivo inválido: use um pacote de cardápios do ClassLink (.json).");
+      setErro("Arquivo inválido: use um pacote de cardápios do FokusApp (.json).");
     }
   }
 

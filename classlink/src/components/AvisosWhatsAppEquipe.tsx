@@ -17,7 +17,7 @@ function formatarTelefone(telefone: string | null) {
   return telefone;
 }
 
-/** Equipe: receber no WhatsApp pessoal o aviso de mensagem nova no ClassLink. */
+/** Equipe: receber no WhatsApp pessoal o aviso de mensagem nova no FokusApp. */
 export function AvisosWhatsAppEquipe() {
   const [pref, setPref] = useState<Preferencia | null>(null);
   const [telefone, setTelefone] = useState("");
@@ -66,12 +66,12 @@ export function AvisosWhatsAppEquipe() {
       <h2 className="font-semibold">Avisos de mensagens no WhatsApp</h2>
       <p className="mt-1 text-sm text-slate-500">
         Receba no seu WhatsApp, pelo número da escola, um aviso com o trecho da mensagem e o link para responder sempre
-        que uma família ou um colega escrever para você no ClassLink.
+        que uma família ou um colega escrever para você no FokusApp.
       </p>
       <p className="mt-2 rounded-md bg-emerald-50 p-2 text-xs text-emerald-900">
         <strong>Responda direto pelo WhatsApp:</strong> toque e segure o aviso, escolha <em>Responder</em> e escreva. A
-        resposta entra na conversa do ClassLink e você recebe a confirmação &quot;✓ Resposta enviada&quot;. Só texto (áudio e foto,
-        pelo ClassLink).
+        resposta entra na conversa do FokusApp e você recebe a confirmação &quot;✓ Resposta enviada&quot;. Só texto (áudio e foto,
+        pelo FokusApp).
       </p>
       {!pref.disponivel && (
         <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-900">

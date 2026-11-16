@@ -75,9 +75,9 @@ async function redefinirEEnviar(identifier: LoginIdentifier, origem: string) {
   if (!user || !user.active || user.deletedAt) return;
 
   const temporaryPassword = randomBytes(6).toString("hex");
-  const mensagem = `Sua nova senha temporária do ClassLink é: ${temporaryPassword}\n\nUse-a para entrar e, se quiser, troque por uma de sua preferência em Conta > Trocar senha.`;
+  const mensagem = `Sua nova senha temporária do FokusApp é: ${temporaryPassword}\n\nUse-a para entrar e, se quiser, troque por uma de sua preferência em Conta > Trocar senha.`;
 
-  // WhatsApp da escola, pelo próprio ClassLink: senha direto se a conversa estiver
+  // WhatsApp da escola, pelo próprio FokusApp: senha direto se a conversa estiver
   // aberta (ou com modelo de acesso); senão, convite com o botão ACESSO. Nesse caminho a
   // senha só é trocada quando a entrega é aceita — nunca fica uma senha que não chegou.
   if (user.phone) {
@@ -88,7 +88,7 @@ async function redefinirEEnviar(identifier: LoginIdentifier, origem: string) {
   let entregue = false;
   if (user.email && isEmailConfigured()) {
     try {
-      await sendPlainEmail({ to: user.email, subject: "Nova senha do ClassLink", text: mensagem });
+      await sendPlainEmail({ to: user.email, subject: "Nova senha do FokusApp", text: mensagem });
       entregue = true;
     } catch (err) {
       console.error("Falha ao enviar nova senha por e-mail", err);

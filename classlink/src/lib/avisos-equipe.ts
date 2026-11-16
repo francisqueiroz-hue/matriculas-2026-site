@@ -34,12 +34,12 @@ export function parametrosModeloAviso(remetente: string, texto: string, link: st
 /** Texto livre do aviso, usado quando a pessoa escreveu para a escola nas últimas 24h. */
 export function textoAviso(remetente: string, texto: string, link: string): string {
   return (
-    `Você recebeu uma nova mensagem no ClassLink de ${remetente}:\n\n"${trechoAviso(texto)}"\n\n` +
+    `Você recebeu uma nova mensagem no FokusApp de ${remetente}:\n\n"${trechoAviso(texto)}"\n\n` +
     `↩️ Para responder daqui, toque e segure esta mensagem e escolha *Responder*. Ou abra: ${link}`
   );
 }
 
-/** Liga uma mensagem enviada pelo WhatsApp da escola à conversa do ClassLink. */
+/** Liga uma mensagem enviada pelo WhatsApp da escola à conversa do FokusApp. */
 export async function registrarAviso(externalId: string, userId: string, tipo: "familia" | "equipe", conversationId: string) {
   if (!externalId) return;
   await prisma.whatsAppVinculoConversa
@@ -51,7 +51,7 @@ interface NovaMensagem {
   destinatarioId: string;
   remetente: string;
   texto: string;
-  /** Link absoluto para abrir a conversa no ClassLink. */
+  /** Link absoluto para abrir a conversa no FokusApp. */
   link: string;
   /** Conversa com família (Message) ou interna da equipe (TeamMessage). */
   tipo: "familia" | "equipe";
@@ -61,7 +61,7 @@ interface NovaMensagem {
 
 /**
  * Avisa um membro da equipe (ADMIN/STAFF) no WhatsApp pessoal, pelo número da escola,
- * que chegou mensagem nova no ClassLink — se ele ativou isso em Conta ou não tem push ativo,
+ * que chegou mensagem nova no FokusApp — se ele ativou isso em Conta ou não tem push ativo,
  * tem celular cadastrado e o modelo aprovado está configurado. Se já houver outra mensagem não lida
  * recente na mesma conversa, não repete o aviso (evita uma mensagem de WhatsApp por
  * frase). Nunca lança erro: aviso é um extra e não pode atrapalhar o envio da mensagem.

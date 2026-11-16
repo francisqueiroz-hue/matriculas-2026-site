@@ -1,7 +1,7 @@
 import { detectarTipoMidia } from "@/lib/tipo-midia";
 
 /**
- * Arquivos enviados pela aba Mensagens do ClassLink (declarações, atestados, documentos,
+ * Arquivos enviados pela aba Mensagens do FokusApp (declarações, atestados, documentos,
  * fotos de documentos), entre a família e a direção/coordenação. Regras compartilhadas entre
  * o servidor e o navegador — sem dependências de servidor.
  *

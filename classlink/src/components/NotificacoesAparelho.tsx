@@ -45,7 +45,7 @@ function AparelhosDaConta({ atualizar }: { atualizar: number }) {
     <div className="mt-3 text-sm text-slate-600 dark:text-slate-300">
       <p className="font-medium text-slate-700 dark:text-slate-200">Aparelhos desta conta que recebem avisos</p>
       {aparelhos.length === 0 ? (
-        <p className="mt-1">Nenhum aparelho registrado. Abra o ClassLink no celular e toque em “Enviar notificação de teste”.</p>
+        <p className="mt-1">Nenhum aparelho registrado. Abra o FokusApp no celular e toque em “Enviar notificação de teste”.</p>
       ) : (
         <ul className="mt-1 space-y-1">
           {aparelhos.map((a) => (
@@ -96,7 +96,7 @@ export function NotificacoesAparelho() {
     try {
       const token = await requestPushToken(false);
       if (!token) {
-        setMensagem({ tipo: "erro", texto: "As notificações deste app ainda não estão configuradas neste navegador. Feche e abra o ClassLink e tente de novo." });
+        setMensagem({ tipo: "erro", texto: "As notificações deste app ainda não estão configuradas neste navegador. Feche e abra o FokusApp e tente de novo." });
         return;
       }
       try {
@@ -111,7 +111,7 @@ export function NotificacoesAparelho() {
         setMensagem({
           tipo: "ok",
           texto: iphone
-            ? "Notificação enviada! Para ver como chega, saia do ClassLink (volte à tela inicial) e aguarde alguns segundos."
+            ? "Notificação enviada! Para ver como chega, saia do FokusApp (volte à tela inicial) e aguarde alguns segundos."
             : "Notificação enviada! Ela deve aparecer em alguns segundos.",
         });
       } else {
@@ -142,16 +142,16 @@ export function NotificacoesAparelho() {
 
       {estado === "instalar-iphone" && (
         <div className="mt-2 space-y-1 text-sm text-slate-600 dark:text-slate-300">
-          <p>No iPhone, as notificações só funcionam com o ClassLink instalado na tela de início:</p>
+          <p>No iPhone, as notificações só funcionam com o FokusApp instalado na tela de início:</p>
           <ol className="list-decimal space-y-1 pl-5">
             <li>
-              Abra o ClassLink no <strong>Safari</strong> e toque em <strong>Compartilhar</strong> (quadrado com seta).
+              Abra o FokusApp no <strong>Safari</strong> e toque em <strong>Compartilhar</strong> (quadrado com seta).
             </li>
             <li>
               Toque em <strong>&quot;Adicionar à Tela de Início&quot;</strong>.
             </li>
             <li>
-              Abra o ClassLink <strong>pelo ícone</strong> e volte a esta página (Minha conta) para ativar.
+              Abra o FokusApp <strong>pelo ícone</strong> e volte a esta página (Minha conta) para ativar.
             </li>
           </ol>
         </div>
@@ -159,7 +159,7 @@ export function NotificacoesAparelho() {
 
       {estado === "sem-suporte" && (
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Este navegador não aceita notificações. No celular, use o ClassLink instalado na tela de início (iPhone com
+          Este navegador não aceita notificações. No celular, use o FokusApp instalado na tela de início (iPhone com
           iOS 16.4 ou mais recente) ou o Chrome no Android.
         </p>
       )}
@@ -169,7 +169,7 @@ export function NotificacoesAparelho() {
           As notificações foram bloqueadas neste aparelho.{" "}
           {iphone ? (
             <>
-              Para liberar, abra <strong>Ajustes → Notificações → ClassLink</strong> e ative{" "}
+              Para liberar, abra <strong>Ajustes → Notificações → FokusApp</strong> (ou <strong>ClassLink</strong>, se o app foi instalado antes da troca de nome) e ative{" "}
               <strong>Permitir Notificações</strong>.
             </>
           ) : (
@@ -180,7 +180,7 @@ export function NotificacoesAparelho() {
 
       {estado === "pendente" && (
         <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          <p>Receba um aviso no celular quando chegar mensagem ou comunicado, mesmo com o ClassLink fechado.</p>
+          <p>Receba um aviso no celular quando chegar mensagem ou comunicado, mesmo com o FokusApp fechado.</p>
           <button
             type="button"
             onClick={ativar}

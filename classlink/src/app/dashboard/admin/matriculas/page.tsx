@@ -110,7 +110,7 @@ function SolicitacaoCard({ s, onChange, onDelete }: { s: Solicitacao; onChange: 
             </span>
             <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COR[s.status]}`}>{STATUS_LABEL[s.status]}</span>
             <span className="text-xs text-slate-500">
-              {new Date(s.createdAt).toLocaleString("pt-BR")} · {s.origem === "SITE" ? "site da escola" : "ClassLink"}
+              {new Date(s.createdAt).toLocaleString("pt-BR")} · {s.origem === "SITE" ? "site da escola" : "FokusApp"}
               {s.responsavelId && " · responsável já cadastrado"}
             </span>
           </div>
@@ -250,7 +250,7 @@ function MatriculasContent() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold">Matrículas {ano ?? ""}</h1>
-          <p className="text-sm text-slate-500">Pré-matrículas e rematrículas enviadas pelo site da escola e pelo ClassLink.</p>
+          <p className="text-sm text-slate-500">Pré-matrículas e rematrículas enviadas pelo site da escola e pelo FokusApp.</p>
         </div>
         <a
           href={`/api/admin/matriculas?${query({ format: "csv" })}`}

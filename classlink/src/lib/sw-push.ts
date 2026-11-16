@@ -1,12 +1,12 @@
 /**
- * Decisão do service worker sobre a notificação push quando o ClassLink está aberto na tela.
+ * Decisão do service worker sobre a notificação push quando o FokusApp está aberto na tela.
  *
  * O SDK do Firebase, ao receber um push, verifica se há alguma janela do app VISÍVEL. Se há,
  * ele não mostra a notificação: só repassa o conteúdo para a página (para um "onMessage").
- * O ClassLink não usa onMessage, então o aviso sumia.
+ * O FokusApp não usa onMessage, então o aviso sumia.
  *
  * Isso tinha dois efeitos:
- *  1. No computador, o ClassLink fica aberto numa janela visível sem foco e a mensagem chegava
+ *  1. No computador, o FokusApp fica aberto numa janela visível sem foco e a mensagem chegava
  *     sem notificação (corrigido no PR #110).
  *  2. No iPhone (e no Safari em geral), push que termina SEM notificação conta como "push
  *     silencioso". Depois de poucos (a Apple fala em três), o Safari CANCELA a inscrição de
@@ -52,6 +52,6 @@ function notificacaoComJanelaVisivel(payload, janelas) {
   } else if (n.tag) {
     opcoes.renotify = true; // cada mensagem nova avisa, mesmo substituindo a anterior
   }
-  return { titulo: n.title || "ClassLink", opcoes: opcoes };
+  return { titulo: n.title || "FokusApp", opcoes: opcoes };
 }
 `;

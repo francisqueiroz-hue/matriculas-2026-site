@@ -110,7 +110,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
     // Só a equipe precisa saber se o WhatsApp ainda entrega texto livre (janela de 24h); a família não vê isso.
     const { whatsappUltimaMensagemEm, ...guardianPublico } = conversation.guardian;
     const souEquipe = session.sub === conversation.staffId;
-    // Só a equipe vê se o WhatsApp recusou a entrega (para reenviar pelo ClassLink).
+    // Só a equipe vê se o WhatsApp recusou a entrega (para reenviar pelo FokusApp).
     const [bloqueio, falhas] = souEquipe
       ? await Promise.all([
           isWhatsAppConfigured() ? bloqueioPorCobranca(session.schoolId) : null,
@@ -156,15 +156,15 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     if (!body) return NextResponse.json({ error: "Escreva a mensagem ou anexe um arquivo." }, { status: 400 });
 
     // WhatsApp/e-mail só fazem sentido enviados pela equipe ao responsável — o responsável
-    // já está na conversa via app, e essas mensagens sempre partem de quem está na tela do ClassLink.
-    // Arquivos (declarações, documentos) ficam sempre no ClassLink: o armazenamento é privado e
+    // já está na conversa via app, e essas mensagens sempre partem de quem está na tela do FokusApp.
+    // Arquivos (declarações, documentos) ficam sempre no FokusApp: o armazenamento é privado e
     // só quem participa da conversa abre (LGPD); a família recebe a notificação do app.
     let canalEfetivo: "APP" | "WHATSAPP" | "EMAIL" =
       channel && channel !== "APP" && session.sub === conversation.staffId && !anexo ? channel : "APP";
 
     let externalId: string | undefined;
     let avisoPeloWhatsApp = false;
-    // Quando o WhatsApp falha, a mensagem não se perde nem trava a tela: vai pelo ClassLink
+    // Quando o WhatsApp falha, a mensagem não se perde nem trava a tela: vai pelo FokusApp
     // (a família recebe a notificação do app) e a equipe é avisada do motivo.
     let aviso: string | null = null;
     if (canalEfetivo === "WHATSAPP") {
@@ -179,11 +179,11 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
       const motivoDaFalha = (err: unknown) => {
         console.error("conversa: falha ao enviar WhatsApp", err);
         const explicacao = err instanceof ErroWhatsApp && err.codigo ? explicarCodigoFalha(err.codigo) : "O WhatsApp não aceitou o envio agora.";
-        return `Não foi possível enviar pelo WhatsApp (${explicacao.replace(/\.$/, "")}). A mensagem foi enviada pelo ClassLink e a família recebe a notificação no celular.`;
+        return `Não foi possível enviar pelo WhatsApp (${explicacao.replace(/\.$/, "")}). A mensagem foi enviada pelo FokusApp e a família recebe a notificação no celular.`;
       };
 
       if (await bloqueioPorCobranca(session.schoolId)) {
-        aviso = `Enviada pelo ClassLink. ${MOTIVO_BLOQUEIO_COBRANCA.split(". ")[0]}.`;
+        aviso = `Enviada pelo FokusApp. ${MOTIVO_BLOQUEIO_COBRANCA.split(". ")[0]}.`;
         canalEfetivo = "APP";
       } else if (janelaWhatsApp(guardian.whatsappUltimaMensagemEm).aberta) {
         try {
@@ -194,12 +194,12 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
         }
       } else {
         // Fora da janela de 24h a Meta descarta texto livre (e aceita o envio, o que enganava a equipe).
-        // O texto completo fica no ClassLink; a família recebe no WhatsApp o aviso padrão aprovado,
-        // com o trecho e o link. A mensagem é do canal ClassLink, então vale o ✓✓ de abertura.
+        // O texto completo fica no FokusApp; a família recebe no WhatsApp o aviso padrão aprovado,
+        // com o trecho e o link. A mensagem é do canal FokusApp, então vale o ✓✓ de abertura.
         canalEfetivo = "APP";
         const modelo = await modeloDisponivel("aviso");
         if (!modelo) {
-          aviso = "Enviada pelo ClassLink: o WhatsApp só entrega texto livre até 24 horas depois da última mensagem da família e o aviso padrão não está disponível agora.";
+          aviso = "Enviada pelo FokusApp: o WhatsApp só entrega texto livre até 24 horas depois da última mensagem da família e o aviso padrão não está disponível agora.";
         } else {
           try {
             const eu = await prisma.user.findUniqueOrThrow({ where: { id: session.sub }, select: SELECT_PESSOA });
@@ -219,7 +219,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
       if (!isEmailConfigured()) return NextResponse.json({ error: "Integração de e-mail não configurada" }, { status: 400 });
       const guardian = await prisma.user.findUniqueOrThrow({ where: { id: conversation.guardianId }, select: { email: true } });
       if (!guardian.email) return NextResponse.json({ error: "Responsável não tem e-mail cadastrado" }, { status: 400 });
-      const sent = await sendEmailMessage({ to: guardian.email, subject: "Nova mensagem do ClassLink", text: body, conversationId: id }).catch((err: unknown) => {
+      const sent = await sendEmailMessage({ to: guardian.email, subject: "Nova mensagem do FokusApp", text: body, conversationId: id }).catch((err: unknown) => {
         console.error("conversa: falha ao enviar e-mail", err);
         throw new ErroDeUsuario("Não foi possível enviar o e-mail. Confira o endereço do responsável e a integração.", 502);
       });

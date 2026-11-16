@@ -75,7 +75,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
       return updated;
     });
 
-    // Nova senha: envia pelo WhatsApp da escola (pelo próprio ClassLink).
+    // Nova senha: envia pelo WhatsApp da escola (pelo próprio FokusApp).
     const envio = temporaryPassword ? await enviarAcessoPeloApp(user.id, request.nextUrl.origin, temporaryPassword) : null;
 
     return NextResponse.json({

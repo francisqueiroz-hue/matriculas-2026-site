@@ -6,7 +6,7 @@ import { shouldShowIosInstallBanner } from "@/lib/device";
 const DISMISS_KEY = "classlink-ios-install-dismissed";
 
 /**
- * No iPhone/iPad, notificações push do ClassLink só chegam depois que a pessoa
+ * No iPhone/iPad, notificações push do FokusApp só chegam depois que a pessoa
  * "Adiciona à Tela de Início" o site (restrição do próprio iOS, não do nosso
  * código). Este aviso aparece só nesse cenário — iOS, ainda pelo navegador — e
  * fica escondido pra sempre naquele aparelho assim que a pessoa fechar.
@@ -37,9 +37,9 @@ export function IosInstallBanner() {
   return (
     <div className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
       <p>
-        📲 Para receber avisos do ClassLink no seu iPhone, toque no ícone de{" "}
+        📲 Para receber avisos do FokusApp no seu iPhone, toque no ícone de{" "}
         <strong>Compartilhar</strong> do Safari e depois em{" "}
-        <strong>&quot;Adicionar à Tela de Início&quot;</strong>. Depois disso, abra o ClassLink por
+        <strong>&quot;Adicionar à Tela de Início&quot;</strong>. Depois disso, abra o FokusApp por
         esse ícone (não mais pelo navegador) para as notificações funcionarem.
       </p>
       <button

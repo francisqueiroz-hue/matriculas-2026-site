@@ -8,7 +8,7 @@ export type { TipoAnexo };
 /**
  * Fotos, documentos, áudios e vídeos que a família manda pelo WhatsApp. O webhook traz só o
  * id da mídia: o arquivo é baixado da Graph API (com o token da escola) e guardado no
- * armazenamento privado do ClassLink, para a equipe ver na conversa por link assinado.
+ * armazenamento privado do FokusApp, para a equipe ver na conversa por link assinado.
  *
  * Meta (developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media):
  * GET /<MEDIA_ID> devolve `url` e `mime_type`; a `url` vence em 5 minutos e exige o mesmo
@@ -35,7 +35,7 @@ interface MidiaNoWebhook {
 
 const TIPOS: readonly TipoAnexo[] = ["image", "sticker", "document", "audio", "video"];
 
-/** Limites do ClassLink (a Meta aceita documentos de até 100 MB; acima disto, fica o aviso). */
+/** Limites do FokusApp (a Meta aceita documentos de até 100 MB; acima disto, fica o aviso). */
 export const LIMITE_BYTES: Record<TipoAnexo, number> = {
   image: 8 * 1024 * 1024,
   sticker: 1024 * 1024,

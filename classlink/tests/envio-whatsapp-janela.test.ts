@@ -69,7 +69,7 @@ beforeEach(() => {
 });
 
 describe("envio pelo WhatsApp respeita a janela de 24h", () => {
-  it("janela fechada com aviso padrão aprovado: texto fica no ClassLink e a família é avisada pelo modelo", async () => {
+  it("janela fechada com aviso padrão aprovado: texto fica no FokusApp e a família é avisada pelo modelo", async () => {
     prismaMock.user.findUniqueOrThrow
       .mockResolvedValueOnce({ phone: "5521987654321", whatsappUltimaMensagemEm: new Date(Date.now() - 30 * 3600 * 1000) })
       .mockResolvedValueOnce({ id: "staff1", name: "Dir", role: "ADMIN", funcao: null, nomeParaFamilias: "Secretaria" });
@@ -81,11 +81,11 @@ describe("envio pelo WhatsApp respeita a janela de 24h", () => {
     expect(templateMock.mock.calls[0][2][1]).toBe("Olá");
     expect(templateMock.mock.calls[0][2][2]).toContain("/dashboard/mensagens/c1");
     expect(registrarAvisoMock).toHaveBeenCalledWith("wamid.aviso", "g1", "familia", "c1");
-    // gravada como mensagem do ClassLink (vale o ✓✓ de abertura), não como "via WhatsApp"
+    // gravada como mensagem do FokusApp (vale o ✓✓ de abertura), não como "via WhatsApp"
     expect(prismaMock.message.create.mock.calls[0][0].data.channel).toBe("APP");
   });
 
-  it("janela fechada e sem aviso padrão aprovado: vai pelo ClassLink, com a explicação", async () => {
+  it("janela fechada e sem aviso padrão aprovado: vai pelo FokusApp, com a explicação", async () => {
     modeloMock.mockResolvedValue(null);
     prismaMock.user.findUniqueOrThrow.mockResolvedValue({ phone: "5521987654321", whatsappUltimaMensagemEm: null });
     const res = await POST(req("WHATSAPP"), ctx);
@@ -109,7 +109,7 @@ describe("envio pelo WhatsApp respeita a janela de 24h", () => {
 describe("falha do WhatsApp não trava o envio", () => {
   const janelaAberta = { phone: "5521987654321", whatsappUltimaMensagemEm: new Date(Date.now() - 3600 * 1000) };
 
-  it("conta bloqueada por pagamento pendente (131042 recente): nem tenta a Meta, envia pelo ClassLink", async () => {
+  it("conta bloqueada por pagamento pendente (131042 recente): nem tenta a Meta, envia pelo FokusApp", async () => {
     bloqueioMock.mockResolvedValue({ desde: new Date() });
     prismaMock.user.findUniqueOrThrow.mockResolvedValue(janelaAberta);
     const res = await POST(req("WHATSAPP"), ctx);
@@ -120,18 +120,18 @@ describe("falha do WhatsApp não trava o envio", () => {
     expect(prismaMock.message.create.mock.calls[0][0].data.externalId).toBeUndefined();
   });
 
-  it("Meta recusa na hora (ex.: 131042): a mensagem vai pelo ClassLink e a equipe vê o motivo", async () => {
+  it("Meta recusa na hora (ex.: 131042): a mensagem vai pelo FokusApp e a equipe vê o motivo", async () => {
     enviarMock.mockRejectedValue(new ErroWhatsAppFake("unsettled payments", 131042));
     prismaMock.user.findUniqueOrThrow.mockResolvedValue(janelaAberta);
     const res = await POST(req("WHATSAPP"), ctx);
     expect(res.status).toBe(201);
     const corpo = await res.json();
     expect(corpo.aviso).toMatch(/Pagamento pendente/);
-    expect(corpo.aviso).toMatch(/ClassLink/);
+    expect(corpo.aviso).toMatch(/FokusApp/);
     expect(prismaMock.message.create.mock.calls[0][0].data.channel).toBe("APP");
   });
 
-  it("WhatsApp sem resposta (tempo esgotado) no aviso padrão: a mensagem fica no ClassLink", async () => {
+  it("WhatsApp sem resposta (tempo esgotado) no aviso padrão: a mensagem fica no FokusApp", async () => {
     templateMock.mockRejectedValue(new ErroWhatsAppFake("O WhatsApp não respondeu a tempo", null));
     prismaMock.user.findUniqueOrThrow
       .mockResolvedValueOnce({ phone: "5521987654321", whatsappUltimaMensagemEm: null })

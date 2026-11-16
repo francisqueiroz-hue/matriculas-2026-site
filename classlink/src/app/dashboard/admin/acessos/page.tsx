@@ -106,7 +106,7 @@ function AcessosContent() {
   async function excluir(r: Responsavel) {
     if (
       !confirm(
-        `Excluir ${r.name}? A pessoa perde o acesso ao ClassLink e sai das listas; e-mail e celular são apagados do cadastro. Use para quem saiu da escola.`,
+        `Excluir ${r.name}? A pessoa perde o acesso ao FokusApp e sai das listas; e-mail e celular são apagados do cadastro. Use para quem saiu da escola.`,
       )
     ) {
       return;
@@ -153,7 +153,7 @@ function AcessosContent() {
     if (!dados) return;
     try {
       await navigator.clipboard.writeText(
-        `Para receber seu acesso ao ClassLink, toque no link e envie a mensagem ACESSO: ${dados.linkPedirAcesso}`,
+        `Para receber seu acesso ao FokusApp, toque no link e envie a mensagem ACESSO: ${dados.linkPedirAcesso}`,
       );
       setCopiado(true);
       setTimeout(() => setCopiado(false), 3000);
@@ -168,17 +168,17 @@ function AcessosContent() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold">Acessos ao ClassLink</h1>
+        <h1 className="text-xl font-bold">Acessos ao FokusApp</h1>
         <p className="text-sm text-slate-500">
-          Famílias e equipe que ainda não entraram no ClassLink e como enviar o acesso para elas.
+          Famílias e equipe que ainda não entraram no FokusApp e como enviar o acesso para elas.
         </p>
       </div>
 
       {dados && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
-          <p className="font-semibold">📲 O acesso sai pelo WhatsApp da escola, direto do ClassLink</p>
+          <p className="font-semibold">📲 O acesso sai pelo WhatsApp da escola, direto do FokusApp</p>
           <p className="mt-1">
-            O ClassLink envia o acesso pelo WhatsApp da escola <strong>{formatarTelefone(dados.numeroEscola)}</strong> — nada sai do seu
+            O FokusApp envia o acesso pelo WhatsApp da escola <strong>{formatarTelefone(dados.numeroEscola)}</strong> — nada sai do seu
             WhatsApp pessoal. A pessoa recebe um convite com o botão <strong>ACESSO</strong>; ao tocar, recebe o link, o login e uma
             senha provisória na hora. Quem já mandou <strong>ACESSO</strong> para a escola também recebe automaticamente.
           </p>
@@ -260,12 +260,12 @@ function AcessosContent() {
               ? "Ninguém da equipe cadastrado."
               : filtro === "semNotificacao"
                 ? "🎉 Toda a equipe está com as notificações ativas."
-                : "🎉 Toda a equipe já entrou no ClassLink."
+                : "🎉 Toda a equipe já entrou no FokusApp."
             : filtro === "todos"
               ? "Nenhum responsável cadastrado."
               : filtro === "semNotificacao"
                 ? "🎉 Todos os responsáveis estão com as notificações ativas."
-                : "🎉 Todos os responsáveis já entraram no ClassLink."}
+                : "🎉 Todos os responsáveis já entraram no FokusApp."}
         </p>
       )}
 

@@ -164,7 +164,7 @@ export function caminhoContratoValido(caminho: string, escolaId: string, contrat
  */
 export function textoEnvioPdf(aluno: string): string {
   const nome = aluno.trim().split(/\s+/)[0] || "seu filho(a)";
-  return `Segue o contrato de matrícula de ${nome} em PDF. Dá para assinar grátis pelo gov.br (${LINK_ASSINADOR_GOVBR}) ou à mão. Depois, envie o PDF assinado pelo ClassLink, no menu Contratos, ou responda por aqui.`;
+  return `Segue o contrato de matrícula de ${nome} em PDF. Dá para assinar grátis pelo gov.br (${LINK_ASSINADOR_GOVBR}) ou à mão. Depois, envie o PDF assinado pelo FokusApp, no menu Contratos, ou responda por aqui.`;
 }
 
 export function nomeArquivoPdfSeguro(nome: string): string {

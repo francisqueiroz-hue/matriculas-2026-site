@@ -3,7 +3,7 @@ import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
-  title: "ClassLink — Comunicação Escola-Família",
+  title: "FokusApp — Comunicação Escola-Família",
   description: "Mural de avisos, mensagens diretas e agenda escolar em um só app.",
   manifest: "/manifest.json",
   icons: {
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "ClassLink",
+    title: "FokusApp",
   },
 };
 

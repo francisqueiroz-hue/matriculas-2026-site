@@ -35,7 +35,7 @@ export function mensagemCobrancaBoleto(input: {
     : `lembramos que a mensalidade de ${input.aluno} (${valorBR(input.valor)}) vence em ${dataBR(input.vencimento)}`;
   return (
     `${saudacao}Aqui é da secretaria da escola: ${situacao}. ` +
-    `O boleto está disponível no ClassLink, em Financeiro. Se já pagou, pode desconsiderar esta mensagem.`
+    `O boleto está disponível no FokusApp, em Financeiro. Se já pagou, pode desconsiderar esta mensagem.`
   );
 }
 

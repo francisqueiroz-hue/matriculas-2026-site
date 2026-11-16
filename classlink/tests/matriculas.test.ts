@@ -6,7 +6,7 @@ import { linkWhatsAppRematricula, mensagemRematricula } from "@/lib/rematricula"
 
 const root = path.join(__dirname, "..");
 
-describe("página de matrículas dentro do ClassLink", () => {
+describe("página de matrículas dentro do FokusApp", () => {
   it("public/matriculas.html está em sincronia com site/index.html (rode npm run sync:matriculas)", () => {
     const site = readFileSync(path.join(root, "../site/index.html"), "utf8");
     const gerado = readFileSync(path.join(root, "public/matriculas.html"), "utf8");
@@ -15,7 +15,7 @@ describe("página de matrículas dentro do ClassLink", () => {
     expect(lf(gerado)).toBe(lf(toClassLinkPage(site)));
   });
 
-  it("troca assets pelas logos do app e links do ClassLink por caminhos relativos na mesma aba", () => {
+  it("troca assets pelas logos do app e links do FokusApp por caminhos relativos na mesma aba", () => {
     const html = toClassLinkPage(
       `<!doctype html>\n<img src="assets/logo-espaco-kids.png"><a href="${CLASSLINK_URL}/login" target="_blank" rel="noopener">Entrar</a>`,
     );

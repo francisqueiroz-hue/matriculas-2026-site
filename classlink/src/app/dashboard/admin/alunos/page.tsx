@@ -182,7 +182,7 @@ function AlunosContent() {
   async function handleUnlinkGuardian(studentId: string, guardianId: string, nome: string) {
     if (!confirm(`Revogar o vínculo de ${nome} com este aluno?`)) return;
     const excluir = confirm(
-      `Se ${nome} não tiver outro aluno na escola, excluir também o acesso ao ClassLink?\n\nOK = excluir o acesso · Cancelar = só desvincular`,
+      `Se ${nome} não tiver outro aluno na escola, excluir também o acesso ao FokusApp?\n\nOK = excluir o acesso · Cancelar = só desvincular`,
     );
     try {
       const res = await apiJson<{ responsavelExcluido: boolean }>(

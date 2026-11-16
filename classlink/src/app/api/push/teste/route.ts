@@ -12,7 +12,7 @@ export async function POST() {
       return NextResponse.json({ ok: false, motivo: erroFirebaseAdmin() ?? "Notificações não configuradas no servidor." });
     }
     const r = await notifyUsers([session.sub], {
-      title: "ClassLink",
+      title: "FokusApp",
       body: "Notificação de teste: está tudo certo neste aparelho. ✅",
       url: "/dashboard",
     });

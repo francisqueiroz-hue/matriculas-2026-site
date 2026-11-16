@@ -1,7 +1,7 @@
 /**
  * Tipos de evento do WhatsApp que não são mensagens para a equipe: uma reação (emoji em cima
  * de uma mensagem, ex.: 👍 na mensagem de boas-vindas) não pede resposta e não tem texto. Entrava
- * no ClassLink como `[Mensagem do tipo "reaction" recebida...]` e gerava aviso à toa.
+ * no FokusApp como `[Mensagem do tipo "reaction" recebida...]` e gerava aviso à toa.
  */
 const TIPOS_IGNORADOS = new Set(["reaction"]);
 

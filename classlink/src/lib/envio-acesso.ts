@@ -26,7 +26,7 @@ export type ResultadoEnvioAcesso =
   | { enviado: false; motivo: string };
 
 /**
- * Envia o acesso de um usuário pelo WhatsApp da escola — sempre pelo próprio ClassLink:
+ * Envia o acesso de um usuário pelo WhatsApp da escola — sempre pelo próprio FokusApp:
  *  1. conversa aberta (a pessoa escreveu nas últimas 24h): manda login e senha direto;
  *  2. modelo de acesso com senha configurado (opcional): manda por ele;
  *  3. senão: manda o convite (modelo aprovado, sem senha) com o botão ACESSO — ao tocar,

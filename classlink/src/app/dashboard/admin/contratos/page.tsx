@@ -126,7 +126,7 @@ function urlArquivo(contratoId: string, arquivoId: string) {
 function linkWhatsApp(telefone: string, responsavel: string, aluno: string) {
   let numero = telefone.replace(/\D/g, "");
   if (numero.length === 10 || numero.length === 11) numero = `55${numero}`;
-  const texto = `Olá, ${responsavel.split(" ")[0]}! Aqui é da secretaria. O contrato de matrícula de ${aluno.split(" ")[0]} já está no ClassLink, no menu Contratos. Dá para assinar grátis pelo gov.br e enviar por lá mesmo. Qualquer dúvida, estamos à disposição!`;
+  const texto = `Olá, ${responsavel.split(" ")[0]}! Aqui é da secretaria. O contrato de matrícula de ${aluno.split(" ")[0]} já está no FokusApp, no menu Contratos. Dá para assinar grátis pelo gov.br e enviar por lá mesmo. Qualquer dúvida, estamos à disposição!`;
   return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
 }
 

@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 /**
  * Cadastra alguém da equipe no mesmo formato dos responsáveis: nome, celular e/ou e-mail e
  * função. Sem senha informada, gera uma provisória e — como no vínculo de responsável —
- * envia o acesso pelo WhatsApp da escola, pelo próprio ClassLink.
+ * envia o acesso pelo WhatsApp da escola, pelo próprio FokusApp.
  */
 export async function POST(request: NextRequest) {
   try {

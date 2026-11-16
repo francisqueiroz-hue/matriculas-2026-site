@@ -55,11 +55,11 @@ export function mensagemCobranca(responsavel: string, aluno: string, ano: number
   const nome = responsavel.trim().split(/\s+/)[0] || "tudo bem";
   switch (etapa) {
     case "NAO_CONFIRMOU":
-      return `Olá, ${nome}! Aqui é da secretaria do Espaço Kids / Instituto Fokus. Ainda não recebemos a confirmação da rematrícula ${ano} de ${aluno}. Você pode confirmar pelo ClassLink (aviso na tela inicial) ou respondendo esta mensagem. Qualquer dúvida, estamos à disposição!`;
+      return `Olá, ${nome}! Aqui é da secretaria do Espaço Kids / Instituto Fokus. Ainda não recebemos a confirmação da rematrícula ${ano} de ${aluno}. Você pode confirmar pelo FokusApp (aviso na tela inicial) ou respondendo esta mensagem. Qualquer dúvida, estamos à disposição!`;
     case "CONFIRMOU":
-      return `Olá, ${nome}! Recebemos a confirmação da rematrícula ${ano} de ${aluno}. Em breve enviaremos o contrato para assinatura pelo ClassLink. Obrigado pela confiança!`;
+      return `Olá, ${nome}! Recebemos a confirmação da rematrícula ${ano} de ${aluno}. Em breve enviaremos o contrato para assinatura pelo FokusApp. Obrigado pela confiança!`;
     case "CONTRATO_ENVIADO":
-      return `Olá, ${nome}! O contrato ${ano} de ${aluno} está aguardando a sua assinatura no ClassLink (menu Contratos). Se precisar de ajuda para assinar, é só responder aqui.`;
+      return `Olá, ${nome}! O contrato ${ano} de ${aluno} está aguardando a sua assinatura no FokusApp (menu Contratos). Se precisar de ajuda para assinar, é só responder aqui.`;
     default:
       return null;
   }

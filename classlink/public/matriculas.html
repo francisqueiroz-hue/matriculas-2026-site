@@ -225,7 +225,7 @@
       </ul>
     </nav>
     <div class="acoes-topo">
-      <a class="btn btn-familia" href="/login" aria-label="Área da família — entrar no ClassLink">
+      <a class="btn btn-familia" href="/login" aria-label="Área da família — entrar no FokusApp">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
         <span>Área da família</span>
       </a>
@@ -274,7 +274,7 @@
         </ul>
         <p><strong>Como funciona:</strong> preencha o formulário ao lado. A secretaria confirma pelo WhatsApp e agenda a atualização dos dados e a assinatura do contrato 2027.</p>
         <div class="app-box">
-          📱 Os comunicados da rematrícula também chegam pelo <strong>ClassLink</strong>.
+          📱 Os comunicados da rematrícula também chegam pelo <strong>FokusApp</strong>.
           <a href="/login">Entrar na Área da família</a>
         </div>
       </div>
@@ -367,7 +367,7 @@
     <div class="container">
       <div class="titulo-secao">
         <h2 id="titulo-familia">A família sempre por perto</h2>
-        <p>Pelo aplicativo <strong>ClassLink</strong>, os responsáveis acompanham a vida escolar pelo celular — sem bilhete perdido na mochila.</p>
+        <p>Pelo aplicativo <strong>FokusApp</strong>, os responsáveis acompanham a vida escolar pelo celular — sem bilhete perdido na mochila.</p>
       </div>
       <div class="grade grade-3">
         <div class="cartao">
@@ -387,7 +387,7 @@
         </div>
       </div>
       <div class="familia-acoes">
-        <a class="btn btn-roxo" href="/login">Entrar no ClassLink</a>
+        <a class="btn btn-roxo" href="/login">Entrar no FokusApp</a>
         <a class="btn btn-contorno-roxo" href="/guia">Primeiro acesso? Veja o passo a passo</a>
       </div>
       <p class="nota">Família da escola sem senha? Envie <strong>ACESSO</strong> para o WhatsApp <a href="https://wa.me/5521992865778?text=ACESSO" target="_blank" rel="noopener">(21) 99286-5778</a> e receba o acesso na hora.</p>
@@ -404,7 +404,7 @@
         <li><h3>Pré-matrícula</h3><p>Preencha o formulário abaixo ou chame no WhatsApp. Retornamos para confirmar a disponibilidade de vaga.</p></li>
         <li><h3>Visita à escola</h3><p>Conheça o espaço, a proposta pedagógica e a equipe. Traga suas dúvidas!</p></li>
         <li><h3>Documentos e contrato</h3><p>Entregue a documentação na secretaria e assine o contrato de prestação de serviços educacionais.</p></li>
-        <li><h3>Boas-vindas</h3><p>Matrícula confirmada! A família recebe o acesso ao ClassLink para acompanhar tudo de perto.</p></li>
+        <li><h3>Boas-vindas</h3><p>Matrícula confirmada! A família recebe o acesso ao FokusApp para acompanhar tudo de perto.</p></li>
       </ol>
     </div>
   </section>
@@ -538,7 +538,7 @@
         </details>
         <details>
           <summary>Como a família acompanha o dia a dia do aluno?</summary>
-          <p>Pelo ClassLink, o aplicativo da escola: comunicados, autorizações, notas, frequência, agenda, mensagens com a equipe e boletos — tudo pelo celular, sem precisar instalar nada da loja de aplicativos.</p>
+          <p>Pelo FokusApp, o aplicativo da escola: comunicados, autorizações, notas, frequência, agenda, mensagens com a equipe e boletos — tudo pelo celular, sem precisar instalar nada da loja de aplicativos.</p>
         </details>
       </div>
     </div>
@@ -561,7 +561,7 @@
       <img class="kids" src="/logos/logo-espaco-kids.png" alt="Espaço Kids" width="110" height="49" style="height:49px">
     </div>
     <div>
-      <p style="margin:0 0 4px"><strong>Secretaria:</strong> <a href="tel:+5521964699441">(21) 96469-9441</a> · <a href="https://wa.me/5521964699441" target="_blank" rel="noopener">WhatsApp</a> · <a href="/login">Área da família (ClassLink)</a></p>
+      <p style="margin:0 0 4px"><strong>Secretaria:</strong> <a href="tel:+5521964699441">(21) 96469-9441</a> · <a href="https://wa.me/5521964699441" target="_blank" rel="noopener">WhatsApp</a> · <a href="/login">Área da família (FokusApp)</a></p>
       <p style="margin:0">© <span id="ano-atual">2026</span> Instituto Fokus &amp; Espaço Kids. Todos os direitos reservados.</p>
     </div>
   </div>
@@ -576,8 +576,8 @@
   "use strict";
   // Número da secretaria (DDI + DDD + número, só dígitos).
   var WHATSAPP = "5521964699441";
-  // Endereço do ClassLink, que registra as solicitações para a administração da escola.
-  // Dentro do próprio ClassLink (/matriculas) este valor vira "" e a chamada é local.
+  // Endereço do FokusApp, que registra as solicitações para a administração da escola.
+  // Dentro do próprio FokusApp (/matriculas) este valor vira "" e a chamada é local.
   var CLASSLINK = "";
 
   function linkWhatsApp(texto) {
@@ -622,7 +622,7 @@
     return el ? el.value.trim() : "";
   }
 
-  // Registra a solicitação no ClassLink (lista de Matrículas da administração).
+  // Registra a solicitação no FokusApp (lista de Matrículas da administração).
   function registrarNoSistema(dados) {
     return fetch(CLASSLINK + "/api/matriculas/solicitacoes", {
       method: "POST",

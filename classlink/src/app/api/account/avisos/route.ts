@@ -12,7 +12,7 @@ const atualizarSchema = z.object({
   telefone: z.string().trim().max(30).optional(),
 });
 
-/** Preferência da equipe: receber no WhatsApp o aviso de mensagem nova no ClassLink. */
+/** Preferência da equipe: receber no WhatsApp o aviso de mensagem nova no FokusApp. */
 export async function GET() {
   try {
     const session = await requireRole("ADMIN", "STAFF");

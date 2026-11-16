@@ -77,7 +77,7 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Clique no aviso de mensagem nova (mostrado pelo painel): foca a aba do ClassLink e abre a conversa.
+// Clique no aviso de mensagem nova (mostrado pelo painel): foca a aba do FokusApp e abre a conversa.
 self.addEventListener("notificationclick", (event) => {
   const data = event.notification.data || {};
   if (data.origem !== "classlink-aviso" || !data.url) return;
@@ -96,7 +96,7 @@ self.addEventListener("notificationclick", (event) => {
 });
 
 ${FONTE_PUSH_SW}
-// Registrado ANTES do Firebase: os dois recebem o mesmo push. Com o ClassLink visível o
+// Registrado ANTES do Firebase: os dois recebem o mesmo push. Com o FokusApp visível o
 // Firebase não mostra nada (só repassa à página), então a notificação sai daqui; com a
 // pessoa olhando o app, sai silenciosa. Todo push termina com notificação: no iPhone, push
 // sem notificação faz o Safari cancelar a inscrição e o aparelho para de receber avisos.
@@ -134,7 +134,7 @@ if (${Boolean(firebaseConfig.apiKey)}) {
   messaging.onBackgroundMessage((payload) => {
     if (payload.notification) return;
     const data = payload.data || {};
-    self.registration.showNotification(data.title || "ClassLink", {
+    self.registration.showNotification(data.title || "FokusApp", {
       body: data.body || "",
       icon: "/icons/icon-192.png",
       data: data.url ? { url: data.url, origem: "classlink-aviso" } : undefined,

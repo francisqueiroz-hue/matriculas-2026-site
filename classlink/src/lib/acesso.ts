@@ -20,12 +20,12 @@ export function loginParaExibir(login: string): string {
 }
 
 export function mensagemAcesso({ nome, url, login, senha }: DadosAcesso): string {
-  return `Olá, ${nome}! Seu acesso ao ClassLink (comunicação da escola) está pronto.\n\nAcesse: ${url}\nEntrar com: ${loginParaExibir(login)}\nSenha provisória: ${senha}\n\nAssim que entrar, troque a senha em Conta > Trocar senha.`;
+  return `Olá, ${nome}! Seu acesso ao FokusApp (comunicação da escola) está pronto.\n\nAcesse: ${url}\nEntrar com: ${loginParaExibir(login)}\nSenha provisória: ${senha}\n\nAssim que entrar, troque a senha em Conta > Trocar senha.`;
 }
 
 /**
  * Parâmetros do modelo aprovado na Meta, na ordem das variáveis {{1}}..{{4}} do texto
- * sugerido no README ("Olá, {{1}}! Seu acesso ao ClassLink ... Acesse {{2}} ... {{3}} ... {{4}}").
+ * sugerido no README ("Olá, {{1}}! Seu acesso ao FokusApp ... Acesse {{2}} ... {{3}} ... {{4}}").
  */
 export function parametrosModeloAcesso({ nome, url, login, senha }: DadosAcesso): string[] {
   return [nome, url, loginParaExibir(login), senha];

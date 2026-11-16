@@ -1,6 +1,6 @@
 {
-  "name": "ClassLink — Comunicação Escola-Família",
-  "short_name": "ClassLink",
+  "name": "FokusApp — Comunicação Escola-Família",
+  "short_name": "FokusApp",
   "description": "Mural de avisos, mensagens diretas e agenda escolar entre escola e família.",
   "start_url": "/dashboard",
   "id": "/dashboard",

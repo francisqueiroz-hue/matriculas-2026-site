@@ -1,14 +1,14 @@
 /**
  * A página pública de matrículas tem uma única fonte: `site/index.html` (na raiz do
  * repositório), que também é publicada no GitHub Pages e pode ser enviada para a
- * hospedagem do site da escola. Dentro do ClassLink ela é servida em `/matriculas`
+ * hospedagem do site da escola. Dentro do FokusApp ela é servida em `/matriculas`
  * a partir de `public/matriculas.html`, gerado por `npm run sync:matriculas` com
  * esta transformação:
  *  - imagens `assets/...` passam a usar as logos que o app já tem em `/logos/...`;
- *  - links absolutos para o ClassLink viram caminhos relativos, abrindo na mesma aba.
+ *  - links absolutos para o FokusApp viram caminhos relativos, abrindo na mesma aba.
  */
 
-/** Endereço público do ClassLink usado nos links da versão estática da página. */
+/** Endereço público do FokusApp usado nos links da versão estática da página. */
 export const CLASSLINK_URL = "https://matriculas-2026-site-murex.vercel.app";
 
 export const GENERATED_HEADER =

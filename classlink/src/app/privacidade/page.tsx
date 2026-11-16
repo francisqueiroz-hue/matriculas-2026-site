@@ -1,6 +1,6 @@
 import { LogoEspacoKids, LogoInstitutoFokus } from "@/components/Logos";
 
-export const metadata = { title: "Política de Privacidade — ClassLink" };
+export const metadata = { title: "Política de Privacidade — FokusApp" };
 
 export default function PrivacidadePage() {
   return (
@@ -12,11 +12,11 @@ export default function PrivacidadePage() {
       </div>
 
       <h1 className="mb-2 text-2xl font-bold">Política de Privacidade</h1>
-      <p className="mb-8 text-sm text-slate-500">ClassLink — Espaço Kids e Instituto Fokus</p>
+      <p className="mb-8 text-sm text-slate-500">FokusApp — Espaço Kids e Instituto Fokus</p>
 
       <div className="space-y-6 text-sm leading-relaxed text-slate-700">
         <p>
-          O ClassLink é o aplicativo de comunicação entre a escola e as famílias dos alunos.
+          O FokusApp (antigo ClassLink) é o aplicativo de comunicação entre a escola e as famílias dos alunos.
           Esta página explica quais dados coletamos e como eles são usados, em conformidade
           com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018).
         </p>
@@ -39,7 +39,7 @@ export default function PrivacidadePage() {
           <p className="mt-2">
             Contratos de matrícula: o PDF do contrato enviado pela escola e o PDF assinado
             enviado pelo responsável ficam guardados de forma privada no banco de dados do
-            ClassLink, acessíveis apenas à direção da escola e aos responsáveis do aluno. Para
+            FokusApp, acessíveis apenas à direção da escola e aos responsáveis do aluno. Para
             comprovar a assinatura, registramos quem enviou, a data e hora, o endereço IP e
             uma impressão digital do arquivo (hash SHA-256). Por serem documentos do contrato
             de prestação de serviços, são mantidos pelo prazo necessário ao cumprimento do

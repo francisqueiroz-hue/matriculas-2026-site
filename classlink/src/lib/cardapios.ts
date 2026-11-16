@@ -7,7 +7,7 @@ import { notifyUsers } from "@/lib/push";
  * Cardápios semanais: a direção/coordenação cadastra com antecedência e, na segunda-feira
  * da semana (a partir das 6h de Brasília), o cardápio é publicado no Mural e as famílias
  * recebem notificação. A publicação roda pelo cron semanal e, como reserva, também quando
- * alguém abre o ClassLink depois desse horário (publicarCardapiosDevidos é idempotente).
+ * alguém abre o FokusApp depois desse horário (publicarCardapiosDevidos é idempotente).
  */
 
 export const FUSO_ESCOLA = "America/Sao_Paulo";

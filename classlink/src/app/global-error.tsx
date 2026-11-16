@@ -7,7 +7,7 @@ export default function ErroGlobal({ reset }: { error: Error & { digest?: string
     <html lang="pt-BR">
       <body className="flex min-h-screen items-center justify-center bg-white px-4 font-sans text-slate-900">
         <div role="alert" className="max-w-md text-center">
-          <h1 className="text-lg font-bold">O ClassLink encontrou um problema</h1>
+          <h1 className="text-lg font-bold">O FokusApp encontrou um problema</h1>
           <p className="mt-2 text-sm text-slate-600">
             Tente de novo. Se o problema continuar, avise a secretaria da escola.
           </p>

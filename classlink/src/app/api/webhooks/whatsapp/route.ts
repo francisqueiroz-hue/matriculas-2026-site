@@ -47,10 +47,10 @@ function textoDaMensagem(msg: WhatsAppMessage): string {
   return "";
 }
 
-/** Tipos que o ClassLink não mostra (localização, contato...): diz o que chegou e o que fazer. */
+/** Tipos que o FokusApp não mostra (localização, contato...): diz o que chegou e o que fazer. */
 function descricaoDeTipoSemSuporte(tipo: string): string {
   const nomes: Record<string, string> = { location: "uma localização", contacts: "um contato" };
-  return `[A família enviou ${nomes[tipo] ?? `uma mensagem do tipo "${tipo}"`} pelo WhatsApp, que o ClassLink não consegue mostrar. Peça para escrever em texto.]`;
+  return `[A família enviou ${nomes[tipo] ?? `uma mensagem do tipo "${tipo}"`} pelo WhatsApp, que o FokusApp não consegue mostrar. Peça para escrever em texto.]`;
 }
 
 /** Guarda quando a pessoa escreveu: nas 24h seguintes a escola pode responder em texto livre. */
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
             );
             continue;
           }
-          // Qualquer outra mensagem é resposta a um aviso: entra na conversa do ClassLink.
+          // Qualquer outra mensagem é resposta a um aviso: entra na conversa do FokusApp.
           await processarRespostaPeloWhatsApp({
             remetente: { id: equipe.id, name: equipe.name },
             telefone: msg.from,

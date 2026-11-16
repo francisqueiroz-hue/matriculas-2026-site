@@ -117,7 +117,7 @@ export async function bloqueioPorCobranca(schoolId: string, agora = new Date()):
 
 export const MOTIVO_BLOQUEIO_COBRANCA =
   "O WhatsApp da escola está bloqueado pela Meta por pagamento pendente na conta do WhatsApp Business. " +
-  "Enquanto isso, as mensagens vão pelo ClassLink (a família recebe a notificação no celular).";
+  "Enquanto isso, as mensagens vão pelo FokusApp (a família recebe a notificação no celular).";
 
 /** Falhas de entrega das mensagens da conversa (pelo id da mensagem no WhatsApp), já explicadas. */
 export async function falhasDasMensagens(externalIds: string[]): Promise<Map<string, string>> {

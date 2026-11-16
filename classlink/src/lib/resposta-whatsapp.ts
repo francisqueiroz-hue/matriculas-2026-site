@@ -8,8 +8,8 @@ import { SELECT_PESSOA, nomeInstitucional } from "@/lib/nome-institucional";
 
 /**
  * Responder pelo WhatsApp: a pessoa da equipe responde ao aviso que o número da escola
- * mandou ("Você recebeu uma nova mensagem no ClassLink de ...") e a resposta entra na
- * conversa do ClassLink, como se tivesse sido escrita no app.
+ * mandou ("Você recebeu uma nova mensagem no FokusApp de ...") e a resposta entra na
+ * conversa do FokusApp, como se tivesse sido escrita no app.
  *
  * A conversa vem do aviso respondido (o WhatsApp manda o id dele em `context`). Sem
  * "Responder", vale o aviso mais recente dos últimos 30 minutos — e a confirmação diz para
@@ -20,8 +20,8 @@ import { SELECT_PESSOA, nomeInstitucional } from "@/lib/nome-institucional";
 export const JANELA_SEM_CONTEXTO_MS = 30 * 60 * 1000;
 
 export const TEXTO_COMO_RESPONDER =
-  "Para responder uma mensagem do ClassLink por aqui, toque e segure o aviso da mensagem e escolha *Responder*. " +
-  "Se preferir, abra o ClassLink pelo link do aviso.";
+  "Para responder uma mensagem do FokusApp por aqui, toque e segure o aviso da mensagem e escolha *Responder*. " +
+  "Se preferir, abra o FokusApp pelo link do aviso.";
 
 export interface RespostaRecebida {
   /** Pessoa da equipe que respondeu (já identificada pelo telefone). */
@@ -77,7 +77,7 @@ export async function processarRespostaPeloWhatsApp(r: RespostaRecebida): Promis
 
   const texto = r.texto.trim();
   if (!texto) {
-    await confirmar(r, "Por enquanto só respostas em texto chegam ao ClassLink. Escreva a resposta ou abra o ClassLink para enviar.");
+    await confirmar(r, "Por enquanto só respostas em texto chegam ao FokusApp. Escreva a resposta ou abra o FokusApp para enviar.");
     return { status: "sem_texto" };
   }
 
@@ -105,7 +105,7 @@ async function responderFamilia(r: RespostaRecebida, conversationId: string, tex
   });
   // A conversa precisa existir, ser desta pessoa e seguir as regras (família ↔ direção/coordenação).
   if (!conversa || conversa.staffId !== r.remetente.id || conversa.guardian.deletedAt) {
-    await confirmar(r, "Essa conversa não está mais disponível no ClassLink.");
+    await confirmar(r, "Essa conversa não está mais disponível no FokusApp.");
     return { status: "sem_conversa" };
   }
   if (!podeConversar(await perfilDoUsuario(r.remetente.id), "familia")) {
@@ -150,7 +150,7 @@ async function responderFamilia(r: RespostaRecebida, conversationId: string, tex
     }).catch((err) => console.error("push notify failed", err));
   }
 
-  await confirmar(r, `✓ Resposta enviada para ${conversa.guardian.name} no ClassLink.`, { tipo: "familia", conversationId });
+  await confirmar(r, `✓ Resposta enviada para ${conversa.guardian.name} no FokusApp.`, { tipo: "familia", conversationId });
   return { status: "enviada", destinatario: conversa.guardian.name, tipo: "familia", conversationId };
 }
 
@@ -164,7 +164,7 @@ async function responderEquipe(r: RespostaRecebida, conversationId: string, text
   });
   const outro = conversa && (conversa.userAId === r.remetente.id ? conversa.userB : conversa.userBId === r.remetente.id ? conversa.userA : null);
   if (!conversa || !outro || outro.deletedAt) {
-    await confirmar(r, "Essa conversa não está mais disponível no ClassLink.");
+    await confirmar(r, "Essa conversa não está mais disponível no FokusApp.");
     return { status: "sem_conversa" };
   }
   const [meuPerfil, perfilOutro] = await Promise.all([perfilDoUsuario(r.remetente.id), perfilDoUsuario(outro.id)]);
@@ -192,6 +192,6 @@ async function responderEquipe(r: RespostaRecebida, conversationId: string, text
     mensagemId: mensagem.id,
   });
 
-  await confirmar(r, `✓ Resposta enviada para ${outro.name} no ClassLink.`, { tipo: "equipe", conversationId });
+  await confirmar(r, `✓ Resposta enviada para ${outro.name} no FokusApp.`, { tipo: "equipe", conversationId });
   return { status: "enviada", destinatario: outro.name, tipo: "equipe", conversationId };
 }

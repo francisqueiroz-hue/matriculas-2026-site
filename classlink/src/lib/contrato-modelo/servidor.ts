@@ -50,7 +50,7 @@ function dataBr(d: Date | null | undefined): string {
 
 /**
  * Sugestão de preenchimento para a família: dados já enviados antes (se for correção) ou o
- * que o ClassLink já sabe do responsável logado e do aluno — nada é inventado.
+ * que o FokusApp já sabe do responsável logado e do aluno — nada é inventado.
  */
 export async function sugestaoDadosFamilia(guardianId: string, studentId: string, salvos: unknown): Promise<DadosFamilia> {
   if (salvos && typeof salvos === "object") return salvos as DadosFamilia;

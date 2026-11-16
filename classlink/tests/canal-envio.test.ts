@@ -24,7 +24,7 @@ describe("explicacaoDoCanal", () => {
   const aberta = { aberta: true, ate: new Date("2026-10-15T10:00:00Z") };
   const fechada = { aberta: false, ate: null };
 
-  it("ClassLink: avisa que há notificação e confirmação de leitura", () => {
+  it("FokusApp: avisa que há notificação e confirmação de leitura", () => {
     expect(explicacaoDoCanal("APP", fechada)).toMatch(/notificação.*✓✓/);
   });
 
@@ -34,14 +34,14 @@ describe("explicacaoDoCanal", () => {
     expect(t).toMatch(/não informa se foi lida/);
   });
 
-  it("WhatsApp fechado sem aviso padrão: indisponível, sugere o ClassLink", () => {
-    expect(explicacaoDoCanal("WHATSAPP", fechada)).toMatch(/Indisponível.*ClassLink/);
+  it("WhatsApp fechado sem aviso padrão: indisponível, sugere o FokusApp", () => {
+    expect(explicacaoDoCanal("WHATSAPP", fechada)).toMatch(/Indisponível.*FokusApp/);
   });
 
-  it("WhatsApp fechado com aviso padrão: explica que o texto fica no ClassLink e a família recebe um aviso", () => {
+  it("WhatsApp fechado com aviso padrão: explica que o texto fica no FokusApp e a família recebe um aviso", () => {
     const t = explicacaoDoCanal("WHATSAPP", { ...fechada, avisoPorModelo: true });
     expect(t).toMatch(/aviso padrão/);
-    expect(t).toMatch(/fica no ClassLink/);
+    expect(t).toMatch(/fica no FokusApp/);
   });
 
   it("e-mail: não informa abertura", () => {
@@ -50,16 +50,16 @@ describe("explicacaoDoCanal", () => {
 });
 
 describe("reciboPorCanal", () => {
-  it("só o ClassLink comprova abertura; WhatsApp/e-mail dizem o que não é acompanhado", () => {
+  it("só o FokusApp comprova abertura; WhatsApp/e-mail dizem o que não é acompanhado", () => {
     expect(reciboPorCanal("APP", null).texto).toMatch(/ainda não aberta/);
     expect(reciboPorCanal("WHATSAPP", null).texto).toMatch(/não é acompanhada/);
     expect(reciboPorCanal("EMAIL", null).texto).toMatch(/Enviada por e-mail/);
   });
 
-  it("aberta no ClassLink: ✓✓ com data e hora, qualquer que tenha sido o canal", () => {
+  it("aberta no FokusApp: ✓✓ com data e hora, qualquer que tenha sido o canal", () => {
     const r = reciboPorCanal("WHATSAPP", "2026-10-14T17:05:00.000Z");
     expect(r.marca).toBe("✓✓");
-    expect(r.texto).toMatch(/^Lida no ClassLink em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/);
+    expect(r.texto).toMatch(/^Lida no FokusApp em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}$/);
   });
 });
 

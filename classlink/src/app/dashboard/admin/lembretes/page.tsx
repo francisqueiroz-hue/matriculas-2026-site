@@ -115,7 +115,7 @@ function Conteudo() {
       <div>
         <h1 className="text-xl font-bold">Lembretes de pendências</h1>
         <p className="text-sm text-slate-500">
-          O ClassLink lembra as famílias do que ainda está pendente: uma única mensagem por família, com tudo junto, e para sozinho quando a pendência é resolvida.
+          O FokusApp lembra as famílias do que ainda está pendente: uma única mensagem por família, com tudo junto, e para sozinho quando a pendência é resolvida.
         </p>
       </div>
 
@@ -132,7 +132,7 @@ function Conteudo() {
               </p>
               {dados.entregas.motivo && <p className="mt-1">{dados.entregas.motivo}</p>}
               <p className="mt-1">
-                Esses lembretes não foram gastos: o ClassLink tenta de novo no próximo envio. Enquanto isso, avise as famílias abaixo por telefone ou pelo app.
+                Esses lembretes não foram gastos: o FokusApp tenta de novo no próximo envio. Enquanto isso, avise as famílias abaixo por telefone ou pelo app.
               </p>
               <ul className="mt-2 list-disc pl-5 text-xs">
                 {dados.entregas.ultimas.map((u, i) => (

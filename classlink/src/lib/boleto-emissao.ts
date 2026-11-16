@@ -76,7 +76,7 @@ export async function gerarBoletosDoMes(
 
     const responsavel = aluno.guardians[0]?.guardian;
 
-    // O responsável é avisado quando o boleto é gerado pelo ClassLink (a cobrança hoje é manual,
+    // O responsável é avisado quando o boleto é gerado pelo FokusApp (a cobrança hoje é manual,
     // sem automação do banco); o aviso não depende da emissão real no Inter.
     const avisar = () => {
       if (!responsavel?.active) return;

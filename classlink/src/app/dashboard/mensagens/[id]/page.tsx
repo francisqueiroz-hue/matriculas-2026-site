@@ -29,7 +29,7 @@ interface DisplayMessage {
   /** Quando a outra pessoa abriu a mensagem (gravado pelo servidor). */
   readAt?: string | null;
   anexo?: Anexo | null;
-  /** O WhatsApp recusou a entrega (só a equipe vê): motivo, para reenviar pelo ClassLink. */
+  /** O WhatsApp recusou a entrega (só a equipe vê): motivo, para reenviar pelo FokusApp. */
   falhaWhatsApp?: string | null;
   sender: { id: string; name: string; role: string };
 }
@@ -83,7 +83,7 @@ const ITENS_REQUISICAO = [
   "Troca de roupa",
 ];
 
-const CANAL_LABEL: Record<Canal, string> = { APP: "ClassLink", WHATSAPP: "WhatsApp", EMAIL: "E-mail" };
+const CANAL_LABEL: Record<Canal, string> = { APP: "FokusApp", WHATSAPP: "WhatsApp", EMAIL: "E-mail" };
 
 export default function ConversationPage() {
   return (
@@ -176,7 +176,7 @@ function ConversationPageInner() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [data?.messages.length]);
 
-  /** WhatsApp vale com a janela de 24h aberta ou, fechada, com o aviso padrão; senão volta para o ClassLink. */
+  /** WhatsApp vale com a janela de 24h aberta ou, fechada, com o aviso padrão; senão volta para o FokusApp. */
   function canalValido(): Canal {
     return canalEnvio === "WHATSAPP" && !whatsappDisponivel(data?.janelaWhatsApp) ? "APP" : canalEnvio;
   }
@@ -205,7 +205,7 @@ function ConversationPageInner() {
       if (res.aviso) {
         setEnvioInfo(res.aviso);
       } else if (res.avisoPeloWhatsApp) {
-        setEnvioInfo("Mensagem enviada pelo ClassLink. A família foi avisada no WhatsApp, com um link para abrir.");
+        setEnvioInfo("Mensagem enviada pelo FokusApp. A família foi avisada no WhatsApp, com um link para abrir.");
       }
       return true;
     } catch (err) {
@@ -265,7 +265,7 @@ function ConversationPageInner() {
   const podeUsarFuncoesDeResponsavel = !isEquipe && data.souStaffNaConversa;
   const guardianTemTelefone = Boolean(data.guardianPhone);
   const guardianTemEmail = Boolean(data.guardianEmail);
-  // Arquivo vai sempre pelo ClassLink (armazenamento privado; só quem está na conversa abre).
+  // Arquivo vai sempre pelo FokusApp (armazenamento privado; só quem está na conversa abre).
   const canalAtual = podeUsarFuncoesDeResponsavel && !arquivo ? canalValido() : "APP";
   const podeAnexar = !isEquipe;
 
@@ -355,7 +355,7 @@ function ConversationPageInner() {
                       onClick={() => void enviarMensagem(m.body, "APP")}
                       className="mt-1 rounded border border-red-300 px-2 py-0.5 font-semibold hover:bg-red-50 disabled:opacity-60"
                     >
-                      Reenviar pelo ClassLink
+                      Reenviar pelo FokusApp
                     </button>
                   </div>
                 )}
@@ -439,7 +439,7 @@ function ConversationPageInner() {
             onChange={(e) => setCanalEnvio(e.target.value as Canal)}
             className="rounded-md border border-slate-300 px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
           >
-            <option value="APP">Canal: ClassLink</option>
+            <option value="APP">Canal: FokusApp</option>
             <option value="WHATSAPP" disabled={!guardianTemTelefone || !whatsappDisponivel(data.janelaWhatsApp)}>
               Canal: WhatsApp
               {!guardianTemTelefone
@@ -468,7 +468,7 @@ function ConversationPageInner() {
       {podeUsarFuncoesDeResponsavel && (
         <p aria-live="polite" className="mt-1 text-xs text-slate-500">
           {arquivo
-            ? "Arquivos vão sempre pelo ClassLink: só a família e a escola abrem. A família recebe a notificação do app."
+            ? "Arquivos vão sempre pelo FokusApp: só a família e a escola abrem. A família recebe a notificação do app."
             : explicacaoDoCanal(canalAtual, data.janelaWhatsApp)}
         </p>
       )}
@@ -481,7 +481,7 @@ function ConversationPageInner() {
   );
 }
 
-/** "✓ Enviada" ou "✓✓ Lida no ClassLink em 14/10/2026 às 14:05": só o ClassLink comprova que a pessoa abriu. */
+/** "✓ Enviada" ou "✓✓ Lida no FokusApp em 14/10/2026 às 14:05": só o FokusApp comprova que a pessoa abriu. */
 function ReciboMensagem({ canal, readAt }: { canal: Canal | null; readAt?: string | null }) {
   const recibo = reciboPorCanal(canal, readAt);
   return (

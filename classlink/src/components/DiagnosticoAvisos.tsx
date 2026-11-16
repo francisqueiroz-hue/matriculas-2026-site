@@ -178,7 +178,7 @@ export function DiagnosticoAvisos() {
             <Item
               ok={d.whatsapp.contaBusiness}
               titulo="ID da conta do WhatsApp Business"
-              dica="Preencha WHATSAPP_BUSINESS_ACCOUNT_ID (Meta for Developers → WhatsApp → Configuração da API) para o ClassLink cadastrar e acompanhar os modelos."
+              dica="Preencha WHATSAPP_BUSINESS_ACCOUNT_ID (Meta for Developers → WhatsApp → Configuração da API) para o FokusApp cadastrar e acompanhar os modelos."
             />
             {modelos.map((m) => (
               <Item

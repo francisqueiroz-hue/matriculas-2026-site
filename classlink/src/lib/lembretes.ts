@@ -80,7 +80,7 @@ export interface Pendencia {
   aluno: string;
   /** Frase curta para a família, ex.: "assinar o contrato de matrícula 2027 de Ana". */
   descricao: string;
-  /** Tela do ClassLink onde a família resolve. */
+  /** Tela do FokusApp onde a família resolve. */
   url: string;
   /** Mensalidade: data de vencimento. Muda a regra (véspera, dia seguinte e a cada N dias). */
   vencimento?: Date;
@@ -265,7 +265,7 @@ export function mensagemLembrete(pendencias: Pick<Pendencia, "descricao" | "url"
     const [p] = pendencias;
     return {
       titulo: "Lembrete da escola",
-      texto: `Ainda falta ${p.descricao}. Toque para ver no ClassLink. Se já resolveu, desconsidere.`,
+      texto: `Ainda falta ${p.descricao}. Toque para ver no FokusApp. Se já resolveu, desconsidere.`,
       url: p.url,
     };
   }
@@ -273,7 +273,7 @@ export function mensagemLembrete(pendencias: Pick<Pendencia, "descricao" | "url"
   const lista = `${itens.slice(0, -1).join("; ")} e ${itens[itens.length - 1]}`;
   return {
     titulo: `Lembrete da escola: ${pendencias.length} pendências`,
-    texto: `Ainda falta ${lista}. Toque para ver no ClassLink. Se já resolveu, desconsidere.`,
+    texto: `Ainda falta ${lista}. Toque para ver no FokusApp. Se já resolveu, desconsidere.`,
     url: "/dashboard",
   };
 }
