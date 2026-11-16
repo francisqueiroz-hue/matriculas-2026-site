@@ -11,6 +11,8 @@ export interface NavLink {
   label: string;
   /** Path de um ícone de 24x24 (mesmo estilo usado em /guia), pra ficar mais fácil de reconhecer o item de relance. */
   icon: string;
+  /** Seção do menu, quando a mesma tela fica em seções diferentes conforme o perfil. */
+  grupo?: string;
 }
 
 const baseLinks: NavLink[] = [
@@ -51,12 +53,18 @@ const guardianLinks: NavLink[] = [
     icon: "M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z M3 10h18 M7 15h3",
   },
   { href: "/dashboard/contratos", label: "Contratos", icon: "M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z M14 3v5h5 M9 13h6 M9 17h4" },
-  {
+  saudeLink(),
+];
+
+/** Ficha de saúde e autorizados: famílias (os próprios filhos), direção e coordenação. */
+function saudeLink(grupo?: string): NavLink {
+  return {
+    ...(grupo && { grupo }),
     href: "/dashboard/saude",
     label: "Saúde e autorizados",
     icon: "M12 21s-7-4.5-9.5-9A5.5 5.5 0 0112 6a5.5 5.5 0 019.5 6c-2.5 4.5-9.5 9-9.5 9z M12 10v5 M9.5 12.5h5",
-  },
-];
+  };
+}
 
 const adminLinks: NavLink[] = [
   { href: "/dashboard/admin", label: "Painel", icon: "M4 4h7v7H4z M13 4h7v5h-7z M13 12h7v8h-7z M4 14h7v6H4z" },
@@ -142,7 +150,7 @@ export interface GrupoNav {
 export function agruparLinks(links: NavLink[]): GrupoNav[] {
   const grupos: GrupoNav[] = [];
   for (const link of links) {
-    const titulo = GRUPO_POR_HREF[link.href] ?? "Gestão";
+    const titulo = link.grupo ?? GRUPO_POR_HREF[link.href] ?? "Gestão";
     const existente = grupos.find((g) => g.titulo === titulo);
     if (existente) existente.links.push(link);
     else grupos.push({ titulo, links: [link] });
@@ -191,10 +199,10 @@ function linksDoPerfil(user: Pick<SessionUser, "role" | "isCoordenacao" | "funca
   if (user.role === "ADMIN") {
     const direcao = ehDirecao({ role: user.role, funcao: user.funcao ?? null });
     const admin = direcao ? adminLinks : adminLinks.filter((l) => !ABAS_SO_DIRECAO.includes(l.href));
-    return [...baseLinks, notasLink, ...admin, fichasLink, guiaLink];
+    return [...baseLinks, notasLink, ...admin, fichasLink, saudeLink("Secretaria"), guiaLink];
   }
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks, guiaLink];
-  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, guiaLink];
+  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, saudeLink("Secretaria"), guiaLink];
   if (user.role === "STAFF") return [...baseLinks, fichasLink, guiaLink];
   return [...baseLinks, guiaLink];
 }

@@ -78,14 +78,22 @@ export async function PUT(request: NextRequest, ctx: RouteContext<"/api/alunos/[
     const entrada = salvarSaudeSchema.parse(await request.json());
 
     // Quem consentiu: a família, ela mesma; a escola, um responsável vinculado (termo em papel).
-    let novoConsentimento: { consentidoPorId: string; consentidoPorNome: string } | null = null;
+    let novoConsentimento: { consentidoPorId: string | null; consentidoPorNome: string } | null = null;
     if (entrada.consentimento) {
       if (papel === "FAMILIA") {
         novoConsentimento = { consentidoPorId: session.sub, consentidoPorNome: session.name };
       } else {
-        const vinculo = aluno.guardians.find((g) => g.guardian.id === entrada.consentimento?.consentidoPorId);
-        if (!vinculo) throw new ErroDeUsuario("Escolha o responsável que assinou o termo de consentimento");
-        novoConsentimento = { consentidoPorId: vinculo.guardian.id, consentidoPorNome: vinculo.guardian.name };
+        const { consentidoPorId: porId, consentidoPorNome: porNome } = entrada.consentimento;
+        if (porId) {
+          const vinculo = aluno.guardians.find((g) => g.guardian.id === porId);
+          if (!vinculo) throw new ErroDeUsuario("Responsável não vinculado a este aluno");
+          novoConsentimento = { consentidoPorId: vinculo.guardian.id, consentidoPorNome: vinculo.guardian.name };
+        } else if (porNome) {
+          // Termo em papel assinado por quem não tem conta no app: fica o nome digitado.
+          novoConsentimento = { consentidoPorId: null, consentidoPorNome: porNome };
+        } else {
+          throw new ErroDeUsuario("Informe quem assinou o termo de consentimento");
+        }
       }
     }
 

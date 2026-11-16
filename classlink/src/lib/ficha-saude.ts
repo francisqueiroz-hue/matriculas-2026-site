@@ -123,6 +123,12 @@ export const salvarSaudeSchema = z
         versaoTexto: z.literal(VERSAO_TERMO_SAUDE),
         /** Escola: responsável vinculado que assinou o termo em papel. */
         consentidoPorId: z.string().trim().min(1).max(40).optional(),
+        /** Escola: quem assinou, quando não é um responsável com conta no app (ex.: avó guardiã). */
+        consentidoPorNome: z
+          .string()
+          .transform((v) => v.replace(/\s+/g, " ").trim())
+          .refine((v) => v.length >= 3 && v.length <= 120, "Nome de quem assinou: de 3 a 120 caracteres")
+          .optional(),
       })
       .optional(),
   })
