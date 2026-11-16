@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
-  whatsappFalha: { upsert: vi.fn(), findMany: vi.fn() },
+  whatsappFalha: { upsert: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
   user: { findMany: vi.fn() },
 }));
 const achaFamilia = vi.hoisted(() => vi.fn());
@@ -9,7 +9,13 @@ const achaEquipe = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/whatsapp", () => ({ findGuardianByPhone: achaFamilia, findStaffByPhone: achaEquipe }));
 
-import { explicarCodigoFalha, registrarFalhaEntrega, resumoFalhasRecentes } from "@/lib/whatsapp-falhas";
+import {
+  bloqueioPorCobranca,
+  explicarCodigoFalha,
+  falhasDasMensagens,
+  registrarFalhaEntrega,
+  resumoFalhasRecentes,
+} from "@/lib/whatsapp-falhas";
 
 const AGORA = new Date("2026-11-12T15:00:00Z");
 
@@ -74,5 +80,33 @@ describe("resumoFalhasRecentes", () => {
     const filtro = prismaMock.whatsappFalha.findMany.mock.calls[0][0].where;
     expect(filtro.schoolId).toBe("s1");
     expect(filtro.createdAt.gte).toEqual(new Date("2026-11-10T15:00:00Z"));
+  });
+});
+
+describe("bloqueioPorCobranca", () => {
+  it("recusa por pagamento pendente nas últimas 24h bloqueia o canal da escola", async () => {
+    const em = new Date("2026-11-12T12:39:00Z");
+    prismaMock.whatsappFalha.findFirst.mockResolvedValue({ createdAt: em });
+    expect(await bloqueioPorCobranca("s1", AGORA)).toEqual({ desde: em });
+    const where = prismaMock.whatsappFalha.findFirst.mock.calls[0][0].where;
+    expect(where).toMatchObject({ schoolId: "s1", codigo: 131042 });
+    expect(where.createdAt.gte).toEqual(new Date("2026-11-11T15:00:00Z"));
+  });
+  it("sem recusa recente (conta quitada): canal liberado", async () => {
+    prismaMock.whatsappFalha.findFirst.mockResolvedValue(null);
+    expect(await bloqueioPorCobranca("s1", AGORA)).toBeNull();
+  });
+});
+
+describe("falhasDasMensagens", () => {
+  it("explica a falha de cada mensagem pelo id do WhatsApp", async () => {
+    prismaMock.whatsappFalha.findMany.mockResolvedValue([{ mensagemId: "wamid.1", codigo: 131042 }]);
+    const mapa = await falhasDasMensagens(["wamid.1", "wamid.2"]);
+    expect(mapa.get("wamid.1")).toMatch(/Pagamento pendente/);
+    expect(mapa.has("wamid.2")).toBe(false);
+  });
+  it("sem mensagens de WhatsApp, nem consulta o banco", async () => {
+    expect((await falhasDasMensagens([])).size).toBe(0);
+    expect(prismaMock.whatsappFalha.findMany).not.toHaveBeenCalled();
   });
 });

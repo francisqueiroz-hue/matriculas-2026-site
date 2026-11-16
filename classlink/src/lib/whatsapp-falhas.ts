@@ -94,3 +94,37 @@ export async function resumoFalhasRecentes(schoolId: string, agora = new Date())
     ultimas: falhas.slice(0, 20).map((f) => ({ nome: (f.userId && nomes.get(f.userId)) || "Número sem cadastro", codigo: f.codigo, em: f.createdAt })),
   };
 }
+
+/**
+ * Janela em que uma recusa por cobrança (131042) ainda vale como "WhatsApp fora do ar": os
+ * lembretes saem todo dia útil, então, quitada a conta, o bloqueio some no máximo em um dia.
+ */
+export const HORAS_BLOQUEIO_COBRANCA = 24;
+
+/**
+ * Enquanto a Meta recusa por pagamento pendente, nenhuma mensagem chega — a escola inteira fica
+ * sem WhatsApp. Devolve desde quando (última recusa) ou null quando o canal está liberado.
+ */
+export async function bloqueioPorCobranca(schoolId: string, agora = new Date()): Promise<{ desde: Date } | null> {
+  const desde = new Date(agora.getTime() - HORAS_BLOQUEIO_COBRANCA * 3_600_000);
+  const ultima = await prisma.whatsappFalha.findFirst({
+    where: { schoolId, codigo: 131042, createdAt: { gte: desde } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  return ultima ? { desde: ultima.createdAt } : null;
+}
+
+export const MOTIVO_BLOQUEIO_COBRANCA =
+  "O WhatsApp da escola está bloqueado pela Meta por pagamento pendente na conta do WhatsApp Business. " +
+  "Enquanto isso, as mensagens vão pelo ClassLink (a família recebe a notificação no celular).";
+
+/** Falhas de entrega das mensagens da conversa (pelo id da mensagem no WhatsApp), já explicadas. */
+export async function falhasDasMensagens(externalIds: string[]): Promise<Map<string, string>> {
+  if (externalIds.length === 0) return new Map();
+  const falhas = await prisma.whatsappFalha.findMany({
+    where: { mensagemId: { in: externalIds } },
+    select: { mensagemId: true, codigo: true },
+  });
+  return new Map(falhas.map((f) => [f.mensagemId, explicarCodigoFalha(f.codigo)]));
+}

@@ -12,9 +12,10 @@ import { textoPadraoDoArquivo } from "@/lib/anexo-envio";
 import { conferirAnexoEnviadoDireto, guardarAnexoDoFormulario, type AnexoRecebido } from "@/lib/anexo-envio-server";
 import { apagarDoBlob } from "@/lib/blob-storage";
 import { notifyUsers } from "@/lib/push";
-import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTemplateMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
+import { MOTIVO_BLOQUEIO_COBRANCA, bloqueioPorCobranca, explicarCodigoFalha, falhasDasMensagens } from "@/lib/whatsapp-falhas";
+import { ErroWhatsApp, isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTemplateMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
 import { isEmailConfigured, sendEmailMessage } from "@/lib/email";
-import { MENSAGEM_JANELA_FECHADA, janelaWhatsApp } from "@/lib/canal-envio";
+import { janelaWhatsApp } from "@/lib/canal-envio";
 import { SELECT_PESSOA, nomeParaQuemVe, pessoaParaQuemVe } from "@/lib/nome-institucional";
 import { getShortSignedMediaUrl, provedorDeMidia } from "@/lib/firebase-storage";
 
@@ -71,6 +72,12 @@ async function comAnexo<T extends MensagemComAnexo>(m: T) {
   return { ...resto, anexo: { tipo: anexoTipo, mime: anexoMime, nome: anexoNome, url } };
 }
 
+function withoutExternalId<T extends { externalId?: string | null }>(m: T): Omit<T, "externalId"> {
+  const { externalId: _id, ...resto } = m;
+  void _id;
+  return resto;
+}
+
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
   try {
     const session = await requireSession();
@@ -103,14 +110,33 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
     // Só a equipe precisa saber se o WhatsApp ainda entrega texto livre (janela de 24h); a família não vê isso.
     const { whatsappUltimaMensagemEm, ...guardianPublico } = conversation.guardian;
     const souEquipe = session.sub === conversation.staffId;
+    // Só a equipe vê se o WhatsApp recusou a entrega (para reenviar pelo ClassLink).
+    const [bloqueio, falhas] = souEquipe
+      ? await Promise.all([
+          isWhatsAppConfigured() ? bloqueioPorCobranca(session.schoolId) : null,
+          falhasDasMensagens(messages.flatMap((m) => (m.channel === "WHATSAPP" && m.externalId ? [m.externalId] : []))),
+        ])
+      : [null, new Map<string, string>()];
     return NextResponse.json({
       conversation: {
         ...conversation,
         guardian: guardianPublico,
         staff: pessoaParaQuemVe(conversation.staff, session.role),
-        ...(souEquipe && { janelaWhatsApp: { ...janelaWhatsApp(whatsappUltimaMensagemEm), avisoPorModelo: isWhatsAppConfigured() } }),
+        ...(souEquipe && {
+          janelaWhatsApp: {
+            ...janelaWhatsApp(whatsappUltimaMensagemEm),
+            avisoPorModelo: isWhatsAppConfigured(),
+            bloqueio: bloqueio ? MOTIVO_BLOQUEIO_COBRANCA : null,
+          },
+        }),
       },
-      messages: await Promise.all(messages.map(async (m) => ({ ...(await comAnexo(m)), sender: pessoaParaQuemVe(m.sender, session.role) }))),
+      messages: await Promise.all(
+        messages.map(async ({ externalId, ...m }) => ({
+          ...(await comAnexo(m)),
+          sender: pessoaParaQuemVe(m.sender, session.role),
+          ...(souEquipe && externalId && falhas.has(externalId) && { falhaWhatsApp: falhas.get(externalId) }),
+        })),
+      ),
     });
   } catch (error) {
     return handleApiError(error);
@@ -138,6 +164,9 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
 
     let externalId: string | undefined;
     let avisoPeloWhatsApp = false;
+    // Quando o WhatsApp falha, a mensagem não se perde nem trava a tela: vai pelo ClassLink
+    // (a família recebe a notificação do app) e a equipe é avisada do motivo.
+    let aviso: string | null = null;
     if (canalEfetivo === "WHATSAPP") {
       if (!isWhatsAppConfigured()) return NextResponse.json({ error: "Integração com WhatsApp não configurada" }, { status: 400 });
       const guardian = await prisma.user.findUniqueOrThrow({
@@ -147,30 +176,44 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
       const phone = guardian.phone ? normalizePhoneBR(guardian.phone) : null;
       if (!phone) return NextResponse.json({ error: "Responsável não tem telefone cadastrado" }, { status: 400 });
 
-      if (janelaWhatsApp(guardian.whatsappUltimaMensagemEm).aberta) {
-        const sent = await sendWhatsAppTextMessage(phone, body).catch((err: unknown) => {
-          console.error("conversa: falha ao enviar WhatsApp", err);
-          throw new ErroDeUsuario("Não foi possível enviar pelo WhatsApp. Confira o número do responsável e a integração.", 502);
-        });
-        externalId = sent.externalId;
+      const motivoDaFalha = (err: unknown) => {
+        console.error("conversa: falha ao enviar WhatsApp", err);
+        const explicacao = err instanceof ErroWhatsApp && err.codigo ? explicarCodigoFalha(err.codigo) : "O WhatsApp não aceitou o envio agora.";
+        return `Não foi possível enviar pelo WhatsApp (${explicacao.replace(/\.$/, "")}). A mensagem foi enviada pelo ClassLink e a família recebe a notificação no celular.`;
+      };
+
+      if (await bloqueioPorCobranca(session.schoolId)) {
+        aviso = `Enviada pelo ClassLink. ${MOTIVO_BLOQUEIO_COBRANCA.split(". ")[0]}.`;
+        canalEfetivo = "APP";
+      } else if (janelaWhatsApp(guardian.whatsappUltimaMensagemEm).aberta) {
+        try {
+          externalId = (await sendWhatsAppTextMessage(phone, body)).externalId;
+        } catch (err) {
+          aviso = motivoDaFalha(err);
+          canalEfetivo = "APP";
+        }
       } else {
         // Fora da janela de 24h a Meta descarta texto livre (e aceita o envio, o que enganava a equipe).
         // O texto completo fica no ClassLink; a família recebe no WhatsApp o aviso padrão aprovado,
         // com o trecho e o link. A mensagem é do canal ClassLink, então vale o ✓✓ de abertura.
-        const modelo = await modeloDisponivel("aviso");
-        if (!modelo) throw new ErroDeUsuario(MENSAGEM_JANELA_FECHADA, 409);
-        const eu = await prisma.user.findUniqueOrThrow({ where: { id: session.sub }, select: SELECT_PESSOA });
-        const aviso = await sendWhatsAppTemplateMessage(
-          phone,
-          modelo,
-          parametrosModeloAviso(nomeParaQuemVe(eu, "GUARDIAN"), body, `${request.nextUrl.origin}/dashboard/mensagens/${id}`),
-        ).catch((err: unknown) => {
-          console.error("conversa: falha ao enviar aviso padrão do WhatsApp", err);
-          throw new ErroDeUsuario("Não foi possível avisar a família pelo WhatsApp agora. Envie pelo ClassLink.", 502);
-        });
-        await registrarAviso(aviso.externalId, conversation.guardianId, "familia", id);
-        avisoPeloWhatsApp = true;
         canalEfetivo = "APP";
+        const modelo = await modeloDisponivel("aviso");
+        if (!modelo) {
+          aviso = "Enviada pelo ClassLink: o WhatsApp só entrega texto livre até 24 horas depois da última mensagem da família e o aviso padrão não está disponível agora.";
+        } else {
+          try {
+            const eu = await prisma.user.findUniqueOrThrow({ where: { id: session.sub }, select: SELECT_PESSOA });
+            const enviado = await sendWhatsAppTemplateMessage(
+              phone,
+              modelo,
+              parametrosModeloAviso(nomeParaQuemVe(eu, "GUARDIAN"), body, `${request.nextUrl.origin}/dashboard/mensagens/${id}`),
+            );
+            await registrarAviso(enviado.externalId, conversation.guardianId, "familia", id);
+            avisoPeloWhatsApp = true;
+          } catch (err) {
+            aviso = motivoDaFalha(err);
+          }
+        }
       }
     } else if (canalEfetivo === "EMAIL") {
       if (!isEmailConfigured()) return NextResponse.json({ error: "Integração de e-mail não configurada" }, { status: 400 });
@@ -227,7 +270,11 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
     });
 
     return NextResponse.json(
-      { message: { ...(await comAnexo(message)), sender: pessoaParaQuemVe(message.sender, session.role) }, avisoPeloWhatsApp },
+      {
+        message: { ...(await comAnexo(withoutExternalId(message))), sender: pessoaParaQuemVe(message.sender, session.role) },
+        avisoPeloWhatsApp,
+        aviso,
+      },
       { status: 201 },
     );
   } catch (error) {
