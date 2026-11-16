@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { dataParaDate, publicarCardapiosDevidos, salvarCardapioSchema, segundaAtual, somarDias } from "@/lib/cardapios";
 import { exigirGestaoCardapio, paraTela, turmasVisiveis } from "@/lib/cardapios-acesso";
 import { perfilDoUsuario } from "@/lib/permissoes-mensagens";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 const INCLUDE = { class: { select: { name: true } } } as const;
 
@@ -15,6 +16,7 @@ const INCLUDE = { class: { select: { name: true } } } as const;
 export async function GET() {
   try {
     const session = await requireSession();
+    await exigirArea(session, "CARDAPIO");
     // Reserva do cron: se a segunda já passou das 6h e o cardápio ainda não saiu, publica agora.
     await publicarCardapiosDevidos(new Date(), session.schoolId).catch((err) => console.error("publicação do cardápio falhou", err));
 
@@ -43,6 +45,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "CARDAPIO");
     await exigirGestaoCardapio(session.sub);
     const body = salvarCardapioSchema.parse(await request.json());
 

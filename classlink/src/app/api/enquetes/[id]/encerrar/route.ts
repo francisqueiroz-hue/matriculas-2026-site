@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Encerra a enquete antes do prazo (quem criou ou a administração). */
 export async function POST(_request: Request, ctx: RouteContext<"/api/enquetes/[id]/encerrar">) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "ENQUETES");
     const { id } = await ctx.params;
     const enquete = await prisma.enquete.findFirst({
       where: { id, schoolId: session.schoolId },

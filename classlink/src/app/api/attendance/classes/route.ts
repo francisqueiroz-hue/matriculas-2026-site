@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Turmas em que o usuário logado pode marcar/consultar frequência: ADMIN (direção) vê
@@ -10,6 +11,7 @@ import { handleApiError } from "@/lib/http";
 export async function GET() {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "FREQUENCIA");
     const classes = await prisma.class.findMany({
       where: {
         schoolId: session.schoolId,

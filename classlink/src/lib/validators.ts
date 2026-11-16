@@ -51,7 +51,7 @@ export const createUserSchema = z
     email: opcionalVazio(z.string().trim().email()),
     phone: opcionalVazio(z.string().trim().max(30)),
     password: opcionalVazio(z.string().min(8).max(72)),
-    funcao: z.enum(["DIRECAO", "COORDENACAO", "PROFESSOR", "AUXILIAR"]),
+    funcao: z.enum(["DIRECAO", "SECRETARIA", "COORDENACAO", "PROFESSOR", "AUXILIAR"]),
     classIds: z.array(z.string()).optional(),
   })
   .refine((data) => Boolean(data.email || data.phone), {
@@ -61,7 +61,7 @@ export const createUserSchema = z
 
 export const updateUserSchema = z.object({
   name: z.string().min(1).max(150).optional(),
-  funcao: z.enum(["DIRECAO", "COORDENACAO", "PROFESSOR", "AUXILIAR"]).optional(),
+  funcao: z.enum(["DIRECAO", "SECRETARIA", "COORDENACAO", "PROFESSOR", "AUXILIAR"]).optional(),
   phone: z.string().max(30).optional(),
   active: z.boolean().optional(),
   classIds: z.array(z.string()).optional(),

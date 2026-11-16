@@ -5,10 +5,12 @@ import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { MENSAGEM_BLOQUEIO, ONDE_GESTAO, perfilDoUsuario, podeConversar, perfilMensagens } from "@/lib/permissoes-mensagens";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET() {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MENSAGENS");
     const perfil = await perfilDoUsuario(session.sub);
     // Professores e auxiliares não conversam com famílias (conversas antigas ficam ocultas).
     if (perfil === "professor") return NextResponse.json({ conversations: [] });
@@ -49,6 +51,7 @@ const startSchema = z.object({ counterpartUserId: z.string().min(1) });
 export async function POST(request: NextRequest) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MENSAGENS");
     const { counterpartUserId } = startSchema.parse(await request.json());
 
     const counterpart = await prisma.user.findFirst({

@@ -5,11 +5,13 @@ import { exigirLecionaNaTurma } from "@/lib/turmas-acesso";
 import { handleApiError } from "@/lib/http";
 import { markAttendanceSchema } from "@/lib/validators";
 import { dataParaMeiaNoiteUtc } from "@/lib/attendance";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Roster da turma numa data (para a tela de marcação): alunos + status já lançado, quando houver. */
 export async function GET(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "FREQUENCIA");
     const classId = request.nextUrl.searchParams.get("classId");
     const date = request.nextUrl.searchParams.get("date");
     if (!classId || !date) {
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "FREQUENCIA");
     const body = markAttendanceSchema.parse(await request.json());
     const dia = dataParaMeiaNoiteUtc(body.date);
 

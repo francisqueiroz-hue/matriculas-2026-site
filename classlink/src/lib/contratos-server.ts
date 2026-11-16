@@ -35,10 +35,13 @@ export async function responsaveisDoAluno(studentId: string): Promise<string[]> 
   return vinculos.map((v) => v.guardianId);
 }
 
-/** Ids da direção ativa da escola (para avisar que chegou contrato assinado). */
+/**
+ * Ids da direção ativa da escola (para avisar que chegou contrato assinado). Só a Direção: a
+ * Secretaria é ADMIN, mas não tem acesso aos contratos (ver lib/equipe.ts, ehDirecao).
+ */
 export async function direcaoDaEscola(schoolId: string): Promise<string[]> {
   const admins = await prisma.user.findMany({
-    where: { schoolId, role: "ADMIN", active: true, deletedAt: null },
+    where: { schoolId, role: "ADMIN", active: true, deletedAt: null, OR: [{ funcao: null }, { funcao: "DIRECAO" }] },
     select: { id: true },
   });
   return admins.map((a) => a.id);

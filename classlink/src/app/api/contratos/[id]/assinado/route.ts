@@ -18,6 +18,7 @@ import { carregarContratoComAcesso, direcaoDaEscola, lerPdfDoBlob, sha256Hex } f
 import { apagarDoBlob } from "@/lib/blob-storage";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Responsável envia o PDF do contrato assinado (gov.br ou à mão). Quem enviou, data/hora,
@@ -32,6 +33,7 @@ import { notifyUsers } from "@/lib/push";
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/contratos/[id]/assinado">) {
   try {
     const session = await requireRole("GUARDIAN");
+    await exigirArea(session, "CONTRATOS");
     const { id } = await ctx.params;
 
     const contrato = await carregarContratoComAcesso(id, session);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { confirmarRenovacaoDiretoSchema, confirmarRenovacaoSchema } from "@/lib/validators";
 import {
@@ -46,7 +46,7 @@ function camposDoForm(form: FormData) {
 export async function POST(request: NextRequest) {
   let blobPath: string | null = null;
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
 
     let bruto: Record<string, unknown>;
     let nomeArquivo: string;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { setMensalidadeSchema } from "@/lib/validators";
 import { alteracoesFinanceiro } from "@/lib/historico-cadastro";
@@ -13,7 +13,7 @@ import { DIA_VENCIMENTO_PADRAO } from "@/lib/billing";
  */
 export async function PUT(request: NextRequest, ctx: RouteContext<"/api/admin/students/[id]/billing">) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const { id } = await ctx.params;
     const body = setMensalidadeSchema.parse(await request.json());
 

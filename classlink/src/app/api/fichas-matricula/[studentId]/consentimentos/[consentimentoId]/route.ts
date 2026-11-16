@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { exigirEquipe } from "@/lib/ficha-matricula-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Revoga um consentimento: preenche revogadoEm e mantém o registro (nunca apaga). */
 export async function DELETE(
@@ -10,6 +11,7 @@ export async function DELETE(
 ) {
   try {
     const session = await exigirEquipe();
+    await exigirArea(session, "FICHAS");
     const { studentId, consentimentoId } = await ctx.params;
     const r = await prisma.consentimentoLgpd.updateMany({
       where: { id: consentimentoId, studentId, schoolId: session.schoolId, revogadoEm: null },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { CONTRATO_MAX_BYTES, ContratoErro } from "@/lib/contratos";
 import { lerPdfDoBlob } from "@/lib/contratos-server";
@@ -14,7 +14,7 @@ import { conferirAssinaturasPdf, normalizarNome } from "@/lib/assinatura-pdf";
  */
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/admin/contratos/[id]/assinatura">) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const { id } = await ctx.params;
     const arquivoId = request.nextUrl.searchParams.get("arquivoId");
     if (!arquivoId) return NextResponse.json({ error: "Informe o arquivo" }, { status: 400 });

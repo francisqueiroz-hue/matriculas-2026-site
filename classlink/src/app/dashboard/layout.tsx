@@ -10,6 +10,8 @@ import { AndroidInstallBanner } from "@/components/AndroidInstallBanner";
 import { RematriculaBanner } from "@/components/RematriculaBanner";
 import { ContratosPendentesBanner } from "@/components/ContratosPendentesBanner";
 import { AvisosMensagensProvider, ConviteAtivarAvisos } from "@/components/AvisosMensagens";
+import { GuardaVisibilidade } from "@/components/GuardaVisibilidade";
+import { areasBloqueadasDoUsuario } from "@/lib/visibilidade-server";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -24,10 +26,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
       role: true,
       schoolId: true,
       isCoordenacao: true,
+      funcao: true,
       school: { select: { name: true } },
     },
   });
   if (!user) redirect("/login");
+  // O que a direção desligou para este perfil (tela Configurações): some do menu e da tela.
+  const areasBloqueadas = await areasBloqueadasDoUsuario(user);
 
   return (
     <UserProvider
@@ -39,6 +44,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         schoolId: user.schoolId,
         schoolName: user.school.name,
         isCoordenacao: user.isCoordenacao,
+        areasBloqueadas,
+        funcao: user.funcao,
       }}
     >
       <AvisosMensagensProvider>
@@ -56,7 +63,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               <ConviteAtivarAvisos />
               <ContratosPendentesBanner />
               <RematriculaBanner />
-              {children}
+              <GuardaVisibilidade>{children}</GuardaVisibilidade>
             </main>
           </div>
         </div>

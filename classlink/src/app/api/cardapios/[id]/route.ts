@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { atualizarPublicacao, conteudoCardapioSchema } from "@/lib/cardapios";
 import { exigirGestaoCardapio, paraTela } from "@/lib/cardapios-acesso";
 import { z } from "zod";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 const editarSchema = z.object({
   conteudo: conteudoCardapioSchema.optional(),
@@ -16,6 +17,7 @@ const editarSchema = z.object({
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/cardapios/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "CARDAPIO");
     await exigirGestaoCardapio(session.sub);
     const { id } = await ctx.params;
     const body = editarSchema.parse(await request.json());
@@ -44,6 +46,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/cardap
 export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/cardapios/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "CARDAPIO");
     await exigirGestaoCardapio(session.sub);
     const { id } = await ctx.params;
     const existente = await prisma.cardapio.findFirst({ where: { id, schoolId: session.schoolId } });

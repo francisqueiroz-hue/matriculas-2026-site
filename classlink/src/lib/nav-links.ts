@@ -3,6 +3,8 @@ import { usePathname } from "next/navigation";
 import type { SessionUser } from "@/lib/types";
 import { apiJson } from "@/lib/api-client";
 import { situacaoDoComunicado } from "@/lib/comunicados-situacao";
+import { ehDirecao } from "@/lib/equipe";
+import { telaBloqueada } from "@/lib/visibilidade";
 
 export interface NavLink {
   href: string;
@@ -95,6 +97,11 @@ const adminLinks: NavLink[] = [
     icon: "M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z M3 10h18 M7 15h3",
   },
   {
+    href: "/dashboard/admin/configuracoes",
+    label: "Configurações",
+    icon: "M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z",
+  },
+  {
     href: "/dashboard/admin/lembretes",
     label: "Lembretes",
     icon: "M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9 M13.7 21a2 2 0 01-3.4 0",
@@ -163,9 +170,29 @@ const guiaLink: NavLink = {
   icon: "M12 21a9 9 0 100-18 9 9 0 000 18z M9.1 9a3 3 0 015.8 1c0 2-3 2.5-3 4 M12 17h.01",
 };
 
-/** Notas fica visível só para direção (ADMIN) e coordenação (STAFF com isCoordenacao). */
-export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao">): NavLink[] {
-  if (user.role === "ADMIN") return [...baseLinks, notasLink, ...adminLinks, fichasLink, guiaLink];
+/** Abas da administração que só a direção vê: financeiro, contratos (com valores), lembretes de cobrança e Configurações (visibilidade). */
+export const ABAS_SO_DIRECAO = [
+  "/dashboard/admin/contratos",
+  "/dashboard/admin/financeiro",
+  "/dashboard/admin/lembretes",
+  "/dashboard/admin/configuracoes",
+];
+
+/**
+ * Notas fica visível só para direção/secretaria (ADMIN) e coordenação (STAFF com isCoordenacao).
+ * Financeiro, Contratos, Lembretes e Configurações só para a direção (o servidor também bloqueia).
+ * Áreas desligadas pela direção em Configurações somem do menu (o servidor também bloqueia).
+ */
+export function getNavLinks(user: Pick<SessionUser, "role" | "isCoordenacao" | "funcao" | "areasBloqueadas">): NavLink[] {
+  return linksDoPerfil(user).filter((l) => !telaBloqueada(l.href, user.areasBloqueadas));
+}
+
+function linksDoPerfil(user: Pick<SessionUser, "role" | "isCoordenacao" | "funcao">): NavLink[] {
+  if (user.role === "ADMIN") {
+    const direcao = ehDirecao({ role: user.role, funcao: user.funcao ?? null });
+    const admin = direcao ? adminLinks : adminLinks.filter((l) => !ABAS_SO_DIRECAO.includes(l.href));
+    return [...baseLinks, notasLink, ...admin, fichasLink, guiaLink];
+  }
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks, guiaLink];
   if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, guiaLink];
   if (user.role === "STAFF") return [...baseLinks, fichasLink, guiaLink];

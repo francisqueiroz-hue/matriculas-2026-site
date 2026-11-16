@@ -3,10 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { updatePostSchema } from "@/lib/validators";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/posts/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MURAL");
     const { id } = await ctx.params;
     const body = updatePostSchema.parse(await request.json());
 
@@ -33,6 +35,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/posts/
 export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/posts/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MURAL");
     const { id } = await ctx.params;
 
     const post = await prisma.post.findFirst({ where: { id, schoolId: session.schoolId } });

@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // confere o conteúdo antes de registrar o envio.
 
 const blob = vi.hoisted(() => ({ issueSignedToken: vi.fn(), get: vi.fn(), put: vi.fn(), del: vi.fn() }));
+// Visibilidade por perfil (Configurações) testada em visibilidade.test.ts; aqui, tudo liberado.
+vi.mock("@/lib/visibilidade-server", () => ({ exigirArea: async () => {} }));
 vi.mock("@vercel/blob", () => blob);
 const cliente = vi.hoisted(() => ({ handleUploadPresigned: vi.fn() }));
 vi.mock("@vercel/blob/client", () => cliente);
@@ -32,6 +34,9 @@ vi.mock("@/lib/push", () => ({ notifyUsers: vi.fn(async () => undefined) }));
 vi.mock("@/lib/erros-servidor", () => ({ registrarErroServidor: vi.fn() }));
 const sessao = vi.hoisted(() => ({ role: "GUARDIAN" }));
 vi.mock("@/lib/session", () => ({
+  // Rotas só da direção: aqui a sessão simulada já é da direção (ver tests/direcao-acesso.test.ts).
+  requireDirecao: async () => (await import("@/lib/session")).requireRole("ADMIN"),
+  exigirDirecaoSeAdmin: async () => undefined,
   requireRole: vi.fn(async (...roles: string[]) => {
     if (!roles.includes(sessao.role)) {
       const { AuthError } = await import("@/lib/session");

@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Reenvia a notificação push de um comunicado para um responsável específico que ainda não respondeu. */
 export async function POST(_request: Request, ctx: RouteContext<"/api/comunicados/[id]/reenviar/[guardianId]">) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "COMUNICADOS");
     const { id: comunicadoId, guardianId } = await ctx.params;
 
     const comunicado = await prisma.comunicado.findFirst({ where: { id: comunicadoId, schoolId: session.schoolId } });

@@ -4,11 +4,13 @@ import { requireSession } from "@/lib/session";
 import { exigirPodeVerAluno } from "@/lib/turmas-acesso";
 import { handleApiError } from "@/lib/http";
 import { calcResumoFrequencia, abaixoDoMinimoLegal, mesReferenciaParaIntervalo, mesAtualReferencia } from "@/lib/attendance";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Histórico e resumo de frequência de um aluno num mês (padrão: mês corrente). */
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/attendance/[studentId]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "FREQUENCIA");
     const { studentId } = await ctx.params;
     const mes = request.nextUrl.searchParams.get("mes") ?? mesAtualReferencia();
     const { inicio, fim } = mesReferenciaParaIntervalo(mes);

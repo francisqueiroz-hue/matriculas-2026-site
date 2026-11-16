@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { novoContratoSchema } from "@/lib/validators";
 import { CONTRATO_LIMITE_ENVIO_SERVIDOR, ContratoErro, nomeArquivoPdfSeguro, validarPdf } from "@/lib/contratos";
@@ -14,7 +14,7 @@ import { notifyUsers } from "@/lib/push";
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const form = await request.formData();
     const dados = novoContratoSchema.parse({
       studentId: form.get("studentId"),

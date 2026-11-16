@@ -6,6 +6,7 @@ import { ErroDeUsuario } from "@/lib/erros";
 import { responderEnqueteSchema } from "@/lib/validators";
 import { enqueteAberta, validarRespostas } from "@/lib/enquetes";
 import { carregarEnqueteVisivel } from "@/lib/enquetes-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * A família responde uma vez; não há edição. Em enquete anônima, a participação (quem respondeu) e o
@@ -14,6 +15,7 @@ import { carregarEnqueteVisivel } from "@/lib/enquetes-acesso";
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/enquetes/[id]/responder">) {
   try {
     const session = await requireRole("GUARDIAN");
+    await exigirArea(session, "ENQUETES");
     const { id } = await ctx.params;
     const { respostas } = responderEnqueteSchema.parse(await request.json());
 

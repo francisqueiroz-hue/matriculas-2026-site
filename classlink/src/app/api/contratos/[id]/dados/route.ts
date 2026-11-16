@@ -9,6 +9,7 @@ import { gerarContrato2027 } from "@/lib/contrato-modelo/gerar";
 import { dadosFamiliaSchema } from "@/lib/contrato-modelo/validacao";
 import { resolverResponsavelLegal, sugestaoDadosFamilia } from "@/lib/contrato-modelo/servidor";
 import { calcularValores, MODELO_CONTRATO_2027, type CondicoesContrato, type DadosFamilia } from "@/lib/contrato-modelo/tipos";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 async function carregar(id: string, session: Awaited<ReturnType<typeof requireRole>>) {
   const contrato = await carregarContratoComAcesso(id, session);
@@ -20,6 +21,7 @@ async function carregar(id: string, session: Awaited<ReturnType<typeof requireRo
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/contratos/[id]/dados">) {
   try {
     const session = await requireRole("GUARDIAN");
+    await exigirArea(session, "CONTRATOS");
     const { id } = await ctx.params;
     const achado = await carregar(id, session);
     if (!achado) return NextResponse.json({ error: "Contrato não encontrado" }, { status: 404 });
@@ -56,6 +58,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/contrat
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/contratos/[id]/dados">) {
   try {
     const session = await requireRole("GUARDIAN");
+    await exigirArea(session, "CONTRATOS");
     const { id } = await ctx.params;
     const achado = await carregar(id, session);
     if (!achado) return NextResponse.json({ error: "Contrato não encontrado" }, { status: 404 });

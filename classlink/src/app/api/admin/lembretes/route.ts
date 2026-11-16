@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { configLembretesSchema } from "@/lib/validators";
 import { planejarDaEscola, pendenciasDaEscola } from "@/lib/lembretes-server";
@@ -15,7 +15,7 @@ import { resumoFalhasRecentes } from "@/lib/whatsapp-falhas";
  */
 export async function GET() {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const agora = new Date();
     const { config, plano } = await planejarDaEscola(session.schoolId, agora);
 
@@ -69,7 +69,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const body = configLembretesSchema.parse(await request.json());
     const escola = await prisma.school.update({
       where: { id: session.schoolId },

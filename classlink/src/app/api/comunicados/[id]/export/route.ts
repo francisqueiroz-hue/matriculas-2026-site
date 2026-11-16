@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { cabecalhosDownloadCsv, celulaCsv } from "@/lib/csv";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 const RESPOSTA_LABEL: Record<string, string> = {
   AUTORIZADO: "Autorizado",
@@ -16,6 +17,7 @@ const RESPOSTA_LABEL: Record<string, string> = {
 export async function GET(_request: Request, ctx: RouteContext<"/api/comunicados/[id]/export">) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "COMUNICADOS");
     const { id: comunicadoId } = await ctx.params;
 
     const comunicado = await prisma.comunicado.findFirst({ where: { id: comunicadoId, schoolId: session.schoolId } });

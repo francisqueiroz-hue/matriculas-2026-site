@@ -8,7 +8,7 @@ import { hashPassword } from "@/lib/auth";
 import { normalizePhoneBR } from "@/lib/whatsapp";
 import { telefoneEmUso } from "@/lib/usuarios";
 import { descreverEnvio, enviarAcessoPeloApp } from "@/lib/envio-acesso";
-import { perfilDaFuncao } from "@/lib/equipe";
+import { ehDirecao, perfilDaFuncao } from "@/lib/equipe";
 
 
 export async function GET(request: NextRequest) {
@@ -51,6 +51,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN");
     const body = createUserSchema.parse(await request.json());
+
+    // Só a direção cadastra alguém como Direção (acesso ao financeiro e aos contratos).
+    if (body.funcao === "DIRECAO") {
+      const quem = await prisma.user.findUnique({ where: { id: session.sub }, select: { role: true, funcao: true } });
+      if (!quem || !ehDirecao(quem)) {
+        return NextResponse.json({ error: "Somente a direção pode cadastrar alguém como Direção." }, { status: 403 });
+      }
+    }
 
     const email = body.email?.toLowerCase();
     let phone: string | undefined;

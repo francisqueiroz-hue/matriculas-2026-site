@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { acaoContratoSchema } from "@/lib/validators";
 import { CONTRATO_MAX_BYTES, ContratoErro, ERRO_SEM_ASSINATURA_DIGITAL, podeExcluirContrato, proximoStatus } from "@/lib/contratos";
@@ -39,7 +39,7 @@ async function ultimoPdfTemAssinatura(contratoId: string): Promise<boolean | nul
  */
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/contratos/[id]">) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const { id } = await ctx.params;
     const body = acaoContratoSchema.parse(await request.json());
 
@@ -127,7 +127,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
 /** Exclui um contrato enviado por engano — só enquanto a família ainda não enviou nada. */
 export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/admin/contratos/[id]">) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const { id } = await ctx.params;
 
     const contrato = await prisma.contrato.findFirst({

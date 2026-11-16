@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Arquivos na aba Mensagens (declarações, documentos): família ↔ direção/coordenação, guardados
 // no armazenamento privado e conferidos pelo conteúdo real.
 
+// Visibilidade por perfil (Configurações) testada em visibilidade.test.ts; aqui, tudo liberado.
+vi.mock("@/lib/visibilidade-server", () => ({ exigirArea: async () => {} }));
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: vi.fn() }));
 
 const blob = vi.hoisted(() => ({ issueSignedToken: vi.fn(async () => "token"), get: vi.fn(), put: vi.fn(), del: vi.fn() }));
