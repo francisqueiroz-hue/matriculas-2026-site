@@ -42,9 +42,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
       }}
     >
       <AvisosMensagensProvider>
-        {/* Contas de família usam um tema mais colorido (ver `.tema-familia` em
-            globals.css); direção e professores ficam com a paleta padrão. */}
-        <div className={`flex flex-1 flex-col ${user.role === "GUARDIAN" ? "tema-familia" : ""}`}>
+        {/* Todas as contas usam o tema colorido das famílias (ver `.tema-familia`
+            em globals.css), para a direção e a coordenação verem o app como os
+            pais veem. */}
+        <div className="tema-familia flex flex-1 flex-col">
           <Navbar />
           <PushRegister />
           <div className="flex flex-1">
