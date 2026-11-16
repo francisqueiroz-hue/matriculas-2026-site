@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { alunoDaEscola, etapasDoContrato, exigirEquipe } from "@/lib/ficha-matricula-acesso";
 import { anoLetivoPadrao, anoLetivoSchema, etapaDaFicha, montarChecklist, tiposVisiveis } from "@/lib/ficha-matricula";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Ficha de um aluno: checklist de documentos do ano letivo e histórico de consentimentos. */
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/fichas-matricula/[studentId]">) {
   try {
     const session = await exigirEquipe();
+    await exigirArea(session, "FICHAS");
     const { studentId } = await ctx.params;
     const aluno = await alunoDaEscola(studentId, session.schoolId);
     if (!aluno) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });

@@ -8,6 +8,7 @@ import { isBlobConfigured } from "@/lib/blob-storage";
 import { assertConversationParticipant } from "@/lib/messaging";
 import { exigirPodeConversar } from "@/lib/permissoes-mensagens";
 import { ANEXO_MAX_BYTES, TIPOS_ANEXO, caminhoAnexoValido } from "@/lib/anexo-envio";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Arquivo acima de 4 MB na aba Mensagens: autoriza o navegador de quem participa da conversa
@@ -18,6 +19,7 @@ import { ANEXO_MAX_BYTES, TIPOS_ANEXO, caminhoAnexoValido } from "@/lib/anexo-en
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]/anexo">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MENSAGENS");
     const { id } = await ctx.params;
     const conversa = await assertConversationParticipant(id, session.sub);
     await exigirPodeConversar(conversa.staffId, conversa.guardianId);

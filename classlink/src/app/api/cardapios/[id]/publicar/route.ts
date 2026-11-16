@@ -4,11 +4,13 @@ import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { publicarCardapio } from "@/lib/cardapios";
 import { exigirGestaoCardapio } from "@/lib/cardapios-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Publica agora, sem esperar a segunda-feira (ex.: cardápio corrigido de última hora). */
 export async function POST(_request: NextRequest, ctx: RouteContext<"/api/cardapios/[id]/publicar">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "CARDAPIO");
     await exigirGestaoCardapio(session.sub);
     const { id } = await ctx.params;
     const existente = await prisma.cardapio.findFirst({ where: { id, schoolId: session.schoolId } });

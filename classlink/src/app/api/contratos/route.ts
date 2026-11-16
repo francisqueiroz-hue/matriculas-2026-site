@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import type { ContratoStatus } from "@/lib/contratos";
 import { MODELO_CONTRATO_2027, valoresDoContrato } from "@/lib/contrato-modelo/tipos";
 import { ROTULO_SITUACAO, conferirValor, precisaAtualizar } from "@/lib/contrato-modelo/conferencia";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 const STATUS_VALIDOS: ContratoStatus[] = ["AGUARDANDO_ASSINATURA", "EM_CONFERENCIA", "AGUARDANDO_ORIGINAL", "COMPLETO", "DEVOLVIDO"];
 
@@ -52,6 +53,7 @@ function conferenciaDoContrato(
 export async function GET(request: NextRequest) {
   try {
     const session = await requireRole("GUARDIAN", "ADMIN");
+    await exigirArea(session, "CONTRATOS");
 
     if (session.role === "GUARDIAN") {
       const contratos = await prisma.contrato.findMany({

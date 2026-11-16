@@ -5,10 +5,12 @@ import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { enqueteAberta } from "@/lib/enquetes";
 import { carregarEnqueteVisivel } from "@/lib/enquetes-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "ENQUETES");
     const { id } = await ctx.params;
     const enquete = await carregarEnqueteVisivel(session, id);
     if (!enquete) throw new ErroDeUsuario("Enquete não encontrada.", 404);

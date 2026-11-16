@@ -5,10 +5,12 @@ import { exigirPodeVerAluno } from "@/lib/turmas-acesso";
 import { handleApiError } from "@/lib/http";
 import { setNotaSchema } from "@/lib/validators";
 import { TRIMESTRES, calcMediaTrimestre, calcMediaFinal, calcSituacao } from "@/lib/notas";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/notas/[studentId]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "NOTAS");
     const { studentId } = await ctx.params;
 
     const student = await prisma.student.findFirst({
@@ -54,6 +56,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/notas/[
 export async function PUT(request: NextRequest, ctx: RouteContext<"/api/notas/[studentId]">) {
   try {
     const session = await requireCoordenacaoOuAdmin();
+    await exigirArea(session, "NOTAS");
     const { studentId } = await ctx.params;
     const body = setNotaSchema.parse(await request.json());
     const disciplinaId = request.nextUrl.searchParams.get("disciplinaId");

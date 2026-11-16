@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getPublicoAlvo } from "@/lib/comunicados";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Responsáveis do público-alvo que ainda não registraram nenhuma resposta. */
 export async function GET(_request: Request, ctx: RouteContext<"/api/comunicados/[id]/pendentes">) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "COMUNICADOS");
     const { id: comunicadoId } = await ctx.params;
 
     const comunicado = await prisma.comunicado.findFirst({ where: { id: comunicadoId, schoolId: session.schoolId } });

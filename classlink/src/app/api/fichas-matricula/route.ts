@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { etapasDoContrato, exigirEquipe } from "@/lib/ficha-matricula-acesso";
 import { anoLetivoPadrao, anoLetivoSchema, etapaDaFicha, resumoDocumentos, type TipoDocumento } from "@/lib/ficha-matricula";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Lista de alunos com o resumo de documentos entregues no ano letivo (padrão: ano corrente). */
 export async function GET(request: NextRequest) {
   try {
     const session = await exigirEquipe();
+    await exigirArea(session, "FICHAS");
     const anoParam = request.nextUrl.searchParams.get("ano");
     const anoLetivo = anoParam ? anoLetivoSchema.parse(anoParam) : anoLetivoPadrao(null);
 

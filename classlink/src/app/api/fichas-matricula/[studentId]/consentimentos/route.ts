@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
 import { alunoDaEscola, exigirEquipe } from "@/lib/ficha-matricula-acesso";
 import { registrarConsentimentoSchema } from "@/lib/ficha-matricula";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Registra um consentimento (finalidade, versão do texto e quem consentiu). Se já houver
@@ -12,6 +13,7 @@ import { registrarConsentimentoSchema } from "@/lib/ficha-matricula";
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/fichas-matricula/[studentId]/consentimentos">) {
   try {
     const session = await exigirEquipe();
+    await exigirArea(session, "FICHAS");
     const { studentId } = await ctx.params;
     const entrada = registrarConsentimentoSchema.parse(await request.json());
 

@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ONDE_GESTAO, perfilDoUsuario } from "@/lib/permissoes-mensagens";
 import { SELECT_PESSOA, nomeParaQuemVe } from "@/lib/nome-institucional";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Mensagens não lidas do usuário logado — conversas com famílias (inclusive as que chegam
@@ -13,6 +14,7 @@ import { SELECT_PESSOA, nomeParaQuemVe } from "@/lib/nome-institucional";
 export async function GET() {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MENSAGENS");
     const naoLida = { senderId: { not: session.sub }, readAt: null };
 
     const perfil = await perfilDoUsuario(session.sub);

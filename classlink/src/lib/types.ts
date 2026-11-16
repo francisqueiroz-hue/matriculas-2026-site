@@ -8,4 +8,6 @@ export interface SessionUser {
   schoolId: string;
   schoolName: string;
   isCoordenacao: boolean;
+  /** Áreas desligadas pela direção para este perfil (tela Configurações). Some do menu e da tela. */
+  areasBloqueadas?: string[];
 }

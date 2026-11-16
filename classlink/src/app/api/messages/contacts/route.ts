@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ONDE_GESTAO, cargoParaExibir, perfilDoUsuario } from "@/lib/permissoes-mensagens";
 import { SELECT_PESSOA, nomeInstitucional } from "@/lib/nome-institucional";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Pessoas com quem o usuário atual pode iniciar uma conversa família ↔ escola (regras em
@@ -13,6 +14,7 @@ import { SELECT_PESSOA, nomeInstitucional } from "@/lib/nome-institucional";
 export async function GET() {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MENSAGENS");
     const perfil = await perfilDoUsuario(session.sub);
 
     if (perfil === "familia") {

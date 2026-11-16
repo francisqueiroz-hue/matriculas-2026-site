@@ -6,6 +6,7 @@ import { handleApiError } from "@/lib/http";
 import { nomeArquivoPdfSeguro } from "@/lib/contratos";
 import { carregarContratoComAcesso } from "@/lib/contratos-server";
 import { lerDoBlob } from "@/lib/blob-storage";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Entrega o PDF (modelo ou assinado) só para quem tem acesso ao contrato. Nunca há link
@@ -16,6 +17,7 @@ import { lerDoBlob } from "@/lib/blob-storage";
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/contratos/[id]/arquivos/[arquivoId]">) {
   try {
     const session = await requireRole("GUARDIAN", "ADMIN");
+    await exigirArea(session, "CONTRATOS");
     const { id, arquivoId } = await ctx.params;
 
     const contrato = await carregarContratoComAcesso(id, session);

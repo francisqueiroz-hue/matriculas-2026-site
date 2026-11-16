@@ -9,10 +9,12 @@ import { separarAbertura } from "@/lib/comunicado-leitura";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 import { exigirAlunoPublicavel, exigirTurmaPublicavel } from "@/lib/turmas-acesso";
 import { visibilidadePorPublico } from "@/lib/escopo-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET() {
   try {
     const session = await requireSession();
+    await exigirArea(session, "COMUNICADOS");
 
     // Família: vínculos com os filhos, para saber quantos filhos cada comunicado alcança.
     // Comunicados individuais (audience STUDENT) só aparecem para o responsável do próprio aluno-alvo.
@@ -77,6 +79,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "COMUNICADOS");
     const body = createComunicadoSchema.parse(await request.json());
 
     if (body.audience === "SCHOOL" && session.role !== "ADMIN") {

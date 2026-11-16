@@ -5,10 +5,12 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ordenarDupla } from "@/lib/messaging";
 import { MENSAGEM_BLOQUEIO, ONDE_GESTAO, perfilDoUsuario, perfilMensagens, podeConversar } from "@/lib/permissoes-mensagens";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET() {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "MENSAGENS");
     const perfil = await perfilDoUsuario(session.sub);
 
     const conversations = await prisma.teamConversation.findMany({
@@ -48,6 +50,7 @@ const startSchema = z.object({ counterpartUserId: z.string().min(1) });
 export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "MENSAGENS");
     const { counterpartUserId } = startSchema.parse(await request.json());
 
     if (counterpartUserId === session.sub) {

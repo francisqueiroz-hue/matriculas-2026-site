@@ -5,6 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
 import { alunoDaEscola, etapasDoContrato, exigirEquipe } from "@/lib/ficha-matricula-acesso";
 import { anoLetivoSchema, documentosFaltantes, etapaDaFicha, mensagemDocumentosFaltantes } from "@/lib/ficha-matricula";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 const corpoSchema = z.object({ anoLetivo: anoLetivoSchema, enviar: z.boolean().optional() });
 
@@ -16,6 +17,7 @@ const corpoSchema = z.object({ anoLetivo: anoLetivoSchema, enviar: z.boolean().o
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/fichas-matricula/[studentId]/aviso">) {
   try {
     const session = await exigirEquipe();
+    await exigirArea(session, "FICHAS");
     const { studentId } = await ctx.params;
     const { anoLetivo, enviar } = corpoSchema.parse(await request.json());
 

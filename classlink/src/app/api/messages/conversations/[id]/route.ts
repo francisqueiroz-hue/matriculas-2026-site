@@ -18,6 +18,7 @@ import { isEmailConfigured, sendEmailMessage } from "@/lib/email";
 import { janelaWhatsApp } from "@/lib/canal-envio";
 import { SELECT_PESSOA, nomeParaQuemVe, pessoaParaQuemVe } from "@/lib/nome-institucional";
 import { getShortSignedMediaUrl, provedorDeMidia } from "@/lib/firebase-storage";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Lê o pedido de envio: JSON (texto e, opcionalmente, o caminho de um arquivo grande já enviado
@@ -81,6 +82,7 @@ function withoutExternalId<T extends { externalId?: string | null }>(m: T): Omit
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MENSAGENS");
     const { id } = await ctx.params;
     const participante = await assertConversationParticipant(id, session.sub);
     await exigirPodeConversar(participante.staffId, participante.guardianId);
@@ -146,6 +148,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/message
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MENSAGENS");
     const { id } = await ctx.params;
     const conversation = await assertConversationParticipant(id, session.sub);
     // Regra da escola: família ↔ direção/coordenação apenas (inclusive conversas antigas).
@@ -286,6 +289,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/message
 export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/messages/conversations/[id]">) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MENSAGENS");
     const { id } = await ctx.params;
     await assertConversationParticipant(id, session.sub);
     await exigirPodeExcluirConversa(session.sub);

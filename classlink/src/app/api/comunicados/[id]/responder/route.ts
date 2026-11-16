@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { responderComunicadoSchema } from "@/lib/validators";
 import { RESPOSTAS_PERMITIDAS } from "@/lib/comunicados";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 function getClientIp(request: NextRequest) {
   const forwardedFor = request.headers.get("x-forwarded-for");
@@ -15,6 +16,7 @@ function getClientIp(request: NextRequest) {
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/comunicados/[id]/responder">) {
   try {
     const session = await requireRole("GUARDIAN");
+    await exigirArea(session, "COMUNICADOS");
     const { id: comunicadoId } = await ctx.params;
     const body = responderComunicadoSchema.parse(await request.json());
 

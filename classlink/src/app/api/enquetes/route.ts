@@ -8,10 +8,12 @@ import { ErroDeUsuario } from "@/lib/erros";
 import { enqueteAberta, normalizarOpcoesPergunta } from "@/lib/enquetes";
 import { filtroDeVisibilidadeEnquetes, publicoDaEnquete } from "@/lib/enquetes-acesso";
 import { exigirAlunoPublicavel, exigirTurmaPublicavel } from "@/lib/turmas-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET() {
   try {
     const session = await requireSession();
+    await exigirArea(session, "ENQUETES");
     const OR = await filtroDeVisibilidadeEnquetes(session);
 
     const enquetes = await prisma.enquete.findMany({
@@ -58,6 +60,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "ENQUETES");
     const body = createEnqueteSchema.parse(await request.json());
 
     if (body.audience === "SCHOOL" && session.role !== "ADMIN") {

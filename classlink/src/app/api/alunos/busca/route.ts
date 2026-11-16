@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCoordenacaoOuAdmin } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Lista enxuta de todos os alunos ativos da escola para a busca instantânea (emergência).
@@ -14,6 +15,7 @@ import { handleApiError } from "@/lib/http";
 export async function GET() {
   try {
     const session = await requireCoordenacaoOuAdmin("Consulta de alunos restrita à direção e à coordenação");
+    await exigirArea(session, "CONSULTA_ALUNOS");
     const alunos = await prisma.student.findMany({
       where: { schoolId: session.schoolId, deletedAt: null },
       select: {

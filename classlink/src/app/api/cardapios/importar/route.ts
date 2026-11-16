@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { dataParaDate, importarCardapiosSchema, publicarCardapiosDevidos, segundaAtual } from "@/lib/cardapios";
 import { exigirGestaoCardapio } from "@/lib/cardapios-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
  * Importa vários cardápios de uma vez (ex.: o trimestre enviado pela nutricionista): para
@@ -13,6 +14,7 @@ import { exigirGestaoCardapio } from "@/lib/cardapios-acesso";
 export async function POST(request: NextRequest) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "CARDAPIO");
     await exigirGestaoCardapio(session.sub);
     const body = importarCardapiosSchema.parse(await request.json());
 

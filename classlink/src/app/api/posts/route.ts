@@ -8,6 +8,7 @@ import { getSignedMediaUrl } from "@/lib/firebase-storage";
 import { filtroDeVisibilidade, turmasVisiveisNoMural } from "@/lib/visibilidade-posts";
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 import { exigirTurmaPublicavel } from "@/lib/turmas-acesso";
+import { exigirArea } from "@/lib/visibilidade-server";
 
 /** Troca o caminho interno do arquivo por uma URL assinada de leitura (temporária). */
 async function withSignedMedia<T extends { mediaUrl: string | null }>(post: T): Promise<T> {
@@ -22,6 +23,7 @@ async function withSignedMedia<T extends { mediaUrl: string | null }>(post: T): 
 export async function GET(request: NextRequest) {
   try {
     const session = await requireSession();
+    await exigirArea(session, "MURAL");
     const cursor = request.nextUrl.searchParams.get("cursor") ?? undefined;
     const classIdFilter = request.nextUrl.searchParams.get("classId") ?? undefined;
 
@@ -62,6 +64,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    await exigirArea(session, "MURAL");
     const body = createPostSchema.parse(await request.json());
 
     if (body.audience === "SCHOOL" && session.role !== "ADMIN") {
