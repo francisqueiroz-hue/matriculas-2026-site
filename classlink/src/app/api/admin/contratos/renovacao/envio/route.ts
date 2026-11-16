@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { issueSignedToken } from "@vercel/blob";
 import { handleUploadPresigned, type HandleUploadPresignedBody } from "@vercel/blob/client";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { isBlobConfigured } from "@/lib/blob-storage";
@@ -16,7 +16,7 @@ import { CONTRATO_MAX_BYTES, alunoDoCaminhoRenovacao } from "@/lib/contratos";
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     if (!isBlobConfigured()) {
       throw new ErroDeUsuario("Arquivos acima de 4 MB ainda não podem ser recebidos. Digitalize em resolução menor (150 dpi).", 400);
     }

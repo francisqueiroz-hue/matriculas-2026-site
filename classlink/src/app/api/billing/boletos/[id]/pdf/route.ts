@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { exigirDirecaoSeAdmin, requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { baixarPdfCobranca } from "@/lib/banco-inter";
 
@@ -8,6 +8,8 @@ import { baixarPdfCobranca } from "@/lib/banco-inter";
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/billing/boletos/[id]/pdf">) {
   try {
     const session = await requireRole("GUARDIAN", "ADMIN");
+    // Da administração, só a direção vê contratos e boletos (valores).
+    await exigirDirecaoSeAdmin(session);
     const { id } = await ctx.params;
 
     const boleto = await prisma.boleto.findFirst({ where: { id, schoolId: session.schoolId } });

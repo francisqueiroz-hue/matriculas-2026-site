@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { novoAlunoSchema } from "@/lib/validators";
 import { nomesSemelhantes } from "@/lib/nomes-semelhantes";
+import { ehDirecao } from "@/lib/equipe";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +19,13 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { name: "asc" },
     });
+
+    // Mensalidade, vencimento e bolsa são dados financeiros: só a direção recebe. Secretaria,
+    // coordenação e professores veem o cadastro sem esses campos.
+    const quem = await prisma.user.findUnique({ where: { id: session.sub }, select: { role: true, funcao: true } });
+    if (!quem || !ehDirecao(quem)) {
+      return NextResponse.json({ students: students.map(semDadosFinanceiros) });
+    }
     return NextResponse.json({ students });
   } catch (error) {
     return handleApiError(error);
@@ -63,4 +71,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return handleApiError(error);
   }
+}
+
+function semDadosFinanceiros<T extends { mensalidadeValor: unknown; diaVencimento: unknown; bolsista: unknown }>(aluno: T) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { mensalidadeValor, diaVencimento, bolsista, ...resto } = aluno;
+  return resto;
 }

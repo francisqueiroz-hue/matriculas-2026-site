@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { setBillingConfigSchema } from "@/lib/validators";
 import { DIA_VENCIMENTO_PADRAO } from "@/lib/billing";
 
 export async function GET() {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const school = await prisma.school.findUniqueOrThrow({
       where: { id: session.schoolId },
       select: { diaVencimentoPadrao: true, diaEmissaoBoletos: true },
@@ -20,7 +20,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const body = setBillingConfigSchema.parse(await request.json());
 
     const school = await prisma.school.update({

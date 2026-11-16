@@ -32,6 +32,9 @@ vi.mock("@/lib/push", () => ({ notifyUsers: vi.fn(async () => undefined) }));
 vi.mock("@/lib/erros-servidor", () => ({ registrarErroServidor: vi.fn() }));
 const sessao = vi.hoisted(() => ({ role: "GUARDIAN" }));
 vi.mock("@/lib/session", () => ({
+  // Rotas só da direção: aqui a sessão simulada já é da direção (ver tests/direcao-acesso.test.ts).
+  requireDirecao: async () => (await import("@/lib/session")).requireRole("ADMIN"),
+  exigirDirecaoSeAdmin: async () => undefined,
   requireRole: vi.fn(async (...roles: string[]) => {
     if (!roles.includes(sessao.role)) {
       const { AuthError } = await import("@/lib/session");

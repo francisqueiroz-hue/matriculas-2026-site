@@ -8,7 +8,7 @@ import { updateUserSchema } from "@/lib/validators";
 import { hashPassword } from "@/lib/auth";
 import { normalizePhoneBR } from "@/lib/whatsapp";
 import { telefoneEmUso } from "@/lib/usuarios";
-import { perfilDaFuncao } from "@/lib/equipe";
+import { ehDirecao, perfilDaFuncao } from "@/lib/equipe";
 import { descreverEnvio, enviarAcessoPeloApp } from "@/lib/envio-acesso";
 import { encerrarTodasAsSessoes } from "@/lib/renovacao-sessao";
 
@@ -20,6 +20,9 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
 
     const existing = await prisma.user.findFirst({ where: { id, schoolId: session.schoolId } });
     if (!existing) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+
+    const bloqueio = await bloqueioParaQuemNaoEDirecao(session.sub, existing, body.funcao);
+    if (bloqueio) return NextResponse.json({ error: bloqueio }, { status: 403 });
 
     // Telefone sempre padronizado (55 + DDD + número): o login por telefone compara exatamente.
     let phone: string | null | undefined;
@@ -39,7 +42,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
     let perfil: { role: "ADMIN" | "STAFF"; isCoordenacao: boolean } | undefined;
     if (body.funcao && existing.role !== "GUARDIAN") {
       const novo = perfilDaFuncao(body.funcao);
-      if (id === session.sub && novo.role !== "ADMIN") {
+      if (id === session.sub && (novo.role !== "ADMIN" || (ehDirecao(existing) && body.funcao !== "DIRECAO"))) {
         return NextResponse.json({ error: "Você não pode tirar de si mesmo o acesso de Direção." }, { status: 400 });
       }
       perfil = { role: novo.role as "ADMIN" | "STAFF", isCoordenacao: novo.isCoordenacao };
@@ -100,6 +103,8 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/admi
     if (existing.id === session.sub) {
       return NextResponse.json({ error: "Use a exclusão de conta para remover seu próprio usuário" }, { status: 400 });
     }
+    const bloqueio = await bloqueioParaQuemNaoEDirecao(session.sub, existing);
+    if (bloqueio) return NextResponse.json({ error: bloqueio }, { status: 403 });
 
     // Exclusão de quem saiu: some das listas, perde o acesso e tem os contatos apagados;
     // mensagens e registros lançados continuam no histórico (ver lib/exclusao).
@@ -108,4 +113,22 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/admi
   } catch (error) {
     return handleApiError(error);
   }
+}
+
+/**
+ * Quem administra sem ser direção (Secretaria) não pode ganhar nem dar acesso de Direção: não
+ * altera, exclui ou troca a senha/celular de alguém da direção, não promove ninguém a Direção e
+ * não muda a própria função. Sem isso, bastaria trocar a própria função para ver o financeiro.
+ */
+async function bloqueioParaQuemNaoEDirecao(
+  sessaoId: string,
+  alvo: { id: string; role: "ADMIN" | "STAFF" | "GUARDIAN"; funcao: Parameters<typeof ehDirecao>[0]["funcao"] },
+  novaFuncao?: string,
+): Promise<string | null> {
+  const quem = await prisma.user.findUnique({ where: { id: sessaoId }, select: { role: true, funcao: true } });
+  if (quem && ehDirecao(quem)) return null;
+  if (ehDirecao(alvo)) return "Somente a direção pode alterar ou excluir o cadastro de alguém da direção.";
+  if (novaFuncao === "DIRECAO") return "Somente a direção pode dar a alguém a função Direção.";
+  if (novaFuncao && alvo.id === sessaoId) return "Peça à direção para mudar a sua função.";
+  return null;
 }

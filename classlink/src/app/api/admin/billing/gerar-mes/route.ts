@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { mesReferenciaAtual, agoraNoFusoDaEscola } from "@/lib/billing";
 import { gerarBoletosDoMes } from "@/lib/boleto-emissao";
@@ -17,7 +17,7 @@ export const maxDuration = 60;
  */
 export async function POST() {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const escola = await prisma.school.findUniqueOrThrow({
       where: { id: session.schoolId },
       select: { id: true, diaVencimentoPadrao: true },

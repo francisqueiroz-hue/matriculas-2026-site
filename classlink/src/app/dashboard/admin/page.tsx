@@ -7,6 +7,8 @@ import { DiagnosticoAvisos } from "@/components/DiagnosticoAvisos";
 import { EnviarGuiaFamilias } from "@/components/EnviarGuiaFamilias";
 import { SaudeSistema } from "@/components/SaudeSistema";
 import { apiJson } from "@/lib/api-client";
+import { useCurrentUser } from "@/components/UserContext";
+import { ehDirecao } from "@/lib/equipe";
 
 interface Metrics {
   totals: { totalStudents: number; totalGuardians: number; totalStaff: number };
@@ -52,6 +54,8 @@ function StatCard({ label, value }: { label: string; value: number | string }) {
 }
 
 export default function AdminMetricsPage() {
+  const user = useCurrentUser();
+  const souDirecao = ehDirecao({ role: user.role, funcao: user.funcao ?? null });
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [comunicadosMetrics, setComunicadosMetrics] = useState<ComunicadosMetrics | null>(null);
   const [periodo, setPeriodo] = useState<(typeof PERIODOS)[number]>(30);
@@ -71,6 +75,8 @@ export default function AdminMetricsPage() {
 
         <EnviarGuiaFamilias />
 
+        {/* Lembretes incluem mensalidades em aberto: só a direção. */}
+        {souDirecao && (
         <Link
           href="/dashboard/admin/lembretes"
           className="block rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 hover:bg-indigo-100"
@@ -80,6 +86,7 @@ export default function AdminMetricsPage() {
             Contratos para assinar, autorizações sem resposta, mensalidades em aberto e rematrículas não confirmadas: veja quem recebe lembrete e quando.
           </span>
         </Link>
+        )}
 
         {metrics && (
           <>

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiFetch, apiJson } from "@/lib/api-client";
 import { ROTULO_CAMPO } from "@/lib/historico-cadastro";
+import { useCurrentUser } from "@/components/UserContext";
+import { ehDirecao } from "@/lib/equipe";
 import { BuscaAluno } from "@/components/BuscaAluno";
 import { filtrarAlunos } from "@/lib/busca-aluno";
 
@@ -34,6 +36,9 @@ interface StudentItem {
 }
 
 function AlunosContent() {
+  // Mensalidade e bolsa: só a direção vê e altera (o servidor nem envia esses dados aos demais).
+  const usuario = useCurrentUser();
+  const souDirecao = ehDirecao({ role: usuario.role, funcao: usuario.funcao ?? null });
   const [students, setStudents] = useState<StudentItem[] | null>(null);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [name, setName] = useState("");
@@ -399,7 +404,7 @@ function AlunosContent() {
         </p>
       )}
 
-      {semMensalidade.length > 0 && (
+      {souDirecao && semMensalidade.length > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
           <p className="font-semibold">{semMensalidade.length} aluno(s) sem mensalidade lançada</p>
           <p className="mt-1">{semMensalidade.map((s) => s.name).join(", ")}</p>
@@ -644,6 +649,7 @@ function AlunosContent() {
                 próprio responsável pode adicionar um e-mail depois, em Minha conta.
               </p>
 
+              {souDirecao && (
               <form onSubmit={(e) => handleSalvarMensalidade(s.id, e)} className="mt-3 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
                 <label className="text-xs text-slate-500">
                   Mensalidade (R$)
@@ -673,6 +679,7 @@ function AlunosContent() {
                   Salvar mensalidade
                 </button>
               </form>
+              )}
               {feedback[s.id] && <p className="mt-1 text-xs text-slate-500">{feedback[s.id]}</p>}
             </li>
           );

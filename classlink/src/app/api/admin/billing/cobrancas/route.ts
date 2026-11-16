@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { agoraNoFusoDaEscola } from "@/lib/billing";
 import { linkWhatsAppCobranca, mensagemCobrancaBoleto } from "@/lib/boleto-aviso";
@@ -11,7 +11,7 @@ import { linkWhatsAppCobranca, mensagemCobrancaBoleto } from "@/lib/boleto-aviso
  */
 export async function GET() {
   try {
-    const session = await requireRole("ADMIN");
+    const session = await requireDirecao();
     const hoje = agoraNoFusoDaEscola();
     hoje.setHours(0, 0, 0, 0);
 
