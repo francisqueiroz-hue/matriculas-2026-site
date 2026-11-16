@@ -5,6 +5,8 @@ import Link from "next/link";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiFetch, apiJson } from "@/lib/api-client";
 import { ROTULO_CAMPO } from "@/lib/historico-cadastro";
+import { BuscaAluno } from "@/components/BuscaAluno";
+import { filtrarAlunos } from "@/lib/busca-aluno";
 
 interface ClassOption {
   id: string;
@@ -59,6 +61,9 @@ function AlunosContent() {
   const [historicoErro, setHistoricoErro] = useState<string | null>(null);
   // Aluno cuja resposta é esperada: resposta atrasada de outro aluno é descartada.
   const historicoPedido = useRef<string | null>(null);
+  // Termo da busca do alto: filtra também a lista completa, para editar sem rolar.
+  const [busca, setBusca] = useState("");
+  const [destacadoId, setDestacadoId] = useState<string | null>(null);
 
   function load() {
     apiJson<{ students: StudentItem[] }>("/api/admin/students").then((data) => setStudents(data.students));
@@ -341,9 +346,18 @@ function AlunosContent() {
     }
   }
 
+  const listados = students ? filtrarAlunos(students, busca) : null;
+
+  function verCadastro(alunoId: string) {
+    setDestacadoId(alunoId);
+    document.getElementById(`aluno-${alunoId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold">Alunos</h1>
+
+      <BuscaAluno onTermoChange={setBusca} onVerCadastro={verCadastro} />
 
       <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <div>
@@ -401,11 +415,23 @@ function AlunosContent() {
         </div>
       )}
 
+      {busca.trim() && students && (
+        <p className="text-sm text-slate-500" role="status">
+          Lista abaixo filtrada pela busca: {listados?.length ?? 0} de {students.length} aluno(s).
+        </p>
+      )}
+
       <ul className="space-y-3">
-        {students?.map((s) => {
+        {listados?.map((s) => {
           const form = guardianForm(s.id);
           return (
-            <li key={s.id} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <li
+              key={s.id}
+              id={`aluno-${s.id}`}
+              className={`scroll-mt-48 rounded-xl border bg-white p-4 dark:bg-slate-900 ${
+                destacadoId === s.id ? "border-indigo-500 ring-2 ring-indigo-300 dark:ring-indigo-700" : "border-slate-200 dark:border-slate-800"
+              }`}
+            >
               {editingStudentId === s.id ? (
                 <div className="rounded-md border border-indigo-200 p-2 dark:border-indigo-800">
                   <form onSubmit={handleSaveStudent} className="flex flex-wrap items-end gap-2">
