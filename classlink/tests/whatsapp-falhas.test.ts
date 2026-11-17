@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const prismaMock = vi.hoisted(() => ({
   whatsappFalha: { upsert: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
   user: { findMany: vi.fn() },
+  school: { findUnique: vi.fn(async () => null as { whatsappEntregueEm: Date | null } | null), updateMany: vi.fn() },
 }));
 const achaFamilia = vi.hoisted(() => vi.fn());
 const achaEquipe = vi.hoisted(() => vi.fn());
@@ -13,8 +14,10 @@ import {
   bloqueioPorCobranca,
   explicarCodigoFalha,
   falhasDasMensagens,
+  registrarEntregaConfirmada,
   registrarFalhaEntrega,
   resumoFalhasRecentes,
+  ultimaEntregaDosStatus,
 } from "@/lib/whatsapp-falhas";
 
 const AGORA = new Date("2026-11-12T15:00:00Z");
@@ -95,6 +98,43 @@ describe("bloqueioPorCobranca", () => {
   it("sem recusa recente (conta quitada): canal liberado", async () => {
     prismaMock.whatsappFalha.findFirst.mockResolvedValue(null);
     expect(await bloqueioPorCobranca("s1", AGORA)).toBeNull();
+  });
+  it("entrega confirmada depois da recusa (conta paga): o aviso some na hora, sem esperar 24 h", async () => {
+    prismaMock.whatsappFalha.findFirst.mockResolvedValue({ createdAt: new Date("2026-11-12T12:39:00Z") });
+    prismaMock.school.findUnique.mockResolvedValueOnce({ whatsappEntregueEm: new Date("2026-11-12T14:00:00Z") });
+    expect(await bloqueioPorCobranca("s1", AGORA)).toBeNull();
+  });
+  it("entrega antiga (antes da recusa) não libera", async () => {
+    const em = new Date("2026-11-12T12:39:00Z");
+    prismaMock.whatsappFalha.findFirst.mockResolvedValue({ createdAt: em });
+    prismaMock.school.findUnique.mockResolvedValueOnce({ whatsappEntregueEm: new Date("2026-11-12T10:00:00Z") });
+    expect(await bloqueioPorCobranca("s1", AGORA)).toEqual({ desde: em });
+  });
+});
+
+describe("entrega confirmada pelo webhook", () => {
+  it("pega o horário mais recente entre delivered/read e ignora sent/failed", () => {
+    const r = ultimaEntregaDosStatus(
+      [
+        { status: "sent", timestamp: "1762958000" },
+        { status: "delivered", timestamp: "1762950000" },
+        { status: "read", timestamp: "1762955000" },
+        { status: "failed", timestamp: "1762959000" },
+      ],
+      AGORA,
+    );
+    expect(r).toEqual(new Date(1762955000 * 1000));
+  });
+  it("sem entrega: null", () => {
+    expect(ultimaEntregaDosStatus([{ status: "failed", timestamp: "1" }], AGORA)).toBeNull();
+  });
+  it("grava só se for mais nova que a registrada", async () => {
+    const em = new Date("2026-11-17T15:40:00Z");
+    await registrarEntregaConfirmada(em);
+    expect(prismaMock.school.updateMany).toHaveBeenCalledWith({
+      where: { OR: [{ whatsappEntregueEm: null }, { whatsappEntregueEm: { lt: em } }] },
+      data: { whatsappEntregueEm: em },
+    });
   });
 });
 

@@ -96,8 +96,9 @@ export async function resumoFalhasRecentes(schoolId: string, agora = new Date())
 }
 
 /**
- * Janela em que uma recusa por cobrança (131042) ainda vale como "WhatsApp fora do ar": os
- * lembretes saem todo dia útil, então, quitada a conta, o bloqueio some no máximo em um dia.
+ * Janela em que uma recusa por cobrança (131042) ainda vale como "WhatsApp fora do ar". O
+ * bloqueio acaba antes disso assim que a Meta confirma uma entrega posterior à recusa (conta
+ * quitada); as 24 h só valem quando nada foi entregue desde então.
  */
 export const HORAS_BLOQUEIO_COBRANCA = 24;
 
@@ -112,7 +113,36 @@ export async function bloqueioPorCobranca(schoolId: string, agora = new Date()):
     orderBy: { createdAt: "desc" },
     select: { createdAt: true },
   });
-  return ultima ? { desde: ultima.createdAt } : null;
+  if (!ultima) return null;
+  // A Meta voltou a entregar depois da última recusa: a cobrança foi resolvida.
+  const escola = await prisma.school.findUnique({ where: { id: schoolId }, select: { whatsappEntregueEm: true } });
+  if (escola?.whatsappEntregueEm && escola.whatsappEntregueEm > ultima.createdAt) return null;
+  return { desde: ultima.createdAt };
+}
+
+/**
+ * Guarda a entrega mais recente confirmada pela Meta. A conta do WhatsApp (e a cobrança) é a
+ * mesma para todo o sistema, então a entrega vale para todas as escolas. Só grava se for mais nova.
+ */
+export async function registrarEntregaConfirmada(em: Date): Promise<void> {
+  if (Number.isNaN(em.getTime())) return;
+  await prisma.school.updateMany({
+    where: { OR: [{ whatsappEntregueEm: null }, { whatsappEntregueEm: { lt: em } }] },
+    data: { whatsappEntregueEm: em },
+  });
+}
+
+/** Momento da entrega mais recente entre os status do webhook ("delivered"/"read"), ou null. */
+export function ultimaEntregaDosStatus(statuses: { status: string; timestamp?: string }[], agora = new Date()): Date | null {
+  let maior: number | null = null;
+  for (const st of statuses) {
+    if (st.status !== "delivered" && st.status !== "read") continue;
+    const segundos = Number(st.timestamp);
+    // Sem horário válido (ou no futuro), vale a hora em que o aviso chegou.
+    const ms = Number.isFinite(segundos) && segundos > 0 ? Math.min(segundos * 1000, agora.getTime()) : agora.getTime();
+    if (maior === null || ms > maior) maior = ms;
+  }
+  return maior === null ? null : new Date(maior);
 }
 
 export const MOTIVO_BLOQUEIO_COBRANCA =

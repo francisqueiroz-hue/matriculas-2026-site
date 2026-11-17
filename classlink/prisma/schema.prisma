@@ -105,6 +105,11 @@ model School {
   diaVencimentoPadrao Int? // dia do mês usado como vencimento quando o aluno não tem um específico
   diaEmissaoBoletos   Int? // dia do mês em que o job de emissão deve rodar
 
+  // Última entrega confirmada pela Meta (webhook "delivered"/"read") de qualquer mensagem do
+  // WhatsApp da escola. Entrega depois de uma recusa por cobrança (131042) = conta quitada: o aviso
+  // "WhatsApp bloqueado" some na hora, sem esperar 24 h. Ver src/lib/whatsapp-falhas.ts.
+  whatsappEntregueEm DateTime?
+
   // Lembretes automáticos de pendências às famílias. Desligado até a direção ativar no painel
   // (nada é enviado só por publicar o código). Ver src/lib/lembretes.ts.
   lembretesAtivos        Boolean        @default(false)
