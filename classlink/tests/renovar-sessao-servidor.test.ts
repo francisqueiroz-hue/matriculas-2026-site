@@ -54,14 +54,66 @@ describe("renovarSessao", () => {
     expect(prismaMock.refreshToken.create).not.toHaveBeenCalled();
   });
 
-  it("reuso de token já trocado há muito tempo: nega e revoga todas as sessões da pessoa", async () => {
-    prismaMock.refreshToken.findUnique.mockResolvedValueOnce({ ...armazenado, revokedAt: new Date("2026-10-21T10:00:00Z") });
+  it("reuso de token já trocado há muito tempo: nega e encerra só a sessão daquele aparelho (família)", async () => {
+    prismaMock.refreshToken.findUnique.mockResolvedValueOnce({
+      ...armazenado,
+      familia: "fam-celular",
+      revokedAt: new Date("2026-10-21T10:00:00Z"),
+    });
+    await expect(renovarSessao("tok", agora)).resolves.toBeNull();
+    expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { familia: "fam-celular", expiresAt: { gt: agora } },
+      data: { revokedAt: agora, expiresAt: agora },
+    });
+    // Nada filtrado só pelo usuário: o computador (outra família) continua conectado.
+    const porUsuario = prismaMock.refreshToken.updateMany.mock.calls.filter(([a]) => a.where.userId !== undefined);
+    expect(porUsuario).toHaveLength(0);
+    expect(prismaMock.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it("reuso de token antigo (sem família): encerra os filhos dele e as sessões antigas, poupando as novas", async () => {
+    prismaMock.refreshToken.findUnique.mockResolvedValueOnce({ ...armazenado, familia: null, revokedAt: new Date("2026-10-21T10:00:00Z") });
     await expect(renovarSessao("tok", agora)).resolves.toBeNull();
     expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledWith({
-      where: { userId: "u1", revokedAt: null },
-      data: { revokedAt: agora },
+      where: { expiresAt: { gt: agora }, OR: [{ familia: "rt1" }, { userId: "u1", familia: null }] },
+      data: { revokedAt: agora, expiresAt: agora },
     });
-    expect(prismaMock.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it("renovação: o token novo herda a família do aparelho", async () => {
+    prismaMock.refreshToken.findUnique
+      .mockResolvedValueOnce({ ...armazenado, familia: "fam-computador" })
+      .mockResolvedValueOnce({ expiresAt: expira, user: { active: true, deletedAt: null } });
+    await renovarSessao("tok", agora);
+    expect(prismaMock.refreshToken.create.mock.calls[0][0].data.familia).toBe("fam-computador");
+  });
+
+  it("renovação de token antigo (sem família): a família passa a ser o id dele", async () => {
+    prismaMock.refreshToken.findUnique
+      .mockResolvedValueOnce({ ...armazenado, familia: null })
+      .mockResolvedValueOnce({ expiresAt: expira, user: { active: true, deletedAt: null } });
+    await renovarSessao("tok", agora);
+    expect(prismaMock.refreshToken.create.mock.calls[0][0].data.familia).toBe("rt1");
+  });
+
+  it("dois aparelhos: o reuso suspeito no celular não derruba o computador", async () => {
+    // Banco em memória com uma família por aparelho.
+    const futuro = expira;
+    const tokens = [
+      { id: "c1", tokenHash: "h-cel-velho", userId: "u1", familia: "cel", revokedAt: new Date("2026-10-21T10:00:00Z"), expiresAt: futuro },
+      { id: "c2", tokenHash: "h-cel-novo", userId: "u1", familia: "cel", revokedAt: null as Date | null, expiresAt: futuro },
+      { id: "p1", tokenHash: "h-pc", userId: "u1", familia: "pc", revokedAt: null as Date | null, expiresAt: futuro },
+    ];
+    prismaMock.refreshToken.findUnique.mockResolvedValueOnce({ ...tokens[0], user: usuario });
+    prismaMock.refreshToken.updateMany.mockImplementation(async ({ where, data }) => {
+      const alvo = tokens.filter((t) => t.familia === where.familia && t.expiresAt > where.expiresAt.gt);
+      alvo.forEach((t) => Object.assign(t, data));
+      return { count: alvo.length };
+    });
+    await expect(renovarSessao("velho", agora)).resolves.toBeNull();
+    expect(tokens.find((t) => t.id === "c2")!.expiresAt).toEqual(agora);
+    expect(tokens.find((t) => t.id === "p1")).toMatchObject({ revokedAt: null, expiresAt: futuro });
   });
 
   it("token vencido pelo logout: nega sem revogar as outras sessões", async () => {

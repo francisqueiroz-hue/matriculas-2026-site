@@ -203,6 +203,22 @@ describe("POST /api/auth/logout: falhas e corridas (casos 1 e 3 do PR #79)", () 
     expect(data.revokedAt).toBeInstanceOf(Date);
   });
 
+  it("token com família: vence só a família deste aparelho, nunca as sessões dos outros", async () => {
+    prismaMock.refreshToken.findUnique.mockResolvedValue({
+      userId: "u1",
+      revokedAt: new Date(Date.now() - 3_000),
+      familia: "fam-celular",
+      expiresAt: new Date(Date.now() + 1e9),
+    });
+    await POST(req());
+    expect(prismaMock.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { familia: "fam-celular", expiresAt: { gt: expect.any(Date) } },
+      data: { revokedAt: expect.any(Date), expiresAt: expect.any(Date) },
+    });
+    const porUsuario = prismaMock.refreshToken.updateMany.mock.calls.filter(([arg]) => arg.where.userId !== undefined);
+    expect(porUsuario).toHaveLength(0);
+  });
+
   it("token ainda não trocado: não mexe em outras sessões do usuário", async () => {
     prismaMock.refreshToken.findUnique.mockResolvedValue({ userId: "u1", revokedAt: null, expiresAt: new Date(Date.now() + 1e9) });
     await POST(req());

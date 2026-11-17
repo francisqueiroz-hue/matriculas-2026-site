@@ -241,8 +241,13 @@ model RefreshToken {
   expiresAt DateTime
   revokedAt DateTime?
   createdAt DateTime  @default(now())
+  /// Sessão de um aparelho: todos os tokens da mesma cadeia de renovação (do login em diante)
+  /// têm a mesma família. Reuso suspeito ou logout encerram só a família, não os outros aparelhos.
+  /// Nulo em tokens criados antes desta coluna existir.
+  familia   String?
 
   @@index([userId])
+  @@index([familia])
 }
 
 /// Contador de falhas de login por identificador (HMAC, nunca o e-mail/telefone em texto).

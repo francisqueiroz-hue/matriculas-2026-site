@@ -67,7 +67,7 @@ async function encerrarSessao(tokenHash: string) {
   const agora = new Date();
   const atual = await prisma.refreshToken.findUnique({
     where: { tokenHash },
-    select: { userId: true, revokedAt: true },
+    select: { userId: true, revokedAt: true, familia: true },
   });
 
   await prisma.refreshToken.updateMany({
@@ -84,10 +84,16 @@ async function encerrarSessao(tokenHash: string) {
   });
 
   // Renovação e logout ao mesmo tempo: se o token deste aparelho já tinha sido trocado,
-  // o substituto pode estar a caminho do navegador e reabriria a sessão. Vence também os
-  // tokens do mesmo usuário emitidos naquela troca (criados logo depois de revokedAt, dentro
-  // da janela de reuso). No pior caso, outro aparelho que renovou no mesmo instante pede login.
-  if (atual?.revokedAt) {
+  // o substituto pode estar a caminho do navegador e reabriria a sessão. Vence a família
+  // inteira (a sessão deste aparelho); os outros aparelhos da pessoa seguem conectados.
+  if (atual?.familia) {
+    await prisma.refreshToken.updateMany({
+      where: { familia: atual.familia, expiresAt: { gt: agora } },
+      data: { revokedAt: agora, expiresAt: agora },
+    });
+  } else if (atual?.revokedAt) {
+    // Token antigo, sem família: vence os tokens do mesmo usuário emitidos naquela troca
+    // (criados logo depois de revokedAt, dentro da janela de reuso), como antes.
     const inicio = new Date(atual.revokedAt.getTime() - FOLGA_RELOGIO_MS);
     const fim = new Date(atual.revokedAt.getTime() + JANELA_REUSO_MS + FOLGA_RELOGIO_MS);
     await prisma.refreshToken.updateMany({

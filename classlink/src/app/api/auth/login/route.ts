@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -111,8 +112,9 @@ export async function POST(request: NextRequest) {
     const primeiroAcesso = await ehPrimeiroAcesso(user);
 
     const { token: refreshToken, tokenHash, expiresAt } = generateRefreshToken();
+    // Cada login abre uma família própria: a sessão deste aparelho, independente das outras.
     await prisma.refreshToken.create({
-      data: { tokenHash, userId: user.id, expiresAt },
+      data: { tokenHash, userId: user.id, expiresAt, familia: randomUUID() },
     });
 
     if (primeiroAcesso) await enviarBoasVindasApp(user);
