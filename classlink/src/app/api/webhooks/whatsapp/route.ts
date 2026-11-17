@@ -9,7 +9,7 @@ import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "
 import { ehPedidoDeAcesso } from "@/lib/acesso";
 import { mensagemIgnoravel } from "@/lib/whatsapp-ignorar";
 import { devolverEnvioFalho } from "@/lib/lembretes-server";
-import { registrarFalhaEntrega } from "@/lib/whatsapp-falhas";
+import { registrarEntregaConfirmada, registrarFalhaEntrega, ultimaEntregaDosStatus } from "@/lib/whatsapp-falhas";
 import { responderNumeroNaoCadastrado, responderPedidoDeAcesso } from "@/lib/pedido-acesso";
 import { corpoDaMidia, guardarMidiaRecebida, midiaDaMensagem } from "@/lib/whatsapp-midia";
 
@@ -63,6 +63,7 @@ async function registrarUltimaMensagem(userId: string) {
 interface WhatsAppStatus {
   id: string;
   status: string;
+  timestamp?: string;
   recipient_id?: string;
   errors?: { code: number; title?: string; message?: string; error_data?: { details?: string } }[];
 }
@@ -106,10 +107,11 @@ export async function POST(request: NextRequest) {
 
     // A Meta aceita o envio (200 + id) e só depois avisa, por aqui, se a entrega falhou —
     // ex.: 131047, texto livre fora da janela de 24h. Registra para aparecer nos logs.
-    const falhas = (payload.entry ?? [])
-      .flatMap((entry) => entry.changes ?? [])
-      .flatMap((change) => change.value?.statuses ?? [])
-      .filter((st) => st.status === "failed");
+    const statuses = (payload.entry ?? []).flatMap((entry) => entry.changes ?? []).flatMap((change) => change.value?.statuses ?? []);
+    // Entrega confirmada: o WhatsApp está funcionando (tira o aviso de bloqueio por cobrança).
+    const entregue = ultimaEntregaDosStatus(statuses);
+    if (entregue) await registrarEntregaConfirmada(entregue).catch((err) => console.error("whatsapp: falha ao registrar entrega", err));
+    const falhas = statuses.filter((st) => st.status === "failed");
     for (const falha of falhas) {
       const erro = falha.errors?.[0];
       console.error(

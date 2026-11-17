@@ -10,6 +10,7 @@ const prismaMock = vi.hoisted(() => ({
   user: { update: vi.fn(), findMany: vi.fn() },
   conversation: { findUniqueOrThrow: vi.fn() },
   whatsappFalha: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null), upsert: vi.fn() },
+  school: { findUnique: vi.fn(async () => null), updateMany: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@prisma/client", () => ({ Prisma: {} }));
