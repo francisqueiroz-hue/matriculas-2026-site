@@ -471,6 +471,22 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
     }
   }
 
+  // Lembrete dentro do ClassLink: fica nas Mensagens da família e chega como notificação do app.
+  const [lembrando, setLembrando] = useState<string | null>(null);
+  const [lembrados, setLembrados] = useState<Record<string, boolean>>({});
+  async function lembrarNoClassLink(responsavelId: string) {
+    setLembrando(responsavelId);
+    setErro(null);
+    try {
+      await apiJson(`/api/admin/contratos/${c.id}/lembrete`, { method: "POST", body: JSON.stringify({ responsavelId }) });
+      setLembrados((l) => ({ ...l, [responsavelId]: true }));
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro ao enviar o lembrete");
+    } finally {
+      setLembrando(null);
+    }
+  }
+
   async function excluir() {
     if (!confirm(`Excluir o contrato de ${c.student.name}? Use só se foi enviado por engano.`)) return;
     try {
@@ -615,6 +631,22 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
             Registrar via original recebida
           </button>
         )}
+        {aguardandoFamilia &&
+          c.student.guardians.map((g) => (
+            <button
+              key={`app-${g.guardian.id}`}
+              type="button"
+              disabled={lembrando !== null || !!lembrados[g.guardian.id]}
+              onClick={() => lembrarNoClassLink(g.guardian.id)}
+              className={`${btn} bg-indigo-50 text-indigo-800 hover:bg-indigo-100`}
+            >
+              {lembrando === g.guardian.id
+                ? "Enviando…"
+                : lembrados[g.guardian.id]
+                  ? `${g.guardian.name.split(" ")[0]} lembrado(a) no ClassLink ✓`
+                  : `Lembrar ${g.guardian.name.split(" ")[0]} no ClassLink`}
+            </button>
+          ))}
         {aguardandoFamilia &&
           c.student.guardians
             .filter((g) => g.guardian.phone)
