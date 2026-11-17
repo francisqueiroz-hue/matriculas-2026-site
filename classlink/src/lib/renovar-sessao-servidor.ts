@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { signAccessToken, generateRefreshToken, hashRefreshToken } from "@/lib/auth";
-import { reusoSuspeito, situacaoRefresh } from "@/lib/renovacao-sessao";
+import { encerrarFamilia, familiaDe, reusoSuspeito, situacaoRefresh } from "@/lib/renovacao-sessao";
 
 /**
  * Troca um refresh token válido por um novo par (access + refresh), com rotação.
@@ -16,10 +16,12 @@ export async function renovarSessao(refreshToken: string, agora = new Date()) {
   const situacao = situacaoRefresh(stored, agora);
   if (!stored) return null;
   if (situacao === "invalido") {
-    // Token já usado há mais que a janela de tolerância: pode ser cópia roubada. Encerra todas
-    // as sessões da pessoa; ela entra de novo e o ladrão fica de fora.
+    // Token já usado há mais que a janela de tolerância: pode ser cópia roubada (ou um aparelho
+    // que não chegou a guardar o token novo). Encerra a sessão DESTE aparelho (a família do
+    // token): quem tem a cópia fica de fora e o aparelho entra de novo. Os outros aparelhos da
+    // pessoa seguem conectados; antes, todos caíam juntos.
     if (reusoSuspeito(stored, agora)) {
-      await prisma.refreshToken.updateMany({ where: { userId: stored.userId, revokedAt: null }, data: { revokedAt: agora } });
+      await prisma.refreshToken.updateMany(encerrarFamilia(stored, agora));
     }
     return null;
   }
@@ -31,7 +33,9 @@ export async function renovarSessao(refreshToken: string, agora = new Date()) {
 
   const novo = generateRefreshToken();
   await prisma.refreshToken.create({
-    data: { tokenHash: novo.tokenHash, userId: stored.user.id, expiresAt: novo.expiresAt },
+    // O token novo herda a família (a sessão deste aparelho). Token antigo, de antes da coluna:
+    // a família passa a ser o id dele.
+    data: { tokenHash: novo.tokenHash, userId: stored.user.id, expiresAt: novo.expiresAt, familia: familiaDe(stored) },
   });
 
   // Logout (ou troca de senha) no meio desta renovação: o token usado foi vencido depois que
