@@ -57,7 +57,7 @@ const guardianLinks: NavLink[] = [
   rotinaLink(),
 ];
 
-/** Rotina diária: direção e secretaria preenchem; a família vê a dos próprios filhos. */
+/** Rotina diária: direção, secretaria e coordenação preenchem; a família vê a dos próprios filhos. */
 function rotinaLink(grupo?: string): NavLink {
   return {
     ...(grupo && { grupo }),
@@ -214,7 +214,7 @@ function linksDoPerfil(user: Pick<SessionUser, "role" | "isCoordenacao" | "funca
     return [...baseLinks, notasLink, ...admin, fichasLink, saudeLink("Secretaria"), rotinaLink("Secretaria"), guiaLink];
   }
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks, guiaLink];
-  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, saudeLink("Secretaria"), guiaLink];
+  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, saudeLink("Secretaria"), rotinaLink("Secretaria"), guiaLink];
   // Professores veem as notas (só leitura) das próprias turmas; para auxiliares a área é fixa
   // como bloqueada e some pelo filtro de áreas.
   if (user.role === "STAFF") return [...baseLinks, notasLink, fichasLink, guiaLink];

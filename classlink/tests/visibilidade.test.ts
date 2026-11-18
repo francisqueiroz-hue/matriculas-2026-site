@@ -15,7 +15,7 @@ describe("regras de visibilidade", () => {
   it("sem nenhuma escolha salva, o app fica como antes (padrões = acesso atual)", () => {
     const vazio = new Map<string, boolean>();
     expect(areasBloqueadasPara("FAMILIAS", vazio)).toEqual(["FICHAS", "CONSULTA_ALUNOS"]);
-    expect(areasBloqueadasPara("COORDENACAO", vazio)).toEqual(["FINANCEIRO", "CONTRATOS", "ROTINA"]);
+    expect(areasBloqueadasPara("COORDENACAO", vazio)).toEqual(["FINANCEIRO", "CONTRATOS"]);
     // Matriz da escola (18/11/2026): professores veem notas e boletim (só leitura).
     expect(areasBloqueadasPara("PROFESSORES", vazio)).toEqual(["FINANCEIRO", "CONTRATOS", "CONSULTA_ALUNOS", "ROTINA"]);
     // Auxiliares: sem agenda, frequência e notas.
@@ -79,7 +79,7 @@ describe("regras de visibilidade", () => {
   });
 
   it("toda célula configurável que expõe dados de outras famílias ou de crianças é sensível", () => {
-    for (const id of ["NOTAS", "FINANCEIRO", "CONTRATOS", "FICHAS", "CONSULTA_ALUNOS"]) {
+    for (const id of ["NOTAS", "FINANCEIRO", "CONTRATOS", "FICHAS", "CONSULTA_ALUNOS", "ROTINA"]) {
       const def = DEFINICOES_AREAS.find((d) => d.id === id)!;
       for (const p of PAPEIS_VISIBILIDADE) {
         const c = def.celulas[p];

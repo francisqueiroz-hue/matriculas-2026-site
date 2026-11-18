@@ -27,7 +27,7 @@ const campoTexto =
   "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800";
 
 /**
- * Ficha da rotina de um dia, para direção e secretaria. Carrega o que já foi salvo no dia
+ * Ficha da rotina de um dia, para direção, secretaria e coordenação. Carrega o que já foi salvo no dia
  * (`inicial`) e salva tudo de uma vez.
  */
 export function RotinaFormulario({

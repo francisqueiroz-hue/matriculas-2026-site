@@ -1,17 +1,19 @@
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireSession } from "@/lib/session";
-import { exigirArea } from "@/lib/visibilidade-server";
+import { exigirArea, papelDaSessao } from "@/lib/visibilidade-server";
 
 export type PapelRotina = "ESCOLA" | "FAMILIA";
 
-const RESTRITO = "Rotina restrita à direção, à secretaria e à família do aluno";
+const RESTRITO = "Rotina restrita à direção, à secretaria, à coordenação e à família do aluno";
 
 /**
  * Quem pode ler a rotina diária de um aluno:
  * - família: só os filhos vinculados (outro aluno responde 404, sem revelar que existe) e só se
  *   a direção não desligou a área "Rotina diária" para as famílias em Configurações;
  * - direção e secretaria (ADMIN): qualquer aluno da escola;
- * - coordenação, professores e demais: 403.
+ * - coordenação (STAFF com isCoordenacao, conferido no banco a cada pedido): qualquer aluno da
+ *   escola, se a direção não desligou a área "Rotina diária" para a coordenação em Configurações;
+ * - professores e demais: 403.
  * Escrever (preencher, corrigir, apagar) é só da escola: `exigirEscola`.
  */
 export async function acessoRotina(studentId: string) {
@@ -28,7 +30,8 @@ export async function acessoRotina(studentId: string) {
   } else if (session.role === "ADMIN") {
     papel = "ESCOLA";
   } else {
-    throw new AuthError(RESTRITO, 403);
+    await exigirCoordenacao(session);
+    papel = "ESCOLA";
   }
   const aluno = await prisma.student.findFirst({
     where: { id: studentId, schoolId: session.schoolId, deletedAt: null },
@@ -39,7 +42,17 @@ export async function acessoRotina(studentId: string) {
 }
 
 export function exigirEscola(papel: PapelRotina) {
-  if (papel !== "ESCOLA") throw new AuthError("Só a direção e a secretaria preenchem a rotina", 403);
+  if (papel !== "ESCOLA") throw new AuthError("Só a direção, a secretaria e a coordenação preenchem a rotina", 403);
+}
+
+/**
+ * Equipe (STAFF): só a coordenação, e só com a área "Rotina diária" liberada para ela. A função
+ * é lida do banco a cada pedido (`papelDaSessao`), então tirar a coordenação de alguém vale na hora.
+ * Professores: a célula é fixa em Configurações, então nunca passam.
+ */
+export async function exigirCoordenacao(session: { sub: string; role: string; schoolId: string }) {
+  if (session.role !== "STAFF" || (await papelDaSessao(session)) !== "COORDENACAO") throw new AuthError(RESTRITO, 403);
+  await exigirArea(session, "ROTINA");
 }
 
 /** Responsáveis ativos do aluno com acesso ao app: quem recebe o aviso da rotina. */
