@@ -19,10 +19,21 @@ vi.mock("@/lib/visibilidade-server", () => ({ exigirArea: async () => {} }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@prisma/client", () => ({ Prisma: {} }));
 const sessaoMock = vi.hoisted(() => ({ atual: { sub: "g1", role: "GUARDIAN", schoolId: "s1" } as { sub: string; role: string; schoolId: string } }));
+const ErroAuth = vi.hoisted(
+  () =>
+    class extends Error {
+      status = 403;
+    },
+);
 vi.mock("@/lib/session", () => ({
   requireRole: vi.fn(async () => sessaoMock.atual),
   requireSession: vi.fn(async () => sessaoMock.atual),
-  AuthError: class extends Error {},
+  // Gestão = direção/secretaria (ADMIN) ou coordenação (aqui, STAFF com sub "c1").
+  ehGestaoDaSessao: vi.fn(async (s: { sub: string; role: string }) => s.role === "ADMIN" || s.sub === "c1"),
+  exigirPodePublicar: vi.fn(async (s: { sub: string; role: string }) => {
+    if (s.role !== "ADMIN" && s.sub !== "c1") throw new ErroAuth("Somente a gestão publica");
+  }),
+  AuthError: ErroAuth,
 }));
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: vi.fn() }));
 vi.mock("@/lib/push", () => ({ notifyUsers: vi.fn(async () => undefined) }));
@@ -180,8 +191,15 @@ describe("criar enquete", () => {
     expect((await criar(req(corpo({ perguntas: [{ tipo: "EMOJI", texto: "Q" }] })))).status).toBe(400);
   });
 
-  it("professor não publica para a escola toda", async () => {
+  it("professor não publica enquete (matriz da escola: professores só veem)", async () => {
     sessaoMock.atual = { sub: "p1", role: "STAFF", schoolId: "s1" };
     expect((await criar(req(corpo({ audience: "SCHOOL" })))).status).toBe(403);
+    expect((await criar(req(corpo({ audience: "CLASS", classId: "t1" })))).status).toBe(403);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("coordenação publica para a escola toda", async () => {
+    sessaoMock.atual = { sub: "c1", role: "STAFF", schoolId: "s1" };
+    expect((await criar(req(corpo({ audience: "SCHOOL" })))).status).toBe(201);
   });
 });

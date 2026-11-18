@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole, requireSession } from "@/lib/session";
+import { ehGestaoDaSessao, exigirPodePublicar, requireRole, requireSession } from "@/lib/session";
+import { MENSAGEM_SO_GESTAO_ESCOLA } from "@/lib/equipe";
 import { handleApiError } from "@/lib/http";
 import { createEventSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
@@ -39,12 +40,13 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
     await exigirArea(session, "AGENDA");
+    await exigirPodePublicar(session);
     const body = createEventSchema.parse(await request.json());
 
     if (body.classId) {
       await exigirTurmaPublicavel(session, body.classId);
-    } else if (session.role !== "ADMIN") {
-      return NextResponse.json({ error: "Apenas administradores criam eventos para toda a escola" }, { status: 403 });
+    } else if (!(await ehGestaoDaSessao(session))) {
+      return NextResponse.json({ error: MENSAGEM_SO_GESTAO_ESCOLA }, { status: 403 });
     }
 
     const event = await prisma.event.create({

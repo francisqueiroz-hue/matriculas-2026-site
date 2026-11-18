@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { ehGestaoDaSessao, requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { exigirArea } from "@/lib/visibilidade-server";
@@ -16,8 +16,8 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/enquetes/[
       select: { criadoPorId: true, encerradaEm: true },
     });
     if (!enquete) throw new ErroDeUsuario("Enquete não encontrada.", 404);
-    if (session.role !== "ADMIN" && enquete.criadoPorId !== session.sub) {
-      throw new ErroDeUsuario("Só quem criou a enquete ou a administração pode encerrá-la.", 403);
+    if (enquete.criadoPorId !== session.sub && !(await ehGestaoDaSessao(session))) {
+      throw new ErroDeUsuario("Só quem criou a enquete, a direção, a secretaria ou a coordenação podem encerrá-la.", 403);
     }
     if (!enquete.encerradaEm) await prisma.enquete.update({ where: { id }, data: { encerradaEm: new Date() } });
     return NextResponse.json({ ok: true });

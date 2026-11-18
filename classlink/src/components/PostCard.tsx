@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
+import { ehGestao, perfilAcessoDe } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
 import { precisaRecolher } from "@/lib/texto-recolhivel";
@@ -41,7 +42,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   const [confirmando, setConfirmando] = useState(false);
   const [expandido, setExpandido] = useState(false);
 
-  const canModerate = user.role === "ADMIN" || user.id === post.author.id;
+  const canModerate = ehGestao(perfilAcessoDe(user)) || user.id === post.author.id;
   const recolher = precisaRecolher(current.body);
   const canSeeReaders = user.role === "ADMIN" || user.role === "STAFF";
 

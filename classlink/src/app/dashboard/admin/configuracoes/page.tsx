@@ -166,7 +166,7 @@ function Conteudo() {
                 <li key={def.id} className="rounded-xl border border-slate-200 bg-white p-4">
                   <p className="font-semibold">{def.nome}</p>
                   <p className="text-xs text-slate-500">{def.descricao}</p>
-                  <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                     {PAPEIS_VISIBILIDADE.map((papel) => (
                       <div key={papel} className="flex flex-col gap-1 rounded-lg bg-slate-50 p-2">
                         <dt className="text-xs font-medium text-slate-600">{NOME_PAPEL[papel]}</dt>

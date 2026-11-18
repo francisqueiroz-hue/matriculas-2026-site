@@ -16,7 +16,36 @@ describe("regras de visibilidade", () => {
     const vazio = new Map<string, boolean>();
     expect(areasBloqueadasPara("FAMILIAS", vazio)).toEqual(["FICHAS", "CONSULTA_ALUNOS"]);
     expect(areasBloqueadasPara("COORDENACAO", vazio)).toEqual(["FINANCEIRO", "CONTRATOS", "ROTINA"]);
-    expect(areasBloqueadasPara("PROFESSORES", vazio)).toEqual(["NOTAS", "FINANCEIRO", "CONTRATOS", "CONSULTA_ALUNOS", "ROTINA"]);
+    // Matriz da escola (18/11/2026): professores veem notas e boletim (só leitura).
+    expect(areasBloqueadasPara("PROFESSORES", vazio)).toEqual(["FINANCEIRO", "CONTRATOS", "CONSULTA_ALUNOS", "ROTINA"]);
+    // Auxiliares: sem agenda, frequência e notas.
+    expect(areasBloqueadasPara("AUXILIARES", vazio)).toEqual([
+      "AGENDA",
+      "FREQUENCIA",
+      "NOTAS",
+      "FINANCEIRO",
+      "CONTRATOS",
+      "CONSULTA_ALUNOS",
+      "ROTINA",
+    ]);
+  });
+
+  it("auxiliares nunca veem agenda nem frequência, mesmo com linha liberada no banco", () => {
+    const forcado = new Map([
+      [chaveEscolha("AGENDA", "AUXILIARES"), true],
+      [chaveEscolha("FREQUENCIA", "PROFESSORES"), true],
+    ]);
+    expect(areaLiberada("AGENDA", "AUXILIARES", forcado)).toBe(false);
+    expect(areaLiberada("FREQUENCIA", "AUXILIARES", forcado)).toBe(false);
+  });
+
+  it("auxiliares herdam o que a direção já escolheu para a antiga coluna Professores e auxiliares", () => {
+    const antigo = new Map([[chaveEscolha("FICHAS", "PROFESSORES"), false]]);
+    expect(areaLiberada("FICHAS", "AUXILIARES", antigo)).toBe(false);
+    // Escolha própria da coluna Auxiliares vale mais que a herdada.
+    const proprio = new Map([...antigo, [chaveEscolha("FICHAS", "AUXILIARES"), true]]);
+    expect(areaLiberada("FICHAS", "AUXILIARES", proprio)).toBe(true);
+    expect(areaLiberada("FICHAS", "PROFESSORES", proprio)).toBe(false);
   });
 
   it("célula fixa nunca libera, mesmo com escolha salva (financeiro e contratos só da direção)", () => {
@@ -63,6 +92,8 @@ describe("regras de visibilidade", () => {
     expect(papelVisibilidade({ role: "GUARDIAN" })).toBe("FAMILIAS");
     expect(papelVisibilidade({ role: "STAFF", isCoordenacao: true })).toBe("COORDENACAO");
     expect(papelVisibilidade({ role: "STAFF", isCoordenacao: false })).toBe("PROFESSORES");
+    expect(papelVisibilidade({ role: "STAFF", isCoordenacao: false, funcao: "PROFESSOR" })).toBe("PROFESSORES");
+    expect(papelVisibilidade({ role: "STAFF", isCoordenacao: false, funcao: "AUXILIAR" })).toBe("AUXILIARES");
     expect(papelVisibilidade({ role: "ADMIN" })).toBeNull();
   });
 
@@ -181,7 +212,7 @@ describe("tela Configurações (API)", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toContain("no-store");
     const dados = await res.json();
-    expect(dados.liberado.FINANCEIRO).toEqual({ COORDENACAO: false, PROFESSORES: false, FAMILIAS: true });
+    expect(dados.liberado.FINANCEIRO).toEqual({ COORDENACAO: false, PROFESSORES: false, AUXILIARES: false, FAMILIAS: true });
   });
 
   it("desligar grava a escolha e o histórico com nome do autor", async () => {

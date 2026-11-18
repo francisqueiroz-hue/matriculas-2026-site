@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
+import { ehGestao, perfilAcessoDe } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { ESCOLHAS_MAX, TIPOS_PERGUNTA } from "@/lib/enquetes";
 
@@ -37,12 +38,14 @@ function modeloSatisfacao(): PerguntaForm[] {
 
 export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
   const user = useCurrentUser();
+  const gestao = ehGestao(perfilAcessoDe(user));
+  // Gestão (direção, secretaria e coordenação) publica para a escola toda e em qualquer turma.
   const [aberto, setAberto] = useState(false);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [audience, setAudience] = useState<"SCHOOL" | "CLASS" | "STUDENT">(user.role === "STAFF" ? "CLASS" : "SCHOOL");
+  const [audience, setAudience] = useState<"SCHOOL" | "CLASS" | "STUDENT">(!gestao ? "CLASS" : "SCHOOL");
   const [classId, setClassId] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [identificada, setIdentificada] = useState(false);
@@ -56,10 +59,10 @@ export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
     apiJson<{ classes: ClassOption[] }>("/api/admin/classes")
       .then((data) => {
         setClasses(data.classes);
-        if (data.classes.length && user.role === "STAFF") setClassId((atual) => atual || data.classes[0].id);
+        if (data.classes.length && !gestao) setClassId((atual) => atual || data.classes[0].id);
       })
       .catch(() => setError("Não foi possível carregar as turmas. Atualize a página para tentar de novo."));
-  }, [aberto, user.role]);
+  }, [aberto, gestao]);
 
   useEffect(() => {
     if (audience !== "STUDENT" || !classId) return;
@@ -159,7 +162,7 @@ export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
           }}
           className={pequeno}
         >
-          {user.role === "ADMIN" && <option value="SCHOOL">Toda a escola</option>}
+          {gestao && <option value="SCHOOL">Toda a escola</option>}
           <option value="CLASS">Turma específica</option>
           <option value="STUDENT">Aluno individual (aos responsáveis)</option>
         </select>

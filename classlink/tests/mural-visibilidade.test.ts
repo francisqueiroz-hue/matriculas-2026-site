@@ -6,7 +6,7 @@ const prismaMock = vi.hoisted(() => ({
   classTeacher: { findMany: vi.fn() },
   post: { findMany: vi.fn(), findFirst: vi.fn() },
   postRead: { upsert: vi.fn(), findMany: vi.fn() },
-  user: { findMany: vi.fn() },
+  user: { findMany: vi.fn(), findUnique: vi.fn(async () => ({ role: "STAFF", isCoordenacao: false })) },
 }));
 // Visibilidade por perfil (Configurações) testada em visibilidade.test.ts; aqui, tudo liberado.
 vi.mock("@/lib/visibilidade-server", () => ({ exigirArea: async () => {} }));

@@ -1,7 +1,16 @@
 import { cookies } from "next/headers";
 import { ACCESS_COOKIE, verifyAccessToken, type AccessTokenPayload } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ehDirecao, MENSAGEM_SO_DIRECAO } from "@/lib/equipe";
+import {
+  ehDirecao,
+  ehGestao,
+  podeLancarNotas,
+  podePublicar,
+  MENSAGEM_SO_DIRECAO,
+  MENSAGEM_SO_GESTAO_PUBLICA,
+  MENSAGEM_SO_NOTAS,
+  type PerfilAcesso,
+} from "@/lib/equipe";
 
 /** Lê e valida o access token do cookie da requisição atual. Retorna null se ausente/inválido. */
 export async function getSession(): Promise<AccessTokenPayload | null> {
@@ -32,9 +41,9 @@ export async function requireRole(...roles: AccessTokenPayload["role"][]) {
 }
 
 /**
- * Lançamento de notas é restrito à direção (ADMIN) ou à coordenação pedagógica
- * (STAFF com isCoordenacao = true) — nunca ao professor regular da turma nem ao
- * responsável. isCoordenacao é checado direto no banco (não fica no JWT) para que
+ * Direção/secretaria (ADMIN) ou coordenação pedagógica (STAFF com isCoordenacao = true).
+ * Usado na consulta de alunos. Para lançar notas use `requireLancarNotas` (sem a secretaria).
+ * isCoordenacao é checado direto no banco (não fica no JWT) para que
  * uma revogação de acesso valha imediatamente, sem esperar o token expirar.
  */
 export async function requireCoordenacaoOuAdmin(mensagem = "Apenas direção ou coordenação podem lançar notas") {
@@ -45,6 +54,40 @@ export async function requireCoordenacaoOuAdmin(mensagem = "Apenas direção ou 
     if (user?.isCoordenacao) return session;
   }
   throw new AuthError(mensagem, 403);
+}
+
+/**
+ * Perfil da pessoa logada, lido do banco a cada pedido: trocar a função de alguém (ex.: de
+ * Coordenação para Professor) vale na hora, sem esperar o token expirar.
+ */
+export async function perfilDaSessao(session: Pick<AccessTokenPayload, "sub" | "role">): Promise<PerfilAcesso> {
+  if (session.role === "GUARDIAN") return { role: "GUARDIAN", funcao: null, isCoordenacao: false };
+  const user = await prisma.user.findUnique({
+    where: { id: session.sub },
+    select: { role: true, funcao: true, isCoordenacao: true },
+  });
+  if (!user) throw new AuthError("Usuário não encontrado", 401);
+  return { role: user.role, funcao: user.funcao ?? null, isCoordenacao: Boolean(user.isCoordenacao) };
+}
+
+/** Gestão (direção, secretaria ou coordenação)? Lido do banco. */
+export async function ehGestaoDaSessao(session: Pick<AccessTokenPayload, "sub" | "role">): Promise<boolean> {
+  if (session.role === "ADMIN") return true;
+  if (session.role !== "STAFF") return false;
+  return ehGestao(await perfilDaSessao(session));
+}
+
+/** Lançar notas e cadastrar disciplinas: só direção e coordenação (a secretaria não lança). */
+export async function requireLancarNotas() {
+  const session = await requireSession();
+  if (!podeLancarNotas(await perfilDaSessao(session))) throw new AuthError(MENSAGEM_SO_NOTAS, 403);
+  return session;
+}
+
+/** Publicar no mural, comunicados, enquetes e agenda: gestão (ver `podePublicar`). */
+export async function exigirPodePublicar(session: Pick<AccessTokenPayload, "sub" | "role">, mensagem = MENSAGEM_SO_GESTAO_PUBLICA) {
+  if (session.role === "ADMIN") return;
+  if (session.role !== "STAFF" || !podePublicar(await perfilDaSessao(session))) throw new AuthError(mensagem, 403);
 }
 
 /**

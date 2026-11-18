@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession, requireCoordenacaoOuAdmin } from "@/lib/session";
+import { requireSession, requireLancarNotas } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { createDisciplinaSchema } from "@/lib/validators";
 
@@ -20,7 +20,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireCoordenacaoOuAdmin();
+    const session = await requireLancarNotas();
     const body = createDisciplinaSchema.parse(await request.json());
 
     const existing = await prisma.disciplina.findFirst({ where: { schoolId: session.schoolId, nome: body.nome } });

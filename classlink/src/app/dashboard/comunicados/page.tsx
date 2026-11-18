@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCurrentUser } from "@/components/UserContext";
+import { perfilAcessoDe, podePublicar } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { ComunicadoComposer } from "@/components/ComunicadoComposer";
 import { formatarDataHora } from "@/lib/datas";
@@ -110,7 +111,7 @@ export default function ComunicadosPage() {
 
   useEffect(load, []);
 
-  const podeCriar = user.role === "ADMIN" || user.role === "STAFF";
+  const podeCriar = podePublicar(perfilAcessoDe(user));
   const responsavel = user.role === "GUARDIAN";
 
   const ordenados = comunicados && responsavel ? ordenarParaResponsavel(comunicados) : comunicados;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
+import { ehGestao, perfilAcessoDe } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 
 interface ClassOption {
@@ -21,12 +22,14 @@ const TIPOS = [
 
 export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
   const user = useCurrentUser();
+  const gestao = ehGestao(perfilAcessoDe(user));
+  // Gestão (direção, secretaria e coordenação) publica para a escola toda e em qualquer turma.
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [tipo, setTipo] = useState("CIRCULAR");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [audience, setAudience] = useState<"SCHOOL" | "CLASS" | "STUDENT">(user.role === "STAFF" ? "CLASS" : "SCHOOL");
+  const [audience, setAudience] = useState<"SCHOOL" | "CLASS" | "STUDENT">(!gestao ? "CLASS" : "SCHOOL");
   const [classId, setClassId] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [prazoResposta, setPrazoResposta] = useState("");
@@ -37,10 +40,10 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
     apiJson<{ classes: ClassOption[] }>("/api/admin/classes")
       .then((data) => {
         setClasses(data.classes);
-        if (data.classes.length && user.role === "STAFF") setClassId(data.classes[0].id);
+        if (data.classes.length && !gestao) setClassId(data.classes[0].id);
       })
       .catch(() => setError("Não foi possível carregar as turmas. Atualize a página para tentar de novo."));
-  }, [user.role]);
+  }, [gestao]);
 
   useEffect(() => {
     if (audience !== "STUDENT" || !classId) return;
@@ -127,7 +130,7 @@ export function ComunicadoComposer({ onCreated }: { onCreated: () => void }) {
           }}
           className="rounded-md border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
         >
-          {user.role === "ADMIN" && <option value="SCHOOL">Toda a escola</option>}
+          {gestao && <option value="SCHOOL">Toda a escola</option>}
           <option value="CLASS">Turma específica</option>
           <option value="STUDENT">Aluno individual (aos responsáveis)</option>
         </select>

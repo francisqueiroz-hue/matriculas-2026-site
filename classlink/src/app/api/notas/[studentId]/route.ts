@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession, requireCoordenacaoOuAdmin } from "@/lib/session";
+import { requireSession, requireLancarNotas } from "@/lib/session";
 import { exigirPodeVerAluno } from "@/lib/turmas-acesso";
 import { handleApiError } from "@/lib/http";
 import { setNotaSchema } from "@/lib/validators";
@@ -52,10 +52,10 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/notas/[
   }
 }
 
-/** Lança/edita uma nota (trabalho/teste/prova) de uma disciplina/trimestre. Apenas direção ou coordenação. */
+/** Lança/edita uma nota (trabalho/teste/prova) de uma disciplina/trimestre. Apenas direção ou coordenação (a secretaria só vê). */
 export async function PUT(request: NextRequest, ctx: RouteContext<"/api/notas/[studentId]">) {
   try {
-    const session = await requireCoordenacaoOuAdmin();
+    const session = await requireLancarNotas();
     await exigirArea(session, "NOTAS");
     const { studentId } = await ctx.params;
     const body = setNotaSchema.parse(await request.json());

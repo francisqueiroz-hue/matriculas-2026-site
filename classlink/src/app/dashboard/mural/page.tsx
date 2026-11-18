@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
+import { perfilAcessoDe, podePublicar } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { juntarPaginas } from "@/lib/paginacao";
 import { PostCard, type PostItem } from "@/components/PostCard";
@@ -44,7 +45,7 @@ export default function MuralPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-bold">Mural de avisos</h1>
 
-      {(user.role === "ADMIN" || user.role === "STAFF") && (
+      {podePublicar(perfilAcessoDe(user)) && (
         <PostComposer onCreated={(post) => setPosts((prev) => [post, ...(prev ?? [])])} />
       )}
 

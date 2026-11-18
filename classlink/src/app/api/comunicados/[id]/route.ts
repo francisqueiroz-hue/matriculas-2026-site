@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { ehGestaoDaSessao, requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getPublicoAlvo } from "@/lib/comunicados";
 import { registrarAbertura, separarAbertura } from "@/lib/comunicado-leitura";
@@ -85,7 +85,7 @@ export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/comu
 
     const comunicado = await prisma.comunicado.findFirst({ where: { id, schoolId: session.schoolId } });
     if (!comunicado) return NextResponse.json({ error: "Comunicado não encontrado" }, { status: 404 });
-    if (comunicado.criadoPorId !== session.sub && session.role !== "ADMIN") {
+    if (comunicado.criadoPorId !== session.sub && !(await ehGestaoDaSessao(session))) {
       return NextResponse.json({ error: "Sem permissão para remover este comunicado" }, { status: 403 });
     }
 

@@ -199,7 +199,7 @@ export const ABAS_SO_DIRECAO = [
 ];
 
 /**
- * Notas fica visível só para direção/secretaria (ADMIN) e coordenação (STAFF com isCoordenacao).
+ * Notas: direção e coordenação lançam; secretaria e professores só veem (o servidor bloqueia o lançamento).
  * Financeiro, Contratos, Lembretes e Configurações só para a direção (o servidor também bloqueia).
  * Áreas desligadas pela direção em Configurações somem do menu (o servidor também bloqueia).
  */
@@ -215,7 +215,9 @@ function linksDoPerfil(user: Pick<SessionUser, "role" | "isCoordenacao" | "funca
   }
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks, guiaLink];
   if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, saudeLink("Secretaria"), guiaLink];
-  if (user.role === "STAFF") return [...baseLinks, fichasLink, guiaLink];
+  // Professores veem as notas (só leitura) das próprias turmas; para auxiliares a área é fixa
+  // como bloqueada e some pelo filtro de áreas.
+  if (user.role === "STAFF") return [...baseLinks, notasLink, fichasLink, guiaLink];
   return [...baseLinks, guiaLink];
 }
 

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const prismaMock = vi.hoisted(() => ({
   guardianStudent: { findMany: vi.fn() },
   classTeacher: { findMany: vi.fn() },
+  user: { findUnique: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@prisma/client", () => ({ Prisma: {} }));
@@ -21,6 +22,19 @@ beforeEach(() => {
     { studentId: "a3", student: { classId: "2ano" } },
   ]);
   prismaMock.classTeacher.findMany.mockResolvedValue([{ classId: "3ano" }, { classId: "3ano" }, { classId: "4ano" }]);
+  // Coordenação é lida do banco: c1 é coordenadora; os demais não.
+  prismaMock.user.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) =>
+    where.id === "c1" ? { role: "STAFF", isCoordenacao: true } : { role: "STAFF", isCoordenacao: false },
+  );
+});
+
+describe("coordenação acompanha a escola toda, como a direção", () => {
+  it("turmasQueAcompanha e visibilidadePorPublico sem restrição", async () => {
+    const coordenacao = { sub: "c1", role: "STAFF" };
+    expect(await turmasQueAcompanha(coordenacao)).toBeNull();
+    expect((await visibilidadePorPublico(coordenacao)).condicoes).toBeUndefined();
+    expect(prismaMock.classTeacher.findMany).not.toHaveBeenCalled();
+  });
 });
 
 describe("alunos e turmas da família", () => {
