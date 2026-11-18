@@ -70,12 +70,13 @@ const HORAS_RESUMO = 48;
 
 export async function resumoFalhasRecentes(schoolId: string, agora = new Date()): Promise<ResumoFalhas> {
   const desde = new Date(agora.getTime() - HORAS_RESUMO * 3_600_000);
-  const falhas = await prisma.whatsappFalha.findMany({
+  const todas = await prisma.whatsappFalha.findMany({
     where: { schoolId, createdAt: { gte: desde } },
     orderBy: { createdAt: "desc" },
     take: 200,
     select: { userId: true, codigo: true, createdAt: true },
   });
+  const falhas = await semEntregasRecuperadas(schoolId, todas);
   if (falhas.length === 0) return { total: 0, pessoas: 0, motivo: null, cobrancaPendente: false, ultimas: [] };
 
   const ids = [...new Set(falhas.flatMap((f) => (f.userId ? [f.userId] : [])))];
@@ -93,6 +94,41 @@ export async function resumoFalhasRecentes(schoolId: string, agora = new Date())
     cobrancaPendente: porCodigo.has(131042),
     ultimas: falhas.slice(0, 20).map((f) => ({ nome: (f.userId && nomes.get(f.userId)) || "Número sem cadastro", codigo: f.codigo, em: f.createdAt })),
   };
+}
+
+/**
+ * Tira do resumo o que já se resolveu, para a direção não avisar famílias que já receberam:
+ *  - recusa por cobrança (131042) anterior a uma entrega confirmada pela Meta: a conta foi quitada
+ *    e os lembretes devolvidos saíram de novo;
+ *  - qualquer recusa de uma pessoa cujo lembrete foi entregue ou lido depois dela.
+ */
+async function semEntregasRecuperadas<T extends { userId: string | null; codigo: number | null; createdAt: Date }>(
+  schoolId: string,
+  falhas: T[],
+): Promise<T[]> {
+  if (falhas.length === 0) return falhas;
+  const escola = await prisma.school.findUnique({ where: { id: schoolId }, select: { whatsappEntregueEm: true } });
+  const entregueEscola = escola?.whatsappEntregueEm ?? null;
+
+  const ids = [...new Set(falhas.flatMap((f) => (f.userId ? [f.userId] : [])))];
+  const entregues = ids.length
+    ? ((await prisma.lembretePendencia.findMany({
+        where: { schoolId, responsavelId: { in: ids }, ultimoEnvioStatus: { in: ["ENTREGUE", "LIDO"] } },
+        select: { responsavelId: true, ultimoEnvioStatusEm: true },
+      })) ?? [])
+    : [];
+  const ultimaEntrega = new Map<string, Date>();
+  for (const e of entregues) {
+    if (!e.ultimoEnvioStatusEm) continue;
+    const atual = ultimaEntrega.get(e.responsavelId);
+    if (!atual || e.ultimoEnvioStatusEm > atual) ultimaEntrega.set(e.responsavelId, e.ultimoEnvioStatusEm);
+  }
+
+  return falhas.filter((f) => {
+    if (f.codigo === 131042 && entregueEscola && entregueEscola > f.createdAt) return false;
+    const pessoa = f.userId ? ultimaEntrega.get(f.userId) : undefined;
+    return !(pessoa && pessoa > f.createdAt);
+  });
 }
 
 /**
