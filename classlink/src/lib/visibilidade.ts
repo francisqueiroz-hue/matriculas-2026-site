@@ -158,11 +158,11 @@ export const DEFINICOES_AREAS: DefinicaoArea[] = [
   {
     id: "ROTINA",
     nome: "Rotina diária",
-    descricao: "Alimentação, sono, evacuação, banho e medicação do dia. Direção e secretaria preenchem; a família vê a do próprio filho.",
+    descricao: "Alimentação, sono, evacuação, banho e medicação do dia. Direção, secretaria e coordenação preenchem; a família vê a do próprio filho.",
     telas: ["/dashboard/rotina"],
     celulas: {
-      COORDENACAO: fixo("Só direção e secretaria"),
-      PROFESSORES: fixo("Só direção e secretaria"),
+      COORDENACAO: sensivel(),
+      PROFESSORES: fixo("Só direção, secretaria e coordenação"),
       FAMILIAS: sensivel(),
     },
   },

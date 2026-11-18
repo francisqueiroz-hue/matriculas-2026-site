@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
-import { AuthError, requireSession } from "@/lib/session";
+import { requireSession } from "@/lib/session";
+import { exigirCoordenacao } from "@/lib/rotina-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
 
 const SEM_CACHE = { "Cache-Control": "private, no-store" };
@@ -9,8 +10,8 @@ const SEM_CACHE = { "Cache-Control": "private, no-store" };
 /**
  * Entrada da tela "Rotina":
  * - família: os filhos vinculados (para escolher de qual ver a rotina);
- * - direção e secretaria: os alunos ativos com a turma (para escolher quem preencher).
- * Coordenação e professores: 403. Nada financeiro sai daqui.
+ * - direção, secretaria e coordenação: os alunos ativos com a turma (para escolher quem preencher).
+ * Professores: 403. Nada financeiro sai daqui.
  */
 export async function GET() {
   try {
@@ -27,7 +28,7 @@ export async function GET() {
         { headers: SEM_CACHE },
       );
     }
-    if (session.role !== "ADMIN") throw new AuthError("Rotina restrita à direção, à secretaria e à família do aluno", 403);
+    if (session.role !== "ADMIN") await exigirCoordenacao(session);
     const alunos = await prisma.student.findMany({
       where: { schoolId: session.schoolId, deletedAt: null },
       select: { id: true, name: true, class: { select: { name: true } } },

@@ -29,7 +29,7 @@ export default function RotinaPage() {
 }
 
 /**
- * Rotina diária. Direção e secretaria escolhem a turma, o aluno e o dia e preenchem a ficha.
+ * Rotina diária. Direção, secretaria e coordenação escolhem a turma, o aluno e o dia e preenchem a ficha.
  * A família vê as rotinas dos próprios filhos (somente leitura), da mais recente para a mais antiga.
  */
 function RotinaConteudo() {
@@ -39,7 +39,7 @@ function RotinaConteudo() {
   const params = useSearchParams();
   const alunoParam = params.get("aluno");
   const familia = user.role === "GUARDIAN";
-  const escola = user.role === "ADMIN";
+  const escola = user.role === "ADMIN" || (user.role === "STAFF" && user.isCoordenacao);
   const [alunos, setAlunos] = useState<AlunoLista[] | null>(null);
   const [erroLista, setErroLista] = useState<string | null>(null);
   const [turma, setTurma] = useState("");
@@ -59,7 +59,7 @@ function RotinaConteudo() {
   const abrir = (id: string) => router.replace(`${pathname}?aluno=${id}`, { scroll: false });
 
   if (!familia && !escola) {
-    return <p className="text-sm text-slate-500">Área restrita à direção, à secretaria e às famílias.</p>;
+    return <p className="text-sm text-slate-500">Área restrita à direção, à secretaria, à coordenação e às famílias.</p>;
   }
 
   const selecionado = familia ? (alunoParam ?? (alunos?.length === 1 ? alunos[0].id : null)) : alunoParam;
