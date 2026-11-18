@@ -79,13 +79,43 @@ beforeEach(() => {
 });
 
 describe("quem vê e quem preenche", () => {
-  it("professora e coordenação: 403 em tudo", async () => {
-    for (const s of [PROFESSORA, COORDENACAO]) {
-      sessaoMock.atual = s;
-      expect((await GET(req(), ctx)).status).toBe(403);
-      expect((await PUT(req("PUT", corpoValido), ctx)).status).toBe(403);
-      expect((await entrada()).status).toBe(403);
-    }
+  it("professora: 403 em tudo", async () => {
+    sessaoMock.atual = PROFESSORA;
+    expect((await GET(req(), ctx)).status).toBe(403);
+    expect((await PUT(req("PUT", corpoValido), ctx)).status).toBe(403);
+    expect((await DELETE(req("DELETE", undefined, `?data=${hoje}`), ctx)).status).toBe(403);
+    expect((await entrada()).status).toBe(403);
+    expect(prismaMock.rotinaDiaria.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.rotinaDiaria.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("professora continua sem acesso mesmo se houver escolha salva liberando (célula fixa)", async () => {
+    sessaoMock.atual = PROFESSORA;
+    prismaMock.visibilidadeArea.findUnique.mockResolvedValue({ liberado: true });
+    expect((await GET(req(), ctx)).status).toBe(403);
+    expect((await PUT(req("PUT", corpoValido), ctx)).status).toBe(403);
+    expect((await entrada()).status).toBe(403);
+  });
+
+  it("coordenação vê, preenche, corrige e apaga", async () => {
+    sessaoMock.atual = COORDENACAO;
+    const lista = await entrada();
+    expect(lista.status).toBe(200);
+    expect((await lista.json()).papel).toBe("ESCOLA");
+    const r = await GET(req(), ctx);
+    expect(r.status).toBe(200);
+    expect((await r.json()).papel).toBe("ESCOLA");
+    expect((await PUT(req("PUT", corpoValido), ctx)).status).toBe(200);
+    expect(prismaMock.rotinaDiaria.upsert.mock.calls[0][0].create.preenchidoPorNome).toBe("Coord");
+    expect((await DELETE(req("DELETE", undefined, `?data=${hoje}`), ctx)).status).toBe(200);
+  });
+
+  it("direção desligou a Rotina para a coordenação em Configurações: 403", async () => {
+    sessaoMock.atual = COORDENACAO;
+    prismaMock.visibilidadeArea.findUnique.mockResolvedValue({ liberado: false });
+    expect((await GET(req(), ctx)).status).toBe(403);
+    expect((await PUT(req("PUT", corpoValido), ctx)).status).toBe(403);
+    expect((await entrada()).status).toBe(403);
     expect(prismaMock.rotinaDiaria.upsert).not.toHaveBeenCalled();
   });
 
@@ -210,13 +240,14 @@ describe("regras da ficha", () => {
     expect(avisoRotinaFamilia("Lia Souza Lima", "2026-11-18").body).toBe("A rotina de Lia de 18/11/2026 está disponível no app.");
   });
 
-  it("menu: direção, secretaria e família têm Rotina; coordenação e professores não", () => {
+  it("menu: direção, secretaria, coordenação e família têm Rotina; professores não", () => {
     const tem = (u: Parameters<typeof getNavLinks>[0]) => getNavLinks(u).some((l) => l.href === "/dashboard/rotina");
     expect(tem({ role: "ADMIN", isCoordenacao: false, funcao: null, areasBloqueadas: [] })).toBe(true);
     expect(tem({ role: "ADMIN", isCoordenacao: false, funcao: "SECRETARIA", areasBloqueadas: [] })).toBe(true);
     expect(tem({ role: "GUARDIAN", isCoordenacao: false, funcao: null, areasBloqueadas: [] })).toBe(true);
     expect(tem({ role: "GUARDIAN", isCoordenacao: false, funcao: null, areasBloqueadas: ["ROTINA"] })).toBe(false);
-    expect(tem({ role: "STAFF", isCoordenacao: true, funcao: null, areasBloqueadas: [] })).toBe(false);
+    expect(tem({ role: "STAFF", isCoordenacao: true, funcao: null, areasBloqueadas: [] })).toBe(true);
+    expect(tem({ role: "STAFF", isCoordenacao: true, funcao: null, areasBloqueadas: ["ROTINA"] })).toBe(false);
     expect(tem({ role: "STAFF", isCoordenacao: false, funcao: null, areasBloqueadas: [] })).toBe(false);
   });
 });

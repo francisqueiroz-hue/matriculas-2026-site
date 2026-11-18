@@ -35,7 +35,7 @@ const SELECT_ROTINA = {
 
 /**
  * Rotinas do aluno nos últimos `dias` dias (padrão 14, máximo 62), da mais recente para a mais
- * antiga. Direção, secretaria e a família do aluno (somente leitura).
+ * antiga. Direção, secretaria, coordenação e a família do aluno (somente leitura).
  */
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/alunos/[id]/rotina">) {
   try {
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/alunos/[
 }
 
 /**
- * Preenche ou corrige a rotina de um dia (só direção e secretaria). Na primeira vez que o dia é
+ * Preenche ou corrige a rotina de um dia (só direção, secretaria e coordenação). Na primeira vez que o dia é
  * salvo, a família recebe um aviso no app; correções do mesmo dia não avisam de novo.
  */
 export async function PUT(request: NextRequest, ctx: RouteContext<"/api/alunos/[id]/rotina">) {
@@ -112,7 +112,7 @@ export async function PUT(request: NextRequest, ctx: RouteContext<"/api/alunos/[
   }
 }
 
-/** Apaga a rotina de um dia lançada por engano (só direção e secretaria). ?data=AAAA-MM-DD */
+/** Apaga a rotina de um dia lançada por engano (só direção, secretaria e coordenação). ?data=AAAA-MM-DD */
 export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/alunos/[id]/rotina">) {
   try {
     const { id } = await ctx.params;
