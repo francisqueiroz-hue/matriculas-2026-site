@@ -212,3 +212,5 @@ export function enqueteAberta(e: { encerradaEm: Date | null; prazo: Date | null 
   if (e.prazo && e.prazo < agora) return false;
   return true;
 }
+
+export const MENSAGEM_RESULTADOS_SO_GESTAO = "Os resultados das enquetes ficam com a direção, a secretaria e a coordenação.";

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/session";
+import { ehGestaoDaSessao, requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
+import { MENSAGEM_RESULTADOS_SO_GESTAO } from "@/lib/enquetes";
 import { ErroDeUsuario } from "@/lib/erros";
 import { carregarEnqueteVisivel, publicoDaEnquete } from "@/lib/enquetes-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
@@ -11,6 +12,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[i
   try {
     const session = await requireRole("ADMIN", "STAFF");
     await exigirArea(session, "ENQUETES");
+    // Resultados, pendências e exportação ficam com a gestão (direção, secretaria e coordenação).
+    if (!(await ehGestaoDaSessao(session))) throw new ErroDeUsuario(MENSAGEM_RESULTADOS_SO_GESTAO, 403);
     const { id } = await ctx.params;
     const enquete = await carregarEnqueteVisivel(session, id);
     if (!enquete) throw new ErroDeUsuario("Enquete não encontrada.", 404);

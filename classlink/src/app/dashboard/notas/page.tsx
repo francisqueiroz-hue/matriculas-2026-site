@@ -3,7 +3,8 @@
 import { Fragment, useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
-import { podeLancarNotas } from "@/lib/equipe";
+import { podeExportarBoletim, podeLancarNotas } from "@/lib/equipe";
+import { BaixarBoletimPdf } from "@/components/BaixarBoletimPdf";
 
 interface ClassOption {
   id: string;
@@ -52,7 +53,7 @@ const SITUACAO_LABEL: Record<BoletimLinha["situacao"], string> = {
  * Notas: direção e coordenação lançam; secretaria e professores (das próprias turmas) só veem.
  * O servidor confere as duas coisas: quem lança (requireLancarNotas) e de quais alunos vê.
  */
-function NotasContent({ podeEditar }: { podeEditar: boolean }) {
+function NotasContent({ podeEditar, podeExportar }: { podeEditar: boolean; podeExportar: boolean }) {
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [classId, setClassId] = useState("");
   const [students, setStudents] = useState<StudentOption[]>([]);
@@ -177,6 +178,23 @@ function NotasContent({ podeEditar }: { podeEditar: boolean }) {
         </div>
       </div>
 
+      {podeExportar && classId && (
+        <div className="flex flex-wrap gap-2">
+          {studentId && (
+            <BaixarBoletimPdf
+              url={`/api/notas/${studentId}/pdf`}
+              nomeArquivo={`boletim-${students.find((s) => s.id === studentId)?.name ?? "aluno"}.pdf`}
+              rotulo="Boletim do aluno em PDF"
+            />
+          )}
+          <BaixarBoletimPdf
+            url={`/api/notas/turma/${classId}/pdf`}
+            nomeArquivo={`boletins-${classes.find((c) => c.id === classId)?.name ?? "turma"}.pdf`}
+            rotulo="Boletins da turma em PDF"
+          />
+        </div>
+      )}
+
       {podeEditar && (
       <form onSubmit={handleAddDisciplina} className="flex items-end gap-2">
         <div>
@@ -294,6 +312,7 @@ export default function NotasPage() {
   if (user.role !== "ADMIN" && user.role !== "STAFF") {
     return <p className="text-sm text-slate-500">Área restrita à equipe da escola.</p>;
   }
-  const podeEditar = podeLancarNotas({ role: user.role, funcao: user.funcao ?? null, isCoordenacao: Boolean(user.isCoordenacao) });
-  return <NotasContent podeEditar={podeEditar} />;
+  const perfil = { role: user.role, funcao: user.funcao ?? null, isCoordenacao: Boolean(user.isCoordenacao) };
+  // Exportar o boletim em PDF (impressão): só direção e coordenação; o servidor também confere.
+  return <NotasContent podeEditar={podeLancarNotas(perfil)} podeExportar={podeExportarBoletim(perfil)} />;
 }

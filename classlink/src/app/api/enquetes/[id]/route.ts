@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { ehGestaoDaSessao, requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { enqueteAberta } from "@/lib/enquetes";
-import { carregarEnqueteVisivel } from "@/lib/enquetes-acesso";
+import { carregarEnqueteVisivel, respondeEstaEnquete } from "@/lib/enquetes-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[id]">) {
@@ -20,6 +20,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[i
       titulo: enquete.titulo,
       descricao: enquete.descricao,
       audience: enquete.audience,
+      interna: enquete.interna,
       anonima: enquete.anonima,
       prazo: enquete.prazo,
       encerradaEm: enquete.encerradaEm,
@@ -30,16 +31,23 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[i
       perguntas: enquete.perguntas.map((p) => ({ id: p.id, tipo: p.tipo, texto: p.texto, obrigatoria: p.obrigatoria, opcoes: p.opcoes })),
     };
 
-    if (session.role === "GUARDIAN") {
-      const participacao = await prisma.enqueteParticipacao.findUnique({
-        where: { enqueteId_userId: { enqueteId: id, userId: session.sub } },
-        select: { respondidoEm: true },
-      });
-      return NextResponse.json({ enquete: base, respondidaEm: participacao?.respondidoEm ?? null });
-    }
-
-    const totalRespostas = await prisma.enqueteParticipacao.count({ where: { enqueteId: id } });
-    return NextResponse.json({ enquete: base, totalRespostas });
+    // Quem responde recebe se já respondeu; a gestão recebe o total. Secretaria e coordenação
+    // respondem as internas e também acompanham os resultados.
+    const podeResponder = await respondeEstaEnquete(session, enquete);
+    const participacao = podeResponder
+      ? await prisma.enqueteParticipacao.findUnique({
+          where: { enqueteId_userId: { enqueteId: id, userId: session.sub } },
+          select: { respondidoEm: true },
+        })
+      : null;
+    const gestao = session.role !== "GUARDIAN" && (await ehGestaoDaSessao(session));
+    const totalRespostas = gestao ? await prisma.enqueteParticipacao.count({ where: { enqueteId: id } }) : undefined;
+    return NextResponse.json({
+      enquete: base,
+      podeResponder,
+      ...(podeResponder ? { respondidaEm: participacao?.respondidoEm ?? null } : {}),
+      ...(gestao ? { totalRespostas, gestao: true } : {}),
+    });
   } catch (error) {
     return handleApiError(error);
   }
