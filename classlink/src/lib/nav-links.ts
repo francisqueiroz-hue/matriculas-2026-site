@@ -54,7 +54,18 @@ const guardianLinks: NavLink[] = [
   },
   { href: "/dashboard/contratos", label: "Contratos", icon: "M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z M14 3v5h5 M9 13h6 M9 17h4" },
   saudeLink(),
+  rotinaLink(),
 ];
+
+/** Rotina diária: direção e secretaria preenchem; a família vê a dos próprios filhos. */
+function rotinaLink(grupo?: string): NavLink {
+  return {
+    ...(grupo && { grupo }),
+    href: "/dashboard/rotina",
+    label: "Rotina",
+    icon: "M12 21a9 9 0 100-18 9 9 0 000 18z M12 7v5l3 2",
+  };
+}
 
 /** Ficha de saúde e autorizados: famílias (os próprios filhos), direção e coordenação. */
 function saudeLink(grupo?: string): NavLink {
@@ -135,6 +146,7 @@ const GRUPO_POR_HREF: Record<string, string> = {
   "/dashboard/financeiro": "Meu(s) filho(s)",
   "/dashboard/contratos": "Meu(s) filho(s)",
   "/dashboard/saude": "Meu(s) filho(s)",
+  "/dashboard/rotina": "Meu(s) filho(s)",
   "/dashboard/notas": "Pedagógico",
   "/dashboard/fichas": "Secretaria",
   "/dashboard/alunos": "Secretaria",
@@ -199,7 +211,7 @@ function linksDoPerfil(user: Pick<SessionUser, "role" | "isCoordenacao" | "funca
   if (user.role === "ADMIN") {
     const direcao = ehDirecao({ role: user.role, funcao: user.funcao ?? null });
     const admin = direcao ? adminLinks : adminLinks.filter((l) => !ABAS_SO_DIRECAO.includes(l.href));
-    return [...baseLinks, notasLink, ...admin, fichasLink, saudeLink("Secretaria"), guiaLink];
+    return [...baseLinks, notasLink, ...admin, fichasLink, saudeLink("Secretaria"), rotinaLink("Secretaria"), guiaLink];
   }
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks, guiaLink];
   if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, saudeLink("Secretaria"), guiaLink];

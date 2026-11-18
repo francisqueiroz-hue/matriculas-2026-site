@@ -15,8 +15,8 @@ describe("regras de visibilidade", () => {
   it("sem nenhuma escolha salva, o app fica como antes (padrões = acesso atual)", () => {
     const vazio = new Map<string, boolean>();
     expect(areasBloqueadasPara("FAMILIAS", vazio)).toEqual(["FICHAS", "CONSULTA_ALUNOS"]);
-    expect(areasBloqueadasPara("COORDENACAO", vazio)).toEqual(["FINANCEIRO", "CONTRATOS"]);
-    expect(areasBloqueadasPara("PROFESSORES", vazio)).toEqual(["NOTAS", "FINANCEIRO", "CONTRATOS", "CONSULTA_ALUNOS"]);
+    expect(areasBloqueadasPara("COORDENACAO", vazio)).toEqual(["FINANCEIRO", "CONTRATOS", "ROTINA"]);
+    expect(areasBloqueadasPara("PROFESSORES", vazio)).toEqual(["NOTAS", "FINANCEIRO", "CONTRATOS", "CONSULTA_ALUNOS", "ROTINA"]);
   });
 
   it("célula fixa nunca libera, mesmo com escolha salva (financeiro e contratos só da direção)", () => {
