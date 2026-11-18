@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
+import { MensagensEquipeGeral } from "@/components/MensagensEquipeGeral";
 
 interface GuardianConversation {
   id: string;
@@ -46,7 +47,7 @@ const ROLE_LABEL: Record<string, string> = { GUARDIAN: "responsável", STAFF: "e
 const REGRA_MENSAGENS: Record<string, string> = {
   familia: "As mensagens da família são atendidas pela direção e pela coordenação.",
   gestao: "Direção e coordenação conversam com as famílias e com toda a equipe.",
-  professor: "Professores e auxiliares conversam com a direção e a coordenação. Assuntos com as famílias passam pela coordenação.",
+  professor: "Professores e auxiliares conversam com a direção e a coordenação; a conversa individual só é vista por vocês dois. Assuntos com as famílias passam pela coordenação.",
 };
 
 export default function MensagensPage() {
@@ -226,6 +227,8 @@ export default function MensagensPage() {
           )}
         </div>
       )}
+
+      {podeFalarComEquipe && <MensagensEquipeGeral />}
 
       {conversas === null && <p className="text-sm text-slate-500">Carregando conversas...</p>}
       {conversas?.length === 0 && <p className="text-sm text-slate-500">Nenhuma conversa ainda.</p>}

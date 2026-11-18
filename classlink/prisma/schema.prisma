@@ -138,6 +138,7 @@ model School {
   fichasSaude           FichaSaude[]
   rotinasDiarias        RotinaDiaria[]
   pessoasAutorizadas    PessoaAutorizada[]
+  mensagensEquipe       MensagemEquipe[]
 }
 
 model User {
@@ -204,6 +205,11 @@ model User {
   teamConversationsA TeamConversation[] @relation("TeamConversationUserA")
   teamConversationsB TeamConversation[] @relation("TeamConversationUserB")
   teamMessagesSent   TeamMessage[]      @relation("TeamMessageSender")
+
+  // Mensagens da gestão para toda a equipe (e as respostas de quem participa)
+  mensagensEquipeEnviadas MensagemEquipe[]         @relation("MensagemEquipeAutor")
+  respostasMensagemEquipe MensagemEquipeResposta[] @relation("MensagemEquipeRespostaAutor")
+  leiturasMensagemEquipe  MensagemEquipeLeitura[]
 
   comunicadosCriados  Comunicado[]         @relation("ComunicadoAuthor")
   respostasComunicado RespostaComunicado[] @relation("RespostaResponsavel")
@@ -975,6 +981,9 @@ model Enquete {
   audience    PostAudience
   // Anônima por padrão: o sistema registra QUE a família respondeu, mas não liga a pessoa às respostas.
   anonima     Boolean      @default(true)
+  // Enquete interna: feita pela direção ou coordenação para a equipe (professores e auxiliares
+  // respondem). Nunca aparece para as famílias. Falso = enquete às famílias (padrão, como antes).
+  interna     Boolean      @default(false)
   prazo       DateTime?
   encerradaEm DateTime?
 
@@ -997,6 +1006,7 @@ model Enquete {
   envios        EnqueteEnvio[]
 
   @@index([schoolId])
+  @@index([schoolId, interna])
   @@index([classId])
   @@index([alunoId])
 }
@@ -1329,4 +1339,51 @@ model RotinaDiaria {
 
   @@unique([studentId, data])
   @@index([schoolId, data])
+}
+
+// ─── Mensagens para toda a equipe ───
+// A direção ou a coordenação escreve para a equipe toda; todos da equipe (direção, secretaria,
+// coordenação, professores e auxiliares) leem e respondem no mesmo assunto, e todos veem as
+// respostas. Famílias nunca acessam. Conversas individuais continuam em TeamConversation.
+model MensagemEquipe {
+  id        String   @id @default(cuid())
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId  String
+  autor     User     @relation("MensagemEquipeAutor", fields: [autorId], references: [id], onDelete: Cascade)
+  autorId   String
+  titulo    String
+  corpo     String
+  createdAt DateTime @default(now())
+  // Atualizado a cada resposta: ordena a lista e acende "não lida" para quem já tinha lido.
+  ultimaAtividadeEm DateTime @default(now())
+
+  respostas MensagemEquipeResposta[]
+  leituras  MensagemEquipeLeitura[]
+
+  @@index([schoolId, ultimaAtividadeEm])
+}
+
+model MensagemEquipeResposta {
+  id         String         @id @default(cuid())
+  mensagem   MensagemEquipe @relation(fields: [mensagemId], references: [id], onDelete: Cascade)
+  mensagemId String
+  autor      User           @relation("MensagemEquipeRespostaAutor", fields: [autorId], references: [id], onDelete: Cascade)
+  autorId    String
+  corpo      String
+  createdAt  DateTime       @default(now())
+
+  @@index([mensagemId, createdAt])
+}
+
+// Última vez que a pessoa abriu o assunto (para o número de não lidas).
+model MensagemEquipeLeitura {
+  id         String         @id @default(cuid())
+  mensagem   MensagemEquipe @relation(fields: [mensagemId], references: [id], onDelete: Cascade)
+  mensagemId String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  lidaEm     DateTime
+
+  @@unique([mensagemId, userId])
+  @@index([userId])
 }

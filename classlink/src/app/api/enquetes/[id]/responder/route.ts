@@ -5,22 +5,29 @@ import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { responderEnqueteSchema } from "@/lib/validators";
 import { enqueteAberta, validarRespostas } from "@/lib/enquetes";
-import { carregarEnqueteVisivel } from "@/lib/enquetes-acesso";
+import { carregarEnqueteVisivel, respondeEstaEnquete } from "@/lib/enquetes-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
 
 /**
- * A família responde uma vez; não há edição. Em enquete anônima, a participação (quem respondeu) e o
+ * A família responde uma vez (enquetes às famílias); professores e auxiliares respondem uma vez as
+ * enquetes internas. Não há edição. Em enquete anônima, a participação (quem respondeu) e o
  * envio (o que respondeu) são gravados SEM ligação entre eles.
  */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/enquetes/[id]/responder">) {
   try {
-    const session = await requireRole("GUARDIAN");
+    const session = await requireRole("GUARDIAN", "STAFF");
     await exigirArea(session, "ENQUETES");
     const { id } = await ctx.params;
     const { respostas } = responderEnqueteSchema.parse(await request.json());
 
     const enquete = await carregarEnqueteVisivel(session, id);
     if (!enquete) throw new ErroDeUsuario("Enquete não encontrada.", 404);
+    if (!(await respondeEstaEnquete(session, enquete))) {
+      throw new ErroDeUsuario(
+        enquete.interna ? "Esta enquete é respondida pelos professores e auxiliares." : "Esta enquete é respondida pelas famílias.",
+        403,
+      );
+    }
     if (!enqueteAberta(enquete)) throw new ErroDeUsuario("Esta enquete já foi encerrada.", 400);
 
     const itens = validarRespostas(enquete.perguntas, respostas);

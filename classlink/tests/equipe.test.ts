@@ -35,3 +35,30 @@ describe("cadastro da equipe igual ao dos responsáveis", () => {
     expect(() => createUserSchema.parse({ name: "Joana", phone: "21977771111", funcao: "PROFESSOR", password: "123" })).toThrow();
   });
 });
+
+describe("regras de 18/11/2026: enquete interna, mensagem para a equipe e boletim em PDF", () => {
+  const p = (role: "ADMIN" | "STAFF" | "GUARDIAN", funcao: import("@prisma/client").FuncaoEquipe | null, isCoordenacao = false) => ({ role, funcao, isCoordenacao });
+
+  it("direção e coordenação criam enquete interna, escrevem para a equipe e exportam o boletim; secretaria não", async () => {
+    const m = await import("@/lib/equipe");
+    for (const fn of [m.podeCriarEnqueteInterna, m.podeEscreverParaEquipe, m.podeExportarBoletim]) {
+      expect(fn(p("ADMIN", "DIRECAO"))).toBe(true);
+      expect(fn(p("ADMIN", null))).toBe(true); // diretor de cadastro antigo
+      expect(fn(p("STAFF", "COORDENACAO", true))).toBe(true);
+      expect(fn(p("ADMIN", "SECRETARIA"))).toBe(false);
+      expect(fn(p("STAFF", "PROFESSOR"))).toBe(false);
+      expect(fn(p("STAFF", "AUXILIAR"))).toBe(false);
+      expect(fn(p("GUARDIAN", null))).toBe(false);
+    }
+  });
+
+  it("professores e auxiliares respondem a enquete interna; gestão e famílias não", async () => {
+    const { respondeEnqueteInterna } = await import("@/lib/equipe");
+    expect(respondeEnqueteInterna(p("STAFF", "PROFESSOR"))).toBe(true);
+    expect(respondeEnqueteInterna(p("STAFF", "AUXILIAR"))).toBe(true);
+    expect(respondeEnqueteInterna(p("STAFF", null))).toBe(true);
+    expect(respondeEnqueteInterna(p("STAFF", "COORDENACAO", true))).toBe(false);
+    expect(respondeEnqueteInterna(p("ADMIN", "DIRECAO"))).toBe(false);
+    expect(respondeEnqueteInterna(p("GUARDIAN", null))).toBe(false);
+  });
+});

@@ -4,7 +4,7 @@ import { requireSession, requireLancarNotas } from "@/lib/session";
 import { exigirPodeVerAluno } from "@/lib/turmas-acesso";
 import { handleApiError } from "@/lib/http";
 import { setNotaSchema } from "@/lib/validators";
-import { TRIMESTRES, calcMediaTrimestre, calcMediaFinal, calcSituacao } from "@/lib/notas";
+import { montarBoletim } from "@/lib/boletim";
 import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/notas/[studentId]">) {
@@ -21,30 +21,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/notas/[
 
     await exigirPodeVerAluno(session, studentId, "ao boletim");
 
-    const [disciplinas, notas] = await Promise.all([
-      prisma.disciplina.findMany({ where: { schoolId: session.schoolId }, orderBy: { nome: "asc" } }),
-      prisma.nota.findMany({ where: { studentId } }),
-    ]);
-
-    const boletim = disciplinas.map((d) => {
-      const porTrimestre = Object.fromEntries(
-        TRIMESTRES.map((t) => {
-          const nota = notas.find((n) => n.disciplinaId === d.id && n.trimestre === t);
-          const trabalho = nota?.trabalho !== undefined && nota?.trabalho !== null ? Number(nota.trabalho) : null;
-          const teste = nota?.teste !== undefined && nota?.teste !== null ? Number(nota.teste) : null;
-          const prova = nota?.prova !== undefined && nota?.prova !== null ? Number(nota.prova) : null;
-          return [t, { trabalho, teste, prova, media: calcMediaTrimestre(trabalho, teste, prova) }];
-        }),
-      );
-      const mediaFinal = calcMediaFinal(TRIMESTRES.map((t) => porTrimestre[t].media));
-      return {
-        disciplinaId: d.id,
-        nome: d.nome,
-        trimestres: porTrimestre,
-        mediaFinal,
-        situacao: calcSituacao(mediaFinal),
-      };
-    });
+    const boletim = await montarBoletim(session.schoolId, studentId);
 
     return NextResponse.json({ student, boletim });
   } catch (error) {

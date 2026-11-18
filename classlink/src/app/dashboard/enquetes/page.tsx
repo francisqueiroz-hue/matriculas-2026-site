@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCurrentUser } from "@/components/UserContext";
-import { perfilAcessoDe, podePublicar } from "@/lib/equipe";
+import { perfilAcessoDe, podePublicar, respondeEnqueteInterna } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { EnqueteComposer } from "@/components/EnqueteComposer";
 import { formatarDataHora } from "@/lib/datas";
@@ -12,6 +12,7 @@ interface EnqueteItem {
   id: string;
   titulo: string;
   audience: "SCHOOL" | "CLASS" | "STUDENT";
+  interna?: boolean;
   anonima: boolean;
   prazo: string | null;
   aberta: boolean;
@@ -24,6 +25,7 @@ interface EnqueteItem {
 }
 
 function publico(e: EnqueteItem) {
+  if (e.interna) return "Equipe (interna)";
   return e.audience === "SCHOOL" ? "Toda a escola" : e.audience === "STUDENT" ? `Individual — ${e.aluno?.name}` : e.class?.name;
 }
 
@@ -70,7 +72,8 @@ export default function EnquetesPage() {
   }
   useEffect(load, []);
 
-  const responsavel = user.role === "GUARDIAN";
+  // Responde: a família (enquetes às famílias) e professores/auxiliares (enquetes internas).
+  const responsavel = user.role === "GUARDIAN" || respondeEnqueteInterna(perfilAcessoDe(user));
   const podeCriar = podePublicar(perfilAcessoDe(user));
   const aguardando = responsavel ? (enquetes ?? []).filter((e) => e.aberta && !e.respondida) : [];
   const demais = responsavel ? (enquetes ?? []).filter((e) => !(e.aberta && !e.respondida)) : (enquetes ?? []);

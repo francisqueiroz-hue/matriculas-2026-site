@@ -33,11 +33,23 @@ vi.mock("@/lib/session", () => ({
   exigirPodePublicar: vi.fn(async (s: { sub: string; role: string }) => {
     if (s.role !== "ADMIN" && s.sub !== "c1") throw new ErroAuth("Somente a gestão publica");
   }),
+  // Direção (d1) ou coordenação (c1); a secretaria (sec1, ADMIN) não.
+  exigirDirecaoOuCoordenacao: vi.fn(async (s: { sub: string }, msg: string) => {
+    if (s.sub !== "d1" && s.sub !== "c1") throw new ErroAuth(msg);
+  }),
   AuthError: ErroAuth,
 }));
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: vi.fn() }));
 vi.mock("@/lib/push", () => ({ notifyUsers: vi.fn(async () => undefined) }));
-const acessoMock = vi.hoisted(() => ({ carregarEnqueteVisivel: vi.fn(), publicoDaEnquete: vi.fn() }));
+const acessoMock = vi.hoisted(() => ({
+  carregarEnqueteVisivel: vi.fn(),
+  publicoDaEnquete: vi.fn(),
+  // Família responde a enquete às famílias; professor (p1) e auxiliar (a1) respondem a interna.
+  respondeEstaEnquete: vi.fn(async (s: { sub: string; role: string }, e: { interna: boolean }) =>
+    s.role === "GUARDIAN" ? !e.interna : e.interna && (s.sub === "p1" || s.sub === "a1"),
+  ),
+  filtroDeVisibilidadeEnquetes: vi.fn(async () => ({})),
+}));
 vi.mock("@/lib/enquetes-acesso", () => acessoMock);
 
 import { POST as responder } from "@/app/api/enquetes/[id]/responder/route";
@@ -52,7 +64,7 @@ const perguntas = [
   { id: "p2", ordem: 1, tipo: "TEXTO", texto: "Comentário", obrigatoria: false, opcoes: null },
 ];
 const enquete = (extra = {}) => ({
-  id: "e1", schoolId: "s1", audience: "SCHOOL", classId: null, alunoId: null, anonima: true, prazo: null, encerradaEm: null, perguntas, ...extra,
+  id: "e1", schoolId: "s1", audience: "SCHOOL", interna: false, classId: null, alunoId: null, anonima: true, prazo: null, encerradaEm: null, perguntas, ...extra,
 });
 const post = (corpo: unknown) => new NextRequest("http://t/api/enquetes/e1/responder", { method: "POST", body: JSON.stringify(corpo) });
 
@@ -201,5 +213,65 @@ describe("criar enquete", () => {
   it("coordenação publica para a escola toda", async () => {
     sessaoMock.atual = { sub: "c1", role: "STAFF", schoolId: "s1" };
     expect((await criar(req(corpo({ audience: "SCHOOL" })))).status).toBe(201);
+  });
+});
+
+describe("enquetes internas (para a equipe)", () => {
+  const corpo = (extra = {}) => ({
+    titulo: "Clima da equipe", audience: "CLASS", classId: "c1", interna: true, anonima: true,
+    perguntas: [{ tipo: "NOTA", texto: "Nota?", obrigatoria: true }], ...extra,
+  });
+  const req = (b: unknown) => new NextRequest("http://t/api/enquetes", { method: "POST", body: JSON.stringify(b) });
+
+  beforeEach(() => {
+    prismaMock.enquete.create.mockResolvedValue({ id: "e7", titulo: "Clima da equipe", schoolId: "s1", audience: "SCHOOL", classId: null, alunoId: null });
+    acessoMock.publicoDaEnquete.mockResolvedValue([{ id: "p1", name: "Prof" }, { id: "a1", name: "Aux" }]);
+  });
+
+  it("direção cria: sempre para a equipe toda, sem turma nem aluno, e avisa o público interno", async () => {
+    sessaoMock.atual = { sub: "d1", role: "ADMIN", schoolId: "s1" };
+    expect((await criar(req(corpo()))).status).toBe(201);
+    const data = prismaMock.enquete.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ interna: true, audience: "SCHOOL", classId: null, alunoId: null, anonima: true });
+    expect(acessoMock.publicoDaEnquete.mock.calls[0][0]).toMatchObject({ interna: true });
+  });
+
+  it("coordenação cria; secretaria, professor e auxiliar não", async () => {
+    sessaoMock.atual = { sub: "c1", role: "STAFF", schoolId: "s1" };
+    expect((await criar(req(corpo()))).status).toBe(201);
+    for (const s of [{ sub: "sec1", role: "ADMIN" }, { sub: "p1", role: "STAFF" }, { sub: "a1", role: "STAFF" }]) {
+      sessaoMock.atual = { ...s, schoolId: "s1" };
+      expect((await criar(req(corpo()))).status).toBe(403);
+    }
+    expect(prismaMock.enquete.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("professor e auxiliar respondem a interna; família não responde a interna", async () => {
+    acessoMock.carregarEnqueteVisivel.mockResolvedValue(enquete({ interna: true }));
+    for (const sub of ["p1", "a1"]) {
+      sessaoMock.atual = { sub, role: "STAFF", schoolId: "s1" };
+      expect((await responder(post({ respostas: { p1: 4 } }), ctx)).status).toBe(201);
+    }
+    sessaoMock.atual = { sub: "g1", role: "GUARDIAN", schoolId: "s1" };
+    expect((await responder(post({ respostas: { p1: 4 } }), ctx)).status).toBe(403);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it("professor não responde enquete das famílias", async () => {
+    sessaoMock.atual = { sub: "p1", role: "STAFF", schoolId: "s1" };
+    acessoMock.carregarEnqueteVisivel.mockResolvedValue(enquete({ interna: false }));
+    expect((await responder(post({ respostas: { p1: 4 } }), ctx)).status).toBe(403);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("professor e auxiliar não veem resultados, pendências nem exportação", async () => {
+    acessoMock.carregarEnqueteVisivel.mockResolvedValue(enquete({ interna: true, anonima: false }));
+    for (const sub of ["p1", "a1"]) {
+      sessaoMock.atual = { sub, role: "STAFF", schoolId: "s1" };
+      expect((await resultados(new Request("http://t"), ctx)).status).toBe(403);
+      expect((await pendentes(new Request("http://t"), ctx)).status).toBe(403);
+      expect((await exportar(new Request("http://t"), ctx)).status).toBe(403);
+    }
+    expect(prismaMock.enqueteParticipacao.count).not.toHaveBeenCalled();
   });
 });

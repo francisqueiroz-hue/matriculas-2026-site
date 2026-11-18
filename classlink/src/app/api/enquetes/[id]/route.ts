@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { enqueteAberta } from "@/lib/enquetes";
-import { carregarEnqueteVisivel } from "@/lib/enquetes-acesso";
+import { carregarEnqueteVisivel, respondeEstaEnquete } from "@/lib/enquetes-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[id]">) {
@@ -20,6 +20,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[i
       titulo: enquete.titulo,
       descricao: enquete.descricao,
       audience: enquete.audience,
+      interna: enquete.interna,
       anonima: enquete.anonima,
       prazo: enquete.prazo,
       encerradaEm: enquete.encerradaEm,
@@ -30,7 +31,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[i
       perguntas: enquete.perguntas.map((p) => ({ id: p.id, tipo: p.tipo, texto: p.texto, obrigatoria: p.obrigatoria, opcoes: p.opcoes })),
     };
 
-    if (session.role === "GUARDIAN") {
+    // Quem responde (família; professor/auxiliar na interna) recebe só se já respondeu.
+    if (await respondeEstaEnquete(session, enquete)) {
       const participacao = await prisma.enqueteParticipacao.findUnique({
         where: { enqueteId_userId: { enqueteId: id, userId: session.sub } },
         select: { respondidoEm: true },

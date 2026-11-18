@@ -80,6 +80,8 @@ export default function BoletimPage() {
         </div>
       )}
 
+      <p className="text-xs text-slate-500">Precisa do boletim impresso? Peça à coordenação ou à direção da escola.</p>
+
       {students.length === 0 && <p className="text-sm text-slate-500">Nenhum aluno vinculado à sua conta.</p>}
       {studentId && boletim === null && <p className="text-sm text-slate-500">Carregando boletim...</p>}
 

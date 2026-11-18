@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
+import { perfilAcessoDe, respondeEnqueteInterna } from "@/lib/equipe";
 
 interface Pergunta {
   id: string;
@@ -18,6 +19,7 @@ interface Enquete {
   titulo: string;
   descricao: string | null;
   audience: "SCHOOL" | "CLASS" | "STUDENT";
+  interna?: boolean;
   anonima: boolean;
   prazo: string | null;
   encerradaEm: string | null;
@@ -139,7 +141,11 @@ function FormularioFamilia({ enquete, onEnviada }: { enquete: Enquete; onEnviada
   return (
     <form onSubmit={enviar} className="space-y-3">
       <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-        {enquete.anonima
+        {enquete.interna
+          ? enquete.anonima
+            ? "Enquete interna e anônima: a direção e a coordenação sabem quantas pessoas da equipe responderam, mas não veem quem escreveu cada resposta. Depois de enviada, a resposta não pode ser alterada."
+            : "Enquete interna e identificada: a direção e a coordenação veem o seu nome junto das respostas. Depois de enviada, a resposta não pode ser alterada."
+          : enquete.anonima
           ? "Esta enquete é anônima: a escola sabe quantas famílias responderam, mas não vê quem escreveu cada resposta. Depois de enviada, a resposta não pode ser alterada. Enquanto você não envia, o que preencheu fica guardado neste aparelho."
           : "Esta enquete é identificada: a escola vê o seu nome junto das respostas. Depois de enviada, a resposta não pode ser alterada. Enquanto você não envia, o que preencheu fica guardado neste aparelho."}
       </p>
@@ -206,7 +212,7 @@ function PainelEscola({ enquete }: { enquete: Enquete }) {
       {res && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <span className="text-sm font-medium">
-            {res.totalRespostas} de {res.totalPublico} famílias responderam · {res.anonima ? "Anônima" : "Identificada"} · {aberta ? "Aberta" : "Encerrada"}
+            {res.totalRespostas} de {res.totalPublico} {enquete.interna ? "pessoas da equipe" : "famílias"} responderam · {res.anonima ? "Anônima" : "Identificada"} · {aberta ? "Aberta" : "Encerrada"}
           </span>
           <span className="flex gap-2">
             {res.detalhesLiberados && (
@@ -286,13 +292,13 @@ export default function EnqueteDetalhePage() {
       <div>
         <h1 className="text-xl font-bold">{enquete.titulo}</h1>
         <p className="text-xs text-slate-500">
-          {enquete.audience === "SCHOOL" ? "Toda a escola" : enquete.audience === "STUDENT" ? `Individual — ${enquete.aluno?.name}` : enquete.class?.name}
+          {enquete.interna ? "Equipe (interna)" : enquete.audience === "SCHOOL" ? "Toda a escola" : enquete.audience === "STUDENT" ? `Individual — ${enquete.aluno?.name}` : enquete.class?.name}
           {enquete.prazo && <> · responder até {formatarDataHora(enquete.prazo)}</>}
         </p>
         {enquete.descricao && <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{enquete.descricao}</p>}
       </div>
 
-      {user.role === "GUARDIAN" ? (
+      {user.role === "GUARDIAN" || (enquete.interna && respondeEnqueteInterna(perfilAcessoDe(user))) ? (
         respondidaEm ? (
           <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950/40 dark:text-green-300">
             ✓ Resposta enviada em {formatarDataHora(respondidaEm)}. Obrigado por participar!

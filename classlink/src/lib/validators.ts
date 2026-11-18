@@ -140,6 +140,8 @@ export const createEnqueteSchema = z.object({
   alunoId: z.string().optional(),
   // Anônima por padrão; "identificada" só quando a escola escolhe (ex.: reunião individual).
   anonima: z.boolean().default(true),
+  // Interna: para a equipe (professores e auxiliares respondem), não para as famílias.
+  interna: z.boolean().default(false),
   prazo: z.string().datetime().optional(),
   perguntas: z
     .array(

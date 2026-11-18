@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ehGestaoDaSessao, exigirPodePublicar, requireRole, requireSession } from "@/lib/session";
-import { MENSAGEM_SO_GESTAO_ESCOLA } from "@/lib/equipe";
+import { ehGestaoDaSessao, exigirDirecaoOuCoordenacao, exigirPodePublicar, requireRole, requireSession } from "@/lib/session";
+import { MENSAGEM_SO_DIRECAO_COORDENACAO_ENQUETE_INTERNA, MENSAGEM_SO_GESTAO_ESCOLA } from "@/lib/equipe";
 import { handleApiError } from "@/lib/http";
 import { createEnqueteSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { ErroDeUsuario } from "@/lib/erros";
 import { enqueteAberta, normalizarOpcoesPergunta } from "@/lib/enquetes";
-import { filtroDeVisibilidadeEnquetes, publicoDaEnquete } from "@/lib/enquetes-acesso";
+import { filtroDeVisibilidadeEnquetes, publicoDaEnquete, respondeEstaEnquete } from "@/lib/enquetes-acesso";
 import { exigirAlunoPublicavel, exigirTurmaPublicavel } from "@/lib/turmas-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
 
@@ -15,14 +15,15 @@ export async function GET() {
   try {
     const session = await requireSession();
     await exigirArea(session, "ENQUETES");
-    const OR = await filtroDeVisibilidadeEnquetes(session);
+    const filtro = await filtroDeVisibilidadeEnquetes(session);
 
     const enquetes = await prisma.enquete.findMany({
-      where: { schoolId: session.schoolId, ...(OR ? { OR } : {}) },
+      where: { AND: [{ schoolId: session.schoolId }, filtro] },
       select: {
         id: true,
         titulo: true,
         audience: true,
+        interna: true,
         anonima: true,
         prazo: true,
         encerradaEm: true,
@@ -35,8 +36,10 @@ export async function GET() {
       take: 100,
     });
 
+    // Quem responde (família; professores e auxiliares nas internas) vê "respondida"; a gestão vê o total.
+    const respondente = session.role === "GUARDIAN" || (session.role === "STAFF" && (await respondeEstaEnquete(session, { interna: true })));
     let respondidas = new Set<string>();
-    if (session.role === "GUARDIAN") {
+    if (respondente) {
       const minhas = await prisma.enqueteParticipacao.findMany({
         where: { userId: session.sub, enqueteId: { in: enquetes.map((e) => e.id) } },
         select: { enqueteId: true },
@@ -50,7 +53,7 @@ export async function GET() {
         ...e,
         aberta: enqueteAberta(e, agora),
         totalPerguntas: _count.perguntas,
-        ...(session.role === "GUARDIAN" ? { respondida: respondidas.has(e.id) } : { totalRespostas: _count.participacoes }),
+        ...(respondente ? { respondida: respondidas.has(e.id) } : { totalRespostas: _count.participacoes }),
       })),
     });
   } catch (error) {
@@ -64,6 +67,12 @@ export async function POST(request: NextRequest) {
     await exigirArea(session, "ENQUETES");
     await exigirPodePublicar(session);
     const body = createEnqueteSchema.parse(await request.json());
+
+    // Enquete interna: da direção ou da coordenação para a equipe (professores e auxiliares).
+    if (body.interna) {
+      await exigirDirecaoOuCoordenacao(session, MENSAGEM_SO_DIRECAO_COORDENACAO_ENQUETE_INTERNA);
+      return criarEnqueteInterna(session, body);
+    }
 
     if (body.audience === "SCHOOL" && !(await ehGestaoDaSessao(session))) {
       throw new ErroDeUsuario(MENSAGEM_SO_GESTAO_ESCOLA, 403);
@@ -87,13 +96,7 @@ export async function POST(request: NextRequest) {
       if (body.anonima) throw new ErroDeUsuario("Enquete para um aluno individual precisa ser identificada.");
     }
 
-    const perguntas = body.perguntas.map((p, i) => ({
-      ordem: i,
-      tipo: p.tipo,
-      texto: p.texto,
-      obrigatoria: p.obrigatoria,
-      opcoes: normalizarOpcoesPergunta(p.tipo, p.opcoes) ?? undefined,
-    }));
+    const perguntas = perguntasParaGravar(body);
 
     const enquete = await prisma.enquete.create({
       data: {
@@ -111,7 +114,7 @@ export async function POST(request: NextRequest) {
       select: { id: true, titulo: true, schoolId: true, audience: true, classId: true, alunoId: true },
     });
 
-    const publico = await publicoDaEnquete(enquete);
+    const publico = await publicoDaEnquete({ ...enquete, interna: false });
     after(() =>
       notifyUsers(
         publico.map((p) => p.id),
@@ -123,4 +126,46 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return handleApiError(error);
   }
+}
+
+type CorpoEnquete = ReturnType<typeof createEnqueteSchema.parse>;
+
+function perguntasParaGravar(body: CorpoEnquete) {
+  return body.perguntas.map((p, i) => ({
+    ordem: i,
+    tipo: p.tipo,
+    texto: p.texto,
+    obrigatoria: p.obrigatoria,
+    opcoes: normalizarOpcoesPergunta(p.tipo, p.opcoes) ?? undefined,
+  }));
+}
+
+/** Enquete interna: sempre para a equipe toda (sem turma nem aluno), nunca visível às famílias. */
+async function criarEnqueteInterna(session: { sub: string; schoolId: string }, body: CorpoEnquete) {
+  const enquete = await prisma.enquete.create({
+    data: {
+      titulo: body.titulo,
+      descricao: body.descricao || null,
+      audience: "SCHOOL",
+      interna: true,
+      anonima: body.anonima,
+      prazo: body.prazo ? new Date(body.prazo) : null,
+      classId: null,
+      alunoId: null,
+      schoolId: session.schoolId,
+      criadoPorId: session.sub,
+      perguntas: { create: perguntasParaGravar(body) as never },
+    },
+    select: { id: true, titulo: true, schoolId: true, audience: true, classId: true, alunoId: true },
+  });
+
+  const publico = await publicoDaEnquete({ ...enquete, interna: true });
+  after(() =>
+    notifyUsers(
+      publico.map((p) => p.id),
+      { title: `Enquete da equipe: ${enquete.titulo}`, body: "A direção e a coordenação querem ouvir você.", url: `/dashboard/enquetes/${enquete.id}` },
+    ).catch((err) => console.error("push notify failed", err)),
+  );
+
+  return NextResponse.json({ enquete: { id: enquete.id } }, { status: 201 });
 }

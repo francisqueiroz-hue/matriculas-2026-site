@@ -3,6 +3,7 @@ import { ACCESS_COOKIE, verifyAccessToken, type AccessTokenPayload } from "@/lib
 import { prisma } from "@/lib/prisma";
 import {
   ehDirecao,
+  ehDirecaoOuCoordenacao,
   ehGestao,
   podeLancarNotas,
   podePublicar,
@@ -109,6 +110,14 @@ export async function exigirDirecaoSeAdmin(session: Pick<AccessTokenPayload, "su
   if (session.role !== "ADMIN") return;
   const user = await prisma.user.findUnique({ where: { id: session.sub }, select: { role: true, funcao: true } });
   if (!user || !ehDirecao(user)) throw new AuthError(MENSAGEM_SO_DIRECAO, 403);
+}
+
+/**
+ * Só direção (sem a secretaria) ou coordenação, com a função lida do banco. Usado nas enquetes
+ * internas, nas mensagens para toda a equipe e na exportação do boletim em PDF.
+ */
+export async function exigirDirecaoOuCoordenacao(session: Pick<AccessTokenPayload, "sub" | "role">, mensagem: string) {
+  if (session.role === "GUARDIAN" || !ehDirecaoOuCoordenacao(await perfilDaSessao(session))) throw new AuthError(mensagem, 403);
 }
 
 export class AuthError extends Error {

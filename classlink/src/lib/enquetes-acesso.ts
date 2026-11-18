@@ -1,14 +1,55 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AccessTokenPayload } from "@/lib/auth";
 import { visibilidadePorPublico } from "@/lib/escopo-acesso";
+import { ehGestao, respondeEnqueteInterna } from "@/lib/equipe";
+import { perfilDaSessao } from "@/lib/session";
 
-/** Filtro de visibilidade das enquetes, igual ao dos comunicados (escola, turma, aluno individual). */
-export async function filtroDeVisibilidadeEnquetes(session: Pick<AccessTokenPayload, "sub" | "role" | "schoolId">) {
-  return (await visibilidadePorPublico(session)).condicoes;
+type SessaoEnquete = Pick<AccessTokenPayload, "sub" | "role" | "schoolId">;
+
+/**
+ * Quem vê quais enquetes (regra da escola, 18/11/2026):
+ *  - família: só as enquetes às famílias (escola, turmas dos filhos e individuais dos filhos),
+ *    nunca as internas;
+ *  - professores e auxiliares: só as enquetes internas, que respondem. As enquetes às famílias
+ *    (e seus resultados) ficam com a gestão;
+ *  - direção, secretaria e coordenação: todas.
+ */
+export async function filtroDeVisibilidadeEnquetes(session: SessaoEnquete): Promise<Prisma.EnqueteWhereInput> {
+  if (session.role === "GUARDIAN") {
+    const { condicoes } = await visibilidadePorPublico(session);
+    return { interna: false, ...(condicoes ? { OR: condicoes } : {}) };
+  }
+  const perfil = await perfilDaSessao(session);
+  if (ehGestao(perfil)) return {};
+  if (respondeEnqueteInterna(perfil)) return { interna: true };
+  // Perfil desconhecido: não vê nada (padrão seguro).
+  return { id: { in: [] } };
 }
 
-/** Responsáveis (sem repetir) que compõem o público da enquete. */
-export async function publicoDaEnquete(e: { schoolId: string; audience: string; classId: string | null; alunoId: string | null }) {
+/** A pessoa logada é quem responde esta enquete (família na enquete às famílias; professor/auxiliar na interna)? */
+export async function respondeEstaEnquete(session: SessaoEnquete, enquete: { interna: boolean }): Promise<boolean> {
+  if (session.role === "GUARDIAN") return !enquete.interna;
+  if (!enquete.interna || session.role !== "STAFF") return false;
+  return respondeEnqueteInterna(await perfilDaSessao(session));
+}
+
+/** Professores e auxiliares ativos da escola: o público das enquetes internas. */
+export const ONDE_RESPONDE_INTERNA: Prisma.UserWhereInput = {
+  role: "STAFF",
+  isCoordenacao: false,
+  OR: [{ funcao: null }, { funcao: { in: ["PROFESSOR", "AUXILIAR"] } }],
+};
+
+/** Pessoas (sem repetir) que compõem o público da enquete: responsáveis, ou a equipe na interna. */
+export async function publicoDaEnquete(e: { schoolId: string; audience: string; classId: string | null; alunoId: string | null; interna?: boolean }) {
+  if (e.interna) {
+    return prisma.user.findMany({
+      where: { schoolId: e.schoolId, active: true, deletedAt: null, ...ONDE_RESPONDE_INTERNA },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+  }
   const links = await prisma.guardianStudent.findMany({
     where: {
       guardian: { schoolId: e.schoolId, active: true, deletedAt: null },
@@ -26,10 +67,10 @@ export async function publicoDaEnquete(e: { schoolId: string; audience: string; 
 }
 
 /** Enquete da escola da sessão que a pessoa pode ver (mesma regra da listagem). Null se não existe/não é visível. */
-export async function carregarEnqueteVisivel(session: Pick<AccessTokenPayload, "sub" | "role" | "schoolId">, id: string) {
-  const OR = await filtroDeVisibilidadeEnquetes(session);
+export async function carregarEnqueteVisivel(session: SessaoEnquete, id: string) {
+  const filtro = await filtroDeVisibilidadeEnquetes(session);
   return prisma.enquete.findFirst({
-    where: { id, schoolId: session.schoolId, ...(OR ? { OR } : {}) },
+    where: { AND: [{ id, schoolId: session.schoolId }, filtro] },
     include: {
       class: { select: { id: true, name: true } },
       aluno: { select: { id: true, name: true } },

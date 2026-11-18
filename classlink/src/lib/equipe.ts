@@ -91,3 +91,30 @@ export const MENSAGEM_SO_GESTAO_ESCOLA = "Somente a direção, a secretaria e a 
 export function perfilAcessoDe(user: { role: string; funcao?: FuncaoEquipe | null; isCoordenacao?: boolean | null }): PerfilAcesso {
   return { role: user.role as Role, funcao: user.funcao ?? null, isCoordenacao: Boolean(user.isCoordenacao) };
 }
+
+/** Direção (sem a secretaria) ou coordenação. */
+export function ehDirecaoOuCoordenacao(user: PerfilAcesso): boolean {
+  return ehDirecao(user) || ehCoordenacao(user);
+}
+
+/**
+ * Responde as enquetes internas: professores e auxiliares (equipe que não é gestão). Quem cria
+ * a enquete interna é a direção ou a coordenação, e a gestão acompanha os resultados.
+ */
+export function respondeEnqueteInterna(user: PerfilAcesso): boolean {
+  if (user.role !== "STAFF" || user.isCoordenacao) return false;
+  return user.funcao === null || user.funcao === "PROFESSOR" || user.funcao === "AUXILIAR";
+}
+
+/** Criar enquete interna (para a equipe): só direção e coordenação. */
+export const podeCriarEnqueteInterna = ehDirecaoOuCoordenacao;
+
+/** Escrever para toda a equipe (Mensagens): só direção e coordenação; todos da equipe respondem. */
+export const podeEscreverParaEquipe = ehDirecaoOuCoordenacao;
+
+/** Exportar o boletim em PDF para impressão: só direção e coordenação (famílias e professores só consultam). */
+export const podeExportarBoletim = ehDirecaoOuCoordenacao;
+
+export const MENSAGEM_SO_DIRECAO_COORDENACAO_ENQUETE_INTERNA = "Somente a direção e a coordenação criam enquetes para a equipe.";
+export const MENSAGEM_SO_DIRECAO_COORDENACAO_EQUIPE = "Somente a direção e a coordenação escrevem para toda a equipe.";
+export const MENSAGEM_SO_DIRECAO_COORDENACAO_BOLETIM = "Somente a direção e a coordenação exportam o boletim para impressão.";

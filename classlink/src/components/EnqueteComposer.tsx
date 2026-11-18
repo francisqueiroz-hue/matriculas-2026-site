@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
-import { ehGestao, perfilAcessoDe } from "@/lib/equipe";
+import { ehGestao, perfilAcessoDe, podeCriarEnqueteInterna } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { ESCOLHAS_MAX, TIPOS_PERGUNTA } from "@/lib/enquetes";
 
@@ -39,6 +39,9 @@ function modeloSatisfacao(): PerguntaForm[] {
 export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
   const user = useCurrentUser();
   const gestao = ehGestao(perfilAcessoDe(user));
+  // Direção e coordenação também fazem enquetes internas, respondidas por professores e auxiliares.
+  const podeInterna = podeCriarEnqueteInterna(perfilAcessoDe(user));
+  const [interna, setInterna] = useState(false);
   // Gestão (direção, secretaria e coordenação) publica para a escola toda e em qualquer turma.
   const [aberto, setAberto] = useState(false);
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -94,10 +97,11 @@ export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
         body: JSON.stringify({
           titulo,
           descricao: descricao || undefined,
-          audience,
-          classId: audience === "CLASS" || audience === "STUDENT" ? classId : undefined,
-          alunoId: audience === "STUDENT" ? alunoId : undefined,
-          anonima: audience === "STUDENT" ? false : !identificada,
+          interna,
+          audience: interna ? "SCHOOL" : audience,
+          classId: !interna && (audience === "CLASS" || audience === "STUDENT") ? classId : undefined,
+          alunoId: !interna && audience === "STUDENT" ? alunoId : undefined,
+          anonima: !interna && audience === "STUDENT" ? false : !identificada,
           prazo: prazo ? new Date(prazo).toISOString() : undefined,
           perguntas: perguntas.map((p) => ({
             tipo: p.tipo,
@@ -111,6 +115,7 @@ export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
       setDescricao("");
       setPrazo("");
       setPerguntas([nova()]);
+      setInterna(false);
       setAberto(false);
       onCreated();
     } catch (err) {
@@ -147,10 +152,32 @@ export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
         </button>
       </div>
 
+      {podeInterna && (
+        <fieldset className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
+          <legend className="px-1 text-xs font-semibold text-slate-500">Para quem é a enquete</legend>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <label className="flex items-center gap-2">
+              <input type="radio" name="publico-enquete" checked={!interna} onChange={() => setInterna(false)} />
+              Famílias
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" name="publico-enquete" checked={interna} onChange={() => setInterna(true)} />
+              Equipe interna (professores e auxiliares respondem)
+            </label>
+          </div>
+          {interna && (
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+              As famílias não veem esta enquete. Os resultados ficam com a direção, a secretaria e a coordenação.
+            </p>
+          )}
+        </fieldset>
+      )}
+
       <input required aria-label="Título da enquete" placeholder="Título (ex.: Pesquisa de satisfação 2026)" value={titulo} onChange={(e) => setTitulo(e.target.value)} className={campo} />
-      <textarea aria-label="Explicação da enquete" placeholder="Explicação para as famílias (opcional)" value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className={campo} />
+      <textarea aria-label="Explicação da enquete" placeholder={interna ? "Explicação para a equipe (opcional)" : "Explicação para as famílias (opcional)"} value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className={campo} />
 
       <div className="flex flex-wrap items-center gap-3">
+        {!interna && (
         <select
           aria-label="Quem recebe"
           value={audience}
@@ -166,7 +193,8 @@ export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
           <option value="CLASS">Turma específica</option>
           <option value="STUDENT">Aluno individual (aos responsáveis)</option>
         </select>
-        {(audience === "CLASS" || audience === "STUDENT") && (
+        )}
+        {!interna && (audience === "CLASS" || audience === "STUDENT") && (
           <select required aria-label="Turma" value={classId} onChange={(e) => { setClassId(e.target.value); setAlunoId(""); }} className={pequeno}>
             <option value="">Selecione a turma</option>
             {classes.map((c) => (
@@ -174,7 +202,7 @@ export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
             ))}
           </select>
         )}
-        {audience === "STUDENT" && (
+        {!interna && audience === "STUDENT" && (
           <select required aria-label="Aluno" value={alunoId} onChange={(e) => setAlunoId(e.target.value)} disabled={!classId} className={`${pequeno} disabled:opacity-50`}>
             <option value="">Selecione o aluno</option>
             {students.map((s) => (
@@ -190,20 +218,20 @@ export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
 
       <fieldset className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800">
         <legend className="px-1 text-xs font-semibold text-slate-500">Quem vê as respostas</legend>
-        {audience === "STUDENT" ? (
+        {!interna && audience === "STUDENT" ? (
           <p className="text-xs text-slate-600 dark:text-slate-300">Enquete individual é sempre identificada: a escola vê quem respondeu e o que respondeu.</p>
         ) : (
           <div className="space-y-1">
             <label className="flex items-start gap-2">
               <input type="radio" name="identificacao" checked={!identificada} onChange={() => setIdentificada(false)} className="mt-1" />
               <span>
-                <strong>Anônima (recomendado)</strong> — a escola vê quantas famílias responderam, mas não liga cada resposta a uma pessoa.
+                <strong>Anônima (recomendado)</strong> — a escola vê quantas {interna ? "pessoas da equipe" : "famílias"} responderam, mas não liga cada resposta a uma pessoa.
               </span>
             </label>
             <label className="flex items-start gap-2">
               <input type="radio" name="identificacao" checked={identificada} onChange={() => setIdentificada(true)} className="mt-1" />
               <span>
-                <strong>Identificada</strong> — a escola vê o nome de quem respondeu e o que respondeu. As famílias são avisadas antes de responder.
+                <strong>Identificada</strong> — a escola vê o nome de quem respondeu e o que respondeu. {interna ? "A equipe é avisada" : "As famílias são avisadas"} antes de responder.
               </span>
             </label>
           </div>
