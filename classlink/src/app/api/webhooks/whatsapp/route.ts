@@ -8,8 +8,8 @@ import { notifyUsers } from "@/lib/push";
 import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "@/lib/whatsapp";
 import { ehPedidoDeAcesso } from "@/lib/acesso";
 import { mensagemIgnoravel } from "@/lib/whatsapp-ignorar";
-import { devolverEnvioFalho } from "@/lib/lembretes-server";
-import { registrarEntregaConfirmada, registrarFalhaEntrega, ultimaEntregaDosStatus } from "@/lib/whatsapp-falhas";
+import { devolverEnvioFalho, registrarStatusLembrete } from "@/lib/lembretes-server";
+import { explicarCodigoFalha, horarioDoStatus, registrarEntregaConfirmada, registrarFalhaEntrega, ultimaEntregaDosStatus } from "@/lib/whatsapp-falhas";
 import { responderNumeroNaoCadastrado, responderPedidoDeAcesso } from "@/lib/pedido-acesso";
 import { corpoDaMidia, guardarMidiaRecebida, midiaDaMensagem } from "@/lib/whatsapp-midia";
 
@@ -111,6 +111,13 @@ export async function POST(request: NextRequest) {
     // Entrega confirmada: o WhatsApp está funcionando (tira o aviso de bloqueio por cobrança).
     const entregue = ultimaEntregaDosStatus(statuses);
     if (entregue) await registrarEntregaConfirmada(entregue).catch((err) => console.error("whatsapp: falha ao registrar entrega", err));
+    // Situação de cada lembrete (entregue/lido), para a direção ver família por família.
+    for (const st of statuses) {
+      if (st.status !== "delivered" && st.status !== "read") continue;
+      await registrarStatusLembrete(st.id, st.status, horarioDoStatus(st.timestamp)).catch((err) =>
+        console.error("lembretes: falha ao registrar entrega", err),
+      );
+    }
     const falhas = statuses.filter((st) => st.status === "failed");
     for (const falha of falhas) {
       const erro = falha.errors?.[0];
@@ -127,7 +134,7 @@ export async function POST(request: NextRequest) {
         titulo: erro?.title,
         detalhe: erro?.error_data?.details ?? erro?.message,
       }).catch((err) => console.error("whatsapp: falha ao registrar entrega recusada", err));
-      await devolverEnvioFalho(falha.id).catch((err) => console.error("lembretes: falha ao devolver envio", err));
+      await devolverEnvioFalho(falha.id, { motivo: explicarCodigoFalha(erro?.code ?? null), em: horarioDoStatus(falha.timestamp) }).catch((err) => console.error("lembretes: falha ao devolver envio", err));
     }
 
     for (const msg of mensagens) {

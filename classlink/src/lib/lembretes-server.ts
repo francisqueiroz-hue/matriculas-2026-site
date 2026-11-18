@@ -361,7 +361,15 @@ export async function executarLembretesDaEscola(
           responsavelId: envio.responsavelId,
           OR: envio.pendencias.map((p) => ({ tipo: p.tipo, referenciaId: p.referenciaId })),
         },
-        data: { envios: { increment: 1 }, ultimoEnvioEm: agora, ultimoEnvioMensagemId: mensagemId ?? null },
+        data: {
+          envios: { increment: 1 },
+          ultimoEnvioEm: agora,
+          ultimoEnvioMensagemId: mensagemId ?? null,
+          // Pelo WhatsApp começa "enviado" e o webhook da Meta atualiza; pelo app não há confirmação.
+          ultimoEnvioStatus: canal === "whatsapp" ? "ENVIADO" : null,
+          ultimoEnvioStatusEm: canal === "whatsapp" ? agora : null,
+          ultimoEnvioFalha: null,
+        },
       });
     }),
     4,
@@ -374,13 +382,39 @@ export async function executarLembretesDaEscola(
  * com cobrança em aberto): devolve o envio que ela gastou e libera nova tentativa no próximo cron.
  * Devolve quantas pendências foram acertadas (0 se a mensagem não era um lembrete).
  */
-export async function devolverEnvioFalho(mensagemId: string): Promise<number> {
+export async function devolverEnvioFalho(mensagemId: string, falha?: { motivo?: string; em?: Date }): Promise<number> {
   const { count } = await prisma.lembretePendencia.updateMany({
     where: { ultimoEnvioMensagemId: mensagemId, envios: { gt: 0 } },
-    data: { envios: { decrement: 1 }, ultimoEnvioEm: null, ultimoEnvioMensagemId: null },
+    data: {
+      envios: { decrement: 1 },
+      ultimoEnvioEm: null,
+      ultimoEnvioMensagemId: null,
+      // Fica registrado para a direção ver quem não recebeu, até o próximo envio.
+      ultimoEnvioStatus: "FALHOU",
+      ultimoEnvioStatusEm: falha?.em ?? new Date(),
+      ultimoEnvioFalha: falha?.motivo ?? null,
+    },
   });
   return count;
 }
+
+/**
+ * A Meta confirmou, pelo webhook de status, que o lembrete chegou ("delivered") ou foi lido
+ * ("read"). Só avança: um "entregue" atrasado não desfaz o "lido". Devolve quantas pendências
+ * foram atualizadas (0 se a mensagem não era o último lembrete de ninguém).
+ */
+export async function registrarStatusLembrete(mensagemId: string, status: "delivered" | "read", em: Date): Promise<number> {
+  const novo = status === "read" ? "LIDO" : "ENTREGUE";
+  const anteriores = status === "read" ? ["ENVIADO", "ENTREGUE"] : ["ENVIADO"];
+  const { count } = await prisma.lembretePendencia.updateMany({
+    where: { ultimoEnvioMensagemId: mensagemId, OR: [{ ultimoEnvioStatus: null }, { ultimoEnvioStatus: { in: anteriores } }] },
+    data: { ultimoEnvioStatus: novo, ultimoEnvioStatusEm: em },
+  });
+  return count;
+}
+
+/** Pendência que voltou começa do zero, sem a situação de entrega do lembrete antigo. */
+const SEM_STATUS = { ultimoEnvioMensagemId: null, ultimoEnvioStatus: null, ultimoEnvioStatusEm: null, ultimoEnvioFalha: null };
 
 /** Cria as linhas das pendências novas, reabre as que voltaram e fecha as resolvidas. */
 async function registrarSituacao(schoolId: string, plano: PlanoLembretes, registros: RegistroLembrete[], agora: Date) {
@@ -407,7 +441,7 @@ async function registrarSituacao(schoolId: string, plano: PlanoLembretes, regist
         resolvidoEm: { not: null },
         OR: novas.map((a) => ({ tipo: a.tipo, referenciaId: a.referenciaId, responsavelId: a.responsavelId })),
       },
-      data: { resolvidoEm: null, envios: 0, ultimoEnvioEm: null, pendenteDesde: agora },
+      data: { resolvidoEm: null, envios: 0, ultimoEnvioEm: null, pendenteDesde: agora, ...SEM_STATUS },
     });
   }
 
@@ -415,7 +449,7 @@ async function registrarSituacao(schoolId: string, plano: PlanoLembretes, regist
   for (const a of reabrir) {
     await prisma.lembretePendencia.updateMany({
       where: { tipo: a.tipo, referenciaId: a.referenciaId, responsavelId: a.responsavelId },
-      data: { resolvidoEm: null, envios: 0, ultimoEnvioEm: null, pendenteDesde: a.pendenteDesde },
+      data: { resolvidoEm: null, envios: 0, ultimoEnvioEm: null, pendenteDesde: a.pendenteDesde, ...SEM_STATUS },
     });
   }
 

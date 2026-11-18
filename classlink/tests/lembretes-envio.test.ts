@@ -31,7 +31,7 @@ vi.mock("@/lib/avisos-equipe", () => ({
   parametrosModeloAviso: (r: string, t: string, l: string) => [r, t, l],
 }));
 
-import { devolverEnvioFalho, executarLembretesDaEscola } from "@/lib/lembretes-server";
+import { devolverEnvioFalho, executarLembretesDaEscola, registrarStatusLembrete } from "@/lib/lembretes-server";
 
 const QUARTA = new Date("2026-11-04T13:00:00Z");
 const DOMINGO = new Date("2026-11-08T13:00:00Z");
@@ -97,7 +97,14 @@ describe("executarLembretesDaEscola", () => {
     expect(notifyUsers).toHaveBeenCalledTimes(2);
     expect(notifyUsers.mock.calls[0][1]).toMatchObject({ url: "/dashboard/contratos" });
     const registro = prismaMock.lembretePendencia.updateMany.mock.calls.find((c) => c[0].data.envios);
-    expect(registro?.[0].data).toEqual({ envios: { increment: 1 }, ultimoEnvioEm: QUARTA, ultimoEnvioMensagemId: null });
+    expect(registro?.[0].data).toEqual({
+      envios: { increment: 1 },
+      ultimoEnvioEm: QUARTA,
+      ultimoEnvioMensagemId: null,
+      ultimoEnvioStatus: null,
+      ultimoEnvioStatusEm: null,
+      ultimoEnvioFalha: null,
+    });
   });
 
   it("tempo da rotina acabando: não começa família nova e ela fica para o próximo dia", async () => {
@@ -164,7 +171,7 @@ describe("executarLembretesDaEscola", () => {
     notifyUsers.mockResolvedValue({ aparelhos: 0, enviados: 0, erros: [] });
     await executarLembretesDaEscola("s1", QUARTA);
     const registro = prismaMock.lembretePendencia.updateMany.mock.calls.find((c) => c[0].data.envios);
-    expect(registro?.[0].data).toMatchObject({ envios: { increment: 1 }, ultimoEnvioMensagemId: "wamid.modelo" });
+    expect(registro?.[0].data).toMatchObject({ envios: { increment: 1 }, ultimoEnvioMensagemId: "wamid.modelo", ultimoEnvioStatus: "ENVIADO" });
   });
 
   it("push: não guarda id de mensagem", async () => {
@@ -175,17 +182,47 @@ describe("executarLembretesDaEscola", () => {
 });
 
 describe("devolverEnvioFalho (entrega recusada pela Meta, ex.: 131042)", () => {
-  it("devolve o envio gasto e libera nova tentativa", async () => {
+  it("devolve o envio gasto, libera nova tentativa e guarda o motivo para a direção", async () => {
     prismaMock.lembretePendencia.updateMany.mockResolvedValue({ count: 2 });
-    await expect(devolverEnvioFalho("wamid.modelo")).resolves.toBe(2);
+    const em = new Date("2026-11-18T15:40:00Z");
+    await expect(devolverEnvioFalho("wamid.modelo", { motivo: "Número sem WhatsApp.", em })).resolves.toBe(2);
     expect(prismaMock.lembretePendencia.updateMany).toHaveBeenCalledWith({
       where: { ultimoEnvioMensagemId: "wamid.modelo", envios: { gt: 0 } },
-      data: { envios: { decrement: 1 }, ultimoEnvioEm: null, ultimoEnvioMensagemId: null },
+      data: {
+        envios: { decrement: 1 },
+        ultimoEnvioEm: null,
+        ultimoEnvioMensagemId: null,
+        ultimoEnvioStatus: "FALHOU",
+        ultimoEnvioStatusEm: em,
+        ultimoEnvioFalha: "Número sem WhatsApp.",
+      },
     });
   });
 
   it("mensagem que não era lembrete: não muda nada", async () => {
     prismaMock.lembretePendencia.updateMany.mockResolvedValue({ count: 0 });
     await expect(devolverEnvioFalho("wamid.outra")).resolves.toBe(0);
+  });
+});
+
+describe("registrarStatusLembrete (webhook de status da Meta)", () => {
+  const em = new Date("2026-11-18T15:41:00Z");
+
+  it("entregue: só avança quem ainda estava como enviado", async () => {
+    prismaMock.lembretePendencia.updateMany.mockResolvedValue({ count: 1 });
+    await expect(registrarStatusLembrete("wamid.x", "delivered", em)).resolves.toBe(1);
+    expect(prismaMock.lembretePendencia.updateMany).toHaveBeenCalledWith({
+      where: { ultimoEnvioMensagemId: "wamid.x", OR: [{ ultimoEnvioStatus: null }, { ultimoEnvioStatus: { in: ["ENVIADO"] } }] },
+      data: { ultimoEnvioStatus: "ENTREGUE", ultimoEnvioStatusEm: em },
+    });
+  });
+
+  it("lido: avança de enviado ou entregue, e um entregue atrasado não desfaz o lido", async () => {
+    prismaMock.lembretePendencia.updateMany.mockResolvedValue({ count: 1 });
+    await registrarStatusLembrete("wamid.x", "read", em);
+    expect(prismaMock.lembretePendencia.updateMany).toHaveBeenCalledWith({
+      where: { ultimoEnvioMensagemId: "wamid.x", OR: [{ ultimoEnvioStatus: null }, { ultimoEnvioStatus: { in: ["ENVIADO", "ENTREGUE"] } }] },
+      data: { ultimoEnvioStatus: "LIDO", ultimoEnvioStatusEm: em },
+    });
   });
 });

@@ -1234,6 +1234,12 @@ model LembretePendencia {
   // Id da mensagem do WhatsApp do último envio: a Meta aceita o envio e só depois avisa, pelo
   // webhook de status, se a entrega falhou. Com o id, a falha devolve o lembrete que ela gastou.
   ultimoEnvioMensagemId String?
+  // Situação do último lembrete pelo WhatsApp, vinda do webhook de status da Meta:
+  // "ENVIADO" (aceito, sem confirmação ainda), "ENTREGUE", "LIDO" ou "FALHOU". Null = saiu pelo
+  // app (push) ou ainda não saiu. Na falha, o envio é devolvido e o motivo fica em ultimoEnvioFalha.
+  ultimoEnvioStatus   String?
+  ultimoEnvioStatusEm DateTime?
+  ultimoEnvioFalha    String?
   resolvidoEm   DateTime?
 
   createdAt DateTime @default(now())
