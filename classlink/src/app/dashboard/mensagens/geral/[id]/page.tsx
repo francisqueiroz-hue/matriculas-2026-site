@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { useConsultaAdaptativa } from "@/lib/consulta-adaptativa";
 import { formatarDataHora } from "@/lib/datas";
 import { ehGestao, perfilAcessoDe } from "@/lib/equipe";
 
@@ -39,11 +40,41 @@ export default function MensagemEquipeGeralPage() {
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
 
+  const carregouRef = useRef(false);
+  const ultimaVistaRef = useRef<string | null>(null);
+
+  /** Carrega o assunto; devolve true se apareceu resposta nova desde a última consulta. */
+  async function carregar(): Promise<boolean> {
+    try {
+      const d = await apiJson<{ mensagem: MensagemEquipe }>(`/api/team-messages/geral/${id}`);
+      carregouRef.current = true;
+      setErro(null);
+      setMensagem(d.mensagem);
+      const ultima = d.mensagem.respostas[d.mensagem.respostas.length - 1]?.id ?? "";
+      const mudou = ultima !== ultimaVistaRef.current;
+      ultimaVistaRef.current = ultima;
+      return mudou;
+    } catch (err) {
+      // Na primeira carga mostra o erro; depois, uma falha de rede passageira não apaga a conversa.
+      if (!carregouRef.current) setErro(err instanceof Error ? err.message : "Não foi possível abrir a mensagem.");
+      return false;
+    }
+  }
+
+  // Respostas dos colegas aparecem sozinhas: consulta a cada 8 s e espaça até 30 s enquanto
+  // ninguém responde; resposta nova, envio ou voltar para a aba trazem de volta aos 8 s.
+  // Com a aba oculta não consulta (abrir é o que marca como lida).
+  const reiniciarConsulta = useConsultaAdaptativa(
+    async () => (document.visibilityState === "visible" ? carregar() : false),
+    { baseMs: 8_000, maxMs: 30_000, ocultoMs: null },
+  );
+
+  // Trocou de assunto: começa do zero.
   useEffect(() => {
-    apiJson<{ mensagem: MensagemEquipe }>(`/api/team-messages/geral/${id}`)
-      .then((d) => setMensagem(d.mensagem))
-      .catch((err) => setErro(err instanceof Error ? err.message : "Não foi possível abrir a mensagem."));
-  }, [id]);
+    carregouRef.current = false;
+    ultimaVistaRef.current = null;
+    reiniciarConsulta();
+  }, [id, reiniciarConsulta]);
 
   async function responder(e: React.FormEvent) {
     e.preventDefault();
@@ -51,8 +82,9 @@ export default function MensagemEquipeGeralPage() {
     setEnviando(true);
     try {
       const d = await apiJson<{ resposta: Resposta }>(`/api/team-messages/geral/${id}`, { method: "POST", body: JSON.stringify({ corpo: texto }) });
-      setMensagem((m) => (m ? { ...m, respostas: [...m.respostas, d.resposta] } : m));
+      setMensagem((m) => (m && !m.respostas.some((r) => r.id === d.resposta.id) ? { ...m, respostas: [...m.respostas, d.resposta] } : m));
       setTexto("");
+      reiniciarConsulta();
     } catch (err) {
       setErroEnvio(err instanceof Error ? err.message : "Não foi possível enviar. Tente de novo.");
     } finally {

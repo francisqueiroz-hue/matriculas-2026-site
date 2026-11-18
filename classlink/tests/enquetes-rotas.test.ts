@@ -241,6 +241,14 @@ describe("enquetes internas (para a equipe)", () => {
     expect(acessoMock.publicoDaEnquete.mock.calls[0][0]).toMatchObject({ interna: true });
   });
 
+  it("opções inválidas na interna dão 400 com a mensagem do erro (não 500)", async () => {
+    sessaoMock.atual = { sub: "c1", role: "STAFF", schoolId: "s1" };
+    const res = await criar(req(corpo({ perguntas: [{ tipo: "ESCOLHA", texto: "Qual?", obrigatoria: true, opcoes: ["Só uma"] }] })));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/múltipla escolha precisa de/);
+    expect(prismaMock.enquete.create).not.toHaveBeenCalled();
+  });
+
   it("coordenação cria; secretaria, professor e auxiliar não", async () => {
     sessaoMock.atual = { sub: "c1", role: "STAFF", schoolId: "s1" };
     expect((await criar(req(corpo()))).status).toBe(201);

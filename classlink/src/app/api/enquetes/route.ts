@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     // Enquete interna: da direção ou da coordenação para a equipe (professores e auxiliares).
     if (body.interna) {
       await exigirDirecaoOuCoordenacao(session, MENSAGEM_SO_DIRECAO_COORDENACAO_ENQUETE_INTERNA);
-      return criarEnqueteInterna(session, body);
+      return await criarEnqueteInterna(session, body); // await: erros de validação caem no catch (400, não 500)
     }
 
     if (body.audience === "SCHOOL" && !(await ehGestaoDaSessao(session))) {
