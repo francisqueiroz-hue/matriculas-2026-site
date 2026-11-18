@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCurrentUser } from "@/components/UserContext";
-import { perfilAcessoDe, podePublicar, respondeEnqueteInterna } from "@/lib/equipe";
+import { perfilAcessoDe, podePublicar } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { EnqueteComposer } from "@/components/EnqueteComposer";
 import { formatarDataHora } from "@/lib/datas";
@@ -29,7 +29,9 @@ function publico(e: EnqueteItem) {
   return e.audience === "SCHOOL" ? "Toda a escola" : e.audience === "STUDENT" ? `Individual — ${e.aluno?.name}` : e.class?.name;
 }
 
-function Cartao({ e, responsavel }: { e: EnqueteItem; responsavel: boolean }) {
+function Cartao({ e }: { e: EnqueteItem }) {
+  // "respondida" só vem nas enquetes que a pessoa responde (família; equipe nas internas).
+  const responsavel = e.respondida !== undefined;
   const pendente = responsavel && e.aberta && !e.respondida;
   return (
     <Link
@@ -72,11 +74,12 @@ export default function EnquetesPage() {
   }
   useEffect(load, []);
 
-  // Responde: a família (enquetes às famílias) e professores/auxiliares (enquetes internas).
-  const responsavel = user.role === "GUARDIAN" || respondeEnqueteInterna(perfilAcessoDe(user));
+  const responsavel = user.role === "GUARDIAN";
   const podeCriar = podePublicar(perfilAcessoDe(user));
-  const aguardando = responsavel ? (enquetes ?? []).filter((e) => e.aberta && !e.respondida) : [];
-  const demais = responsavel ? (enquetes ?? []).filter((e) => !(e.aberta && !e.respondida)) : (enquetes ?? []);
+  // Aguardando: enquetes que a pessoa responde, abertas e ainda sem resposta dela.
+  const aguarda = (e: EnqueteItem) => e.respondida === false && e.aberta;
+  const aguardando = (enquetes ?? []).filter(aguarda);
+  const demais = (enquetes ?? []).filter((e) => !aguarda(e));
 
   return (
     <div className="space-y-4">
@@ -89,14 +92,14 @@ export default function EnquetesPage() {
       {aguardando.length > 0 && (
         <section aria-labelledby="titulo-aguardando" className="space-y-3">
           <h2 id="titulo-aguardando" className="font-semibold">Aguardando sua resposta ({aguardando.length})</h2>
-          {aguardando.map((e) => <Cartao key={e.id} e={e} responsavel />)}
+          {aguardando.map((e) => <Cartao key={e.id} e={e} />)}
         </section>
       )}
 
       {demais.length > 0 && (
         <section className="space-y-3">
           {responsavel && <h2 className="pt-2 font-semibold">Respondidas e encerradas</h2>}
-          {demais.map((e) => <Cartao key={e.id} e={e} responsavel={responsavel} />)}
+          {demais.map((e) => <Cartao key={e.id} e={e} />)}
         </section>
       )}
     </div>

@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
-import { perfilAcessoDe, respondeEnqueteInterna } from "@/lib/equipe";
 
 interface Pergunta {
   id: string;
@@ -143,8 +141,8 @@ function FormularioFamilia({ enquete, onEnviada }: { enquete: Enquete; onEnviada
       <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
         {enquete.interna
           ? enquete.anonima
-            ? "Enquete interna e anônima: a direção e a coordenação sabem quantas pessoas da equipe responderam, mas não veem quem escreveu cada resposta. Depois de enviada, a resposta não pode ser alterada."
-            : "Enquete interna e identificada: a direção e a coordenação veem o seu nome junto das respostas. Depois de enviada, a resposta não pode ser alterada."
+            ? "Enquete interna e anônima: a gestão sabe quantas pessoas da equipe responderam, mas não veem quem escreveu cada resposta. Depois de enviada, a resposta não pode ser alterada."
+            : "Enquete interna e identificada: a gestão vê o seu nome junto das respostas. Depois de enviada, a resposta não pode ser alterada."
           : enquete.anonima
           ? "Esta enquete é anônima: a escola sabe quantas famílias responderam, mas não vê quem escreveu cada resposta. Depois de enviada, a resposta não pode ser alterada. Enquanto você não envia, o que preencheu fica guardado neste aparelho."
           : "Esta enquete é identificada: a escola vê o seu nome junto das respostas. Depois de enviada, a resposta não pode ser alterada. Enquanto você não envia, o que preencheu fica guardado neste aparelho."}
@@ -269,16 +267,19 @@ function PainelEscola({ enquete }: { enquete: Enquete }) {
 
 export default function EnqueteDetalhePage() {
   const { id } = useParams<{ id: string }>();
-  const user = useCurrentUser();
   const [enquete, setEnquete] = useState<Enquete | null>(null);
   const [respondidaEm, setRespondidaEm] = useState<string | null>(null);
+  const [podeResponder, setPodeResponder] = useState(false);
+  const [gestao, setGestao] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   function load() {
-    apiJson<{ enquete: Enquete; respondidaEm?: string | null }>(`/api/enquetes/${id}`)
+    apiJson<{ enquete: Enquete; respondidaEm?: string | null; podeResponder?: boolean; gestao?: boolean }>(`/api/enquetes/${id}`)
       .then((d) => {
         setEnquete(d.enquete);
         setRespondidaEm(d.respondidaEm ?? null);
+        setPodeResponder(Boolean(d.podeResponder));
+        setGestao(Boolean(d.gestao));
       })
       .catch(() => setErro("Não foi possível abrir esta enquete."));
   }
@@ -298,7 +299,7 @@ export default function EnqueteDetalhePage() {
         {enquete.descricao && <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{enquete.descricao}</p>}
       </div>
 
-      {user.role === "GUARDIAN" || (enquete.interna && respondeEnqueteInterna(perfilAcessoDe(user))) ? (
+      {podeResponder && (
         respondidaEm ? (
           <p role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950/40 dark:text-green-300">
             ✓ Resposta enviada em {formatarDataHora(respondidaEm)}. Obrigado por participar!
@@ -308,9 +309,8 @@ export default function EnqueteDetalhePage() {
         ) : (
           <FormularioFamilia enquete={enquete} onEnviada={load} />
         )
-      ) : (
-        <PainelEscola enquete={enquete} />
       )}
+      {gestao && <PainelEscola enquete={enquete} />}
     </div>
   );
 }

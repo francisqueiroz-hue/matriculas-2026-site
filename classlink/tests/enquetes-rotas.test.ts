@@ -26,7 +26,11 @@ const ErroAuth = vi.hoisted(
     },
 );
 vi.mock("@/lib/session", () => ({
-  requireRole: vi.fn(async () => sessaoMock.atual),
+  // Confere o papel de verdade (pegou a secretaria, que é ADMIN, ao responder).
+  requireRole: vi.fn(async (...roles: string[]) => {
+    if (!roles.includes(sessaoMock.atual.role)) throw new ErroAuth("Acesso negado");
+    return sessaoMock.atual;
+  }),
   requireSession: vi.fn(async () => sessaoMock.atual),
   // Gestão = direção/secretaria (ADMIN) ou coordenação (aqui, STAFF com sub "c1").
   ehGestaoDaSessao: vi.fn(async (s: { sub: string; role: string }) => s.role === "ADMIN" || s.sub === "c1"),
@@ -44,9 +48,10 @@ vi.mock("@/lib/push", () => ({ notifyUsers: vi.fn(async () => undefined) }));
 const acessoMock = vi.hoisted(() => ({
   carregarEnqueteVisivel: vi.fn(),
   publicoDaEnquete: vi.fn(),
-  // Família responde a enquete às famílias; professor (p1) e auxiliar (a1) respondem a interna.
-  respondeEstaEnquete: vi.fn(async (s: { sub: string; role: string }, e: { interna: boolean }) =>
-    s.role === "GUARDIAN" ? !e.interna : e.interna && (s.sub === "p1" || s.sub === "a1"),
+  // Família responde a enquete às famílias; na interna: professor (p1), auxiliar (a1),
+  // coordenação (c1) e secretaria (sec1), menos quem criou.
+  respondeEstaEnquete: vi.fn(async (s: { sub: string; role: string }, e: { interna: boolean; criadoPorId?: string }) =>
+    s.role === "GUARDIAN" ? !e.interna : e.interna && e.criadoPorId !== s.sub && ["p1", "a1", "c1", "sec1"].includes(s.sub),
   ),
   filtroDeVisibilidadeEnquetes: vi.fn(async () => ({})),
 }));
@@ -246,15 +251,17 @@ describe("enquetes internas (para a equipe)", () => {
     expect(prismaMock.enquete.create).toHaveBeenCalledTimes(1);
   });
 
-  it("professor e auxiliar respondem a interna; família não responde a interna", async () => {
-    acessoMock.carregarEnqueteVisivel.mockResolvedValue(enquete({ interna: true }));
-    for (const sub of ["p1", "a1"]) {
-      sessaoMock.atual = { sub, role: "STAFF", schoolId: "s1" };
+  it("professor, auxiliar, coordenação e secretaria respondem a interna; família e quem criou não", async () => {
+    acessoMock.carregarEnqueteVisivel.mockResolvedValue(enquete({ interna: true, criadoPorId: "d1" }));
+    for (const s of [{ sub: "p1", role: "STAFF" }, { sub: "a1", role: "STAFF" }, { sub: "c1", role: "STAFF" }, { sub: "sec1", role: "ADMIN" }]) {
+      sessaoMock.atual = { ...s, schoolId: "s1" };
       expect((await responder(post({ respostas: { p1: 4 } }), ctx)).status).toBe(201);
     }
-    sessaoMock.atual = { sub: "g1", role: "GUARDIAN", schoolId: "s1" };
-    expect((await responder(post({ respostas: { p1: 4 } }), ctx)).status).toBe(403);
-    expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+    for (const s of [{ sub: "g1", role: "GUARDIAN" }, { sub: "d1", role: "ADMIN" }]) {
+      sessaoMock.atual = { ...s, schoolId: "s1" };
+      expect((await responder(post({ respostas: { p1: 4 } }), ctx)).status).toBe(403);
+    }
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(4);
   });
 
   it("professor não responde enquete das famílias", async () => {

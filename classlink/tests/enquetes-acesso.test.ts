@@ -49,21 +49,29 @@ describe("quem vê quais enquetes", () => {
 });
 
 describe("quem responde", () => {
-  it("família responde a das famílias; professor e auxiliar, a interna; gestão não responde", async () => {
+  it("família responde a das famílias; na interna respondem professor, auxiliar, coordenação e secretaria, menos quem criou", async () => {
     expect(await respondeEstaEnquete(s("g1", "GUARDIAN"), { interna: false })).toBe(true);
     expect(await respondeEstaEnquete(s("g1", "GUARDIAN"), { interna: true })).toBe(false);
     expect(await respondeEstaEnquete(s("prof", "STAFF"), { interna: true })).toBe(true);
     expect(await respondeEstaEnquete(s("aux", "STAFF"), { interna: true })).toBe(true);
     expect(await respondeEstaEnquete(s("prof", "STAFF"), { interna: false })).toBe(false);
-    expect(await respondeEstaEnquete(s("coord", "STAFF"), { interna: true })).toBe(false);
-    expect(await respondeEstaEnquete(s("dir", "ADMIN"), { interna: true })).toBe(false);
+    expect(await respondeEstaEnquete(s("coord", "STAFF"), { interna: true, criadoPorId: "dir" })).toBe(true);
+    expect(await respondeEstaEnquete(s("sec", "ADMIN"), { interna: true, criadoPorId: "dir" })).toBe(true);
+    expect(await respondeEstaEnquete(s("coord", "STAFF"), { interna: true, criadoPorId: "coord" })).toBe(false); // a própria
+    expect(await respondeEstaEnquete(s("dir", "ADMIN"), { interna: true, criadoPorId: "coord" })).toBe(false);
+    expect(await respondeEstaEnquete(s("sec", "ADMIN"), { interna: false })).toBe(false);
   });
 
-  it("público da interna: professores e auxiliares ativos da escola (sem famílias)", async () => {
+  it("público da interna: equipe ativa menos a direção, com a secretaria, sem quem criou (sem famílias)", async () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: "prof", name: "P" }]);
-    await publicoDaEnquete({ schoolId: "s1", audience: "SCHOOL", classId: null, alunoId: null, interna: true });
+    await publicoDaEnquete({ schoolId: "s1", audience: "SCHOOL", classId: null, alunoId: null, interna: true, criadoPorId: "coord" });
     const where = prismaMock.user.findMany.mock.calls[0][0].where;
-    expect(where).toMatchObject({ schoolId: "s1", active: true, deletedAt: null, role: "STAFF", isCoordenacao: false });
+    expect(where).toMatchObject({ schoolId: "s1", active: true, deletedAt: null, id: { not: "coord" } });
+    expect(where.OR).toEqual([
+      { role: "STAFF", funcao: null },
+      { role: "STAFF", funcao: { not: "DIRECAO" } },
+      { role: "ADMIN", funcao: "SECRETARIA" },
+    ]);
     expect(prismaMock.guardianStudent.findMany).not.toHaveBeenCalled();
   });
 });

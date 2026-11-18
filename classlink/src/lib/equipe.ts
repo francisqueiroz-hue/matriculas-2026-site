@@ -98,12 +98,14 @@ export function ehDirecaoOuCoordenacao(user: PerfilAcesso): boolean {
 }
 
 /**
- * Responde as enquetes internas: professores e auxiliares (equipe que não é gestão). Quem cria
- * a enquete interna é a direção ou a coordenação, e a gestão acompanha os resultados.
+ * Responde as enquetes internas (regra do Francis, 18/11/2026): professores, auxiliares,
+ * coordenação e secretaria. A direção cria e acompanha; quem criou a enquete não responde a
+ * própria (ver `respondeEstaEnquete`).
  */
 export function respondeEnqueteInterna(user: PerfilAcesso): boolean {
-  if (user.role !== "STAFF" || user.isCoordenacao) return false;
-  return user.funcao === null || user.funcao === "PROFESSOR" || user.funcao === "AUXILIAR";
+  if (user.role === "STAFF") return user.funcao !== "DIRECAO";
+  if (user.role === "ADMIN") return user.funcao === "SECRETARIA";
+  return false;
 }
 
 /** Criar enquete interna (para a equipe): só direção e coordenação. */

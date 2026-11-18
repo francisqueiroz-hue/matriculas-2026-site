@@ -13,7 +13,7 @@ type SessaoEnquete = Pick<AccessTokenPayload, "sub" | "role" | "schoolId">;
  *    nunca as internas;
  *  - professores e auxiliares: só as enquetes internas, que respondem. As enquetes às famílias
  *    (e seus resultados) ficam com a gestão;
- *  - direção, secretaria e coordenação: todas.
+ *  - direção, secretaria e coordenação: todas (secretaria e coordenação também respondem as internas).
  */
 export async function filtroDeVisibilidadeEnquetes(session: SessaoEnquete): Promise<Prisma.EnqueteWhereInput> {
   if (session.role === "GUARDIAN") {
@@ -27,25 +27,46 @@ export async function filtroDeVisibilidadeEnquetes(session: SessaoEnquete): Prom
   return { id: { in: [] } };
 }
 
-/** A pessoa logada é quem responde esta enquete (família na enquete às famílias; professor/auxiliar na interna)? */
-export async function respondeEstaEnquete(session: SessaoEnquete, enquete: { interna: boolean }): Promise<boolean> {
+/**
+ * A pessoa logada responde esta enquete? Família: as enquetes às famílias. Interna: professores,
+ * auxiliares, coordenação e secretaria, menos quem criou a enquete.
+ */
+export async function respondeEstaEnquete(
+  session: SessaoEnquete,
+  enquete: { interna: boolean; criadoPorId?: string | null },
+): Promise<boolean> {
   if (session.role === "GUARDIAN") return !enquete.interna;
-  if (!enquete.interna || session.role !== "STAFF") return false;
+  if (!enquete.interna || enquete.criadoPorId === session.sub) return false;
   return respondeEnqueteInterna(await perfilDaSessao(session));
 }
 
-/** Professores e auxiliares ativos da escola: o público das enquetes internas. */
+/** Público das enquetes internas: equipe (menos a direção) e secretaria. */
 export const ONDE_RESPONDE_INTERNA: Prisma.UserWhereInput = {
-  role: "STAFF",
-  isCoordenacao: false,
-  OR: [{ funcao: null }, { funcao: { in: ["PROFESSOR", "AUXILIAR"] } }],
+  OR: [
+    { role: "STAFF", funcao: null },
+    { role: "STAFF", funcao: { not: "DIRECAO" } },
+    { role: "ADMIN", funcao: "SECRETARIA" },
+  ],
 };
 
 /** Pessoas (sem repetir) que compõem o público da enquete: responsáveis, ou a equipe na interna. */
-export async function publicoDaEnquete(e: { schoolId: string; audience: string; classId: string | null; alunoId: string | null; interna?: boolean }) {
+export async function publicoDaEnquete(e: {
+  schoolId: string;
+  audience: string;
+  classId: string | null;
+  alunoId: string | null;
+  interna?: boolean;
+  criadoPorId?: string | null;
+}) {
   if (e.interna) {
     return prisma.user.findMany({
-      where: { schoolId: e.schoolId, active: true, deletedAt: null, ...ONDE_RESPONDE_INTERNA },
+      where: {
+        schoolId: e.schoolId,
+        active: true,
+        deletedAt: null,
+        ...ONDE_RESPONDE_INTERNA,
+        ...(e.criadoPorId ? { id: { not: e.criadoPorId } } : {}),
+      },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });

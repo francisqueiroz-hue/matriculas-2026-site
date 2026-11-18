@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ehGestaoDaSessao, exigirDirecaoOuCoordenacao, exigirPodePublicar, requireRole, requireSession } from "@/lib/session";
-import { MENSAGEM_SO_DIRECAO_COORDENACAO_ENQUETE_INTERNA, MENSAGEM_SO_GESTAO_ESCOLA } from "@/lib/equipe";
+import { ehGestaoDaSessao, exigirDirecaoOuCoordenacao, exigirPodePublicar, perfilDaSessao, requireRole, requireSession } from "@/lib/session";
+import { MENSAGEM_SO_DIRECAO_COORDENACAO_ENQUETE_INTERNA, MENSAGEM_SO_GESTAO_ESCOLA, ehGestao, respondeEnqueteInterna } from "@/lib/equipe";
 import { handleApiError } from "@/lib/http";
 import { createEnqueteSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
 import { ErroDeUsuario } from "@/lib/erros";
 import { enqueteAberta, normalizarOpcoesPergunta } from "@/lib/enquetes";
-import { filtroDeVisibilidadeEnquetes, publicoDaEnquete, respondeEstaEnquete } from "@/lib/enquetes-acesso";
+import { filtroDeVisibilidadeEnquetes, publicoDaEnquete } from "@/lib/enquetes-acesso";
 import { exigirAlunoPublicavel, exigirTurmaPublicavel } from "@/lib/turmas-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
 
@@ -28,6 +28,7 @@ export async function GET() {
         prazo: true,
         encerradaEm: true,
         dataCriacao: true,
+        criadoPorId: true,
         class: { select: { id: true, name: true } },
         aluno: { select: { id: true, name: true } },
         _count: { select: { participacoes: true, perguntas: true } },
@@ -36,25 +37,39 @@ export async function GET() {
       take: 100,
     });
 
-    // Quem responde (família; professores e auxiliares nas internas) vê "respondida"; a gestão vê o total.
-    const respondente = session.role === "GUARDIAN" || (session.role === "STAFF" && (await respondeEstaEnquete(session, { interna: true })));
-    let respondidas = new Set<string>();
-    if (respondente) {
-      const minhas = await prisma.enqueteParticipacao.findMany({
-        where: { userId: session.sub, enqueteId: { in: enquetes.map((e) => e.id) } },
-        select: { enqueteId: true },
-      });
-      respondidas = new Set(minhas.map((m) => m.enqueteId));
-    }
+    // Quem responde (família; equipe nas internas) vê "respondida" em cada enquete que responde;
+    // a gestão (direção, secretaria e coordenação) vê o total de respostas. Secretaria e
+    // coordenação podem ter os dois numa enquete interna.
+    const perfil = session.role === "GUARDIAN" ? null : await perfilDaSessao(session);
+    const gestao = perfil !== null && ehGestao(perfil);
+    const respondeInternas = perfil !== null && respondeEnqueteInterna(perfil);
+    const responde = new Map(
+      enquetes.map((e) => [e.id, perfil === null ? !e.interna : e.interna && e.criadoPorId !== session.sub && respondeInternas]),
+    );
+    const idsQueResponde = enquetes.filter((e) => responde.get(e.id)).map((e) => e.id);
+    const respondidas = new Set(
+      idsQueResponde.length
+        ? (
+            await prisma.enqueteParticipacao.findMany({
+              where: { userId: session.sub, enqueteId: { in: idsQueResponde } },
+              select: { enqueteId: true },
+            })
+          ).map((m) => m.enqueteId)
+        : [],
+    );
 
     const agora = new Date();
     return NextResponse.json({
-      enquetes: enquetes.map(({ _count, ...e }) => ({
-        ...e,
-        aberta: enqueteAberta(e, agora),
-        totalPerguntas: _count.perguntas,
-        ...(respondente ? { respondida: respondidas.has(e.id) } : { totalRespostas: _count.participacoes }),
-      })),
+      enquetes: enquetes.map(({ _count, criadoPorId: _autor, ...e }) => {
+        void _autor;
+        return {
+          ...e,
+          aberta: enqueteAberta(e, agora),
+          totalPerguntas: _count.perguntas,
+          ...(responde.get(e.id) ? { respondida: respondidas.has(e.id) } : {}),
+          ...(gestao ? { totalRespostas: _count.participacoes } : {}),
+        };
+      }),
     });
   } catch (error) {
     return handleApiError(error);
@@ -156,7 +171,7 @@ async function criarEnqueteInterna(session: { sub: string; schoolId: string }, b
       criadoPorId: session.sub,
       perguntas: { create: perguntasParaGravar(body) as never },
     },
-    select: { id: true, titulo: true, schoolId: true, audience: true, classId: true, alunoId: true },
+    select: { id: true, titulo: true, schoolId: true, audience: true, classId: true, alunoId: true, criadoPorId: true },
   });
 
   const publico = await publicoDaEnquete({ ...enquete, interna: true });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { ehGestaoDaSessao, requireSession } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { enqueteAberta } from "@/lib/enquetes";
@@ -31,17 +31,23 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/enquetes/[i
       perguntas: enquete.perguntas.map((p) => ({ id: p.id, tipo: p.tipo, texto: p.texto, obrigatoria: p.obrigatoria, opcoes: p.opcoes })),
     };
 
-    // Quem responde (família; professor/auxiliar na interna) recebe só se já respondeu.
-    if (await respondeEstaEnquete(session, enquete)) {
-      const participacao = await prisma.enqueteParticipacao.findUnique({
-        where: { enqueteId_userId: { enqueteId: id, userId: session.sub } },
-        select: { respondidoEm: true },
-      });
-      return NextResponse.json({ enquete: base, respondidaEm: participacao?.respondidoEm ?? null });
-    }
-
-    const totalRespostas = await prisma.enqueteParticipacao.count({ where: { enqueteId: id } });
-    return NextResponse.json({ enquete: base, totalRespostas });
+    // Quem responde recebe se já respondeu; a gestão recebe o total. Secretaria e coordenação
+    // respondem as internas e também acompanham os resultados.
+    const podeResponder = await respondeEstaEnquete(session, enquete);
+    const participacao = podeResponder
+      ? await prisma.enqueteParticipacao.findUnique({
+          where: { enqueteId_userId: { enqueteId: id, userId: session.sub } },
+          select: { respondidoEm: true },
+        })
+      : null;
+    const gestao = session.role !== "GUARDIAN" && (await ehGestaoDaSessao(session));
+    const totalRespostas = gestao ? await prisma.enqueteParticipacao.count({ where: { enqueteId: id } }) : undefined;
+    return NextResponse.json({
+      enquete: base,
+      podeResponder,
+      ...(podeResponder ? { respondidaEm: participacao?.respondidoEm ?? null } : {}),
+      ...(gestao ? { totalRespostas, gestao: true } : {}),
+    });
   } catch (error) {
     return handleApiError(error);
   }

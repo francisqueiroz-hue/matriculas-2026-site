@@ -52,12 +52,14 @@ describe("regras de 18/11/2026: enquete interna, mensagem para a equipe e boleti
     }
   });
 
-  it("professores e auxiliares respondem a enquete interna; gestão e famílias não", async () => {
+  it("professores, auxiliares, coordenação e secretaria respondem a enquete interna; direção e famílias não", async () => {
     const { respondeEnqueteInterna } = await import("@/lib/equipe");
     expect(respondeEnqueteInterna(p("STAFF", "PROFESSOR"))).toBe(true);
     expect(respondeEnqueteInterna(p("STAFF", "AUXILIAR"))).toBe(true);
     expect(respondeEnqueteInterna(p("STAFF", null))).toBe(true);
-    expect(respondeEnqueteInterna(p("STAFF", "COORDENACAO", true))).toBe(false);
+    expect(respondeEnqueteInterna(p("STAFF", "COORDENACAO", true))).toBe(true);
+    expect(respondeEnqueteInterna(p("ADMIN", "SECRETARIA"))).toBe(true);
+    expect(respondeEnqueteInterna(p("ADMIN", null))).toBe(false);
     expect(respondeEnqueteInterna(p("ADMIN", "DIRECAO"))).toBe(false);
     expect(respondeEnqueteInterna(p("GUARDIAN", null))).toBe(false);
   });

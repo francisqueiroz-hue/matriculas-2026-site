@@ -15,7 +15,7 @@ import { exigirArea } from "@/lib/visibilidade-server";
  */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/enquetes/[id]/responder">) {
   try {
-    const session = await requireRole("GUARDIAN", "STAFF");
+    const session = await requireRole("GUARDIAN", "STAFF", "ADMIN");
     await exigirArea(session, "ENQUETES");
     const { id } = await ctx.params;
     const { respostas } = responderEnqueteSchema.parse(await request.json());

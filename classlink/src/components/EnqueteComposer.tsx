@@ -162,12 +162,12 @@ export function EnqueteComposer({ onCreated }: { onCreated: () => void }) {
             </label>
             <label className="flex items-center gap-2">
               <input type="radio" name="publico-enquete" checked={interna} onChange={() => setInterna(true)} />
-              Equipe interna (professores e auxiliares respondem)
+              Equipe interna
             </label>
           </div>
           {interna && (
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-              As famílias não veem esta enquete. Os resultados ficam com a direção, a secretaria e a coordenação.
+              As famílias não veem esta enquete. Respondem professores, auxiliares, secretaria e coordenação (quem cria não responde). Os resultados ficam com a direção, a secretaria e a coordenação.
             </p>
           )}
         </fieldset>
