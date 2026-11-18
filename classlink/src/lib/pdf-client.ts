@@ -23,10 +23,10 @@ export function pareceComPdf(inicio: Uint8Array): boolean {
 }
 
 /** Baixa o PDF com a sessão do app e devolve um File pronto para salvar ou compartilhar. */
-export async function obterPdf(url: string, nome: string): Promise<File> {
+export async function obterPdf(url: string, nome: string, init?: RequestInit): Promise<File> {
   let resposta: Response;
   try {
-    resposta = await apiFetch(url, { cache: "no-store" });
+    resposta = await apiFetch(url, { cache: "no-store", ...init });
   } catch {
     throw new PdfErro(MENSAGEM_SEM_CONEXAO);
   }

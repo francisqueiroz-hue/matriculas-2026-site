@@ -119,6 +119,7 @@ model School {
   lembretesMaxEnvios     Int            @default(4) // lembretes por pendência, no máximo
 
   users                 User[]
+  boletimModelo         BoletimModelo?
   classes               Class[]
   students              Student[]
   posts                 Post[]
@@ -1386,4 +1387,17 @@ model MensagemEquipeLeitura {
 
   @@unique([mensagemId, userId])
   @@index([userId])
+}
+
+/// Modelo do boletim impresso da escola (cabeçalho com portaria, rodapé com endereço, cidade e
+/// nomes de quem assina). Um por escola; editado pela direção ou coordenação na tela do boletim.
+/// As edições feitas na hora de imprimir um boletim NÃO ficam aqui nem alteram as notas.
+model BoletimModelo {
+  id           String   @id @default(cuid())
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId     String   @unique
+  dados        Json
+  editadoPorId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

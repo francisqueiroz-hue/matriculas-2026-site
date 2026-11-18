@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
 import { podeExportarBoletim, podeLancarNotas } from "@/lib/equipe";
+import Link from "next/link";
 import { BaixarBoletimPdf } from "@/components/BaixarBoletimPdf";
 
 interface ClassOption {
@@ -179,18 +180,32 @@ function NotasContent({ podeEditar, podeExportar }: { podeEditar: boolean; podeE
       </div>
 
       {podeExportar && classId && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-start gap-2">
+          {studentId && (
+            <Link
+              href={`/dashboard/notas/boletim?aluno=${studentId}`}
+              className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Revisar e imprimir boletim do aluno
+            </Link>
+          )}
+          <Link
+            href={`/dashboard/notas/boletim?turma=${classId}`}
+            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Revisar e imprimir boletins da turma
+          </Link>
           {studentId && (
             <BaixarBoletimPdf
               url={`/api/notas/${studentId}/pdf`}
               nomeArquivo={`boletim-${students.find((s) => s.id === studentId)?.name ?? "aluno"}.pdf`}
-              rotulo="Boletim do aluno em PDF"
+              rotulo="PDF direto do aluno"
             />
           )}
           <BaixarBoletimPdf
             url={`/api/notas/turma/${classId}/pdf`}
             nomeArquivo={`boletins-${classes.find((c) => c.id === classId)?.name ?? "turma"}.pdf`}
-            rotulo="Boletins da turma em PDF"
+            rotulo="PDF direto da turma"
           />
         </div>
       )}
