@@ -3,10 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { exigirDirecaoOuCoordenacao, requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { MENSAGEM_SO_DIRECAO_COORDENACAO_BOLETIM } from "@/lib/equipe";
-import { respostaBoletimPdf } from "@/lib/boletim-pdf-server";
+import { SELECT_ALUNO_BOLETIM, respostaBoletimPdf } from "@/lib/boletim-pdf-server";
 import { exigirArea } from "@/lib/visibilidade-server";
 
-/** Boletins da turma toda em um PDF (uma página por aluno), para imprimir: só direção e coordenação. */
+/** Boletins da turma toda em um PDF (cada aluno a partir de uma página nova, no modelo da escola), para imprimir: só direção e coordenação. */
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/notas/turma/[classId]/pdf">) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
@@ -19,7 +19,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/notas/t
 
     const alunos = await prisma.student.findMany({
       where: { classId, schoolId: session.schoolId, deletedAt: null },
-      select: { id: true, name: true, class: { select: { name: true, year: true } } },
+      select: SELECT_ALUNO_BOLETIM,
       orderBy: { name: "asc" },
     });
     if (alunos.length === 0) return NextResponse.json({ error: "Esta turma não tem alunos." }, { status: 400 });
