@@ -132,6 +132,12 @@ export async function registrarEntregaConfirmada(em: Date): Promise<void> {
   });
 }
 
+/** Horário informado pela Meta (segundos desde 1970); sem horário válido ou no futuro, agora. */
+export function horarioDoStatus(timestamp: string | undefined, agora = new Date()): Date {
+  const segundos = Number(timestamp);
+  return Number.isFinite(segundos) && segundos > 0 ? new Date(Math.min(segundos * 1000, agora.getTime())) : agora;
+}
+
 /** Momento da entrega mais recente entre os status do webhook ("delivered"/"read"), ou null. */
 export function ultimaEntregaDosStatus(statuses: { status: string; timestamp?: string }[], agora = new Date()): Date | null {
   let maior: number | null = null;

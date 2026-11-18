@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DirecaoGuard } from "@/components/DirecaoGuard";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
+import { ROTULO_ENTREGA, type SituacaoEntrega } from "@/lib/lembrete-entrega";
 import { LIMITES, ROTULO_TIPO_LEMBRETE, TIPOS_LEMBRETE, type ConfigLembretes, type LembreteTipo, type SituacaoPendencia } from "@/lib/lembretes";
 
 interface PendenciaFamilia {
@@ -15,6 +16,7 @@ interface PendenciaFamilia {
   ultimoEnvioEm: string | null;
   situacao: SituacaoPendencia;
   proximoEm: string | null;
+  entrega: SituacaoEntrega | null;
 }
 interface Familia {
   id: string;
@@ -48,6 +50,32 @@ const COR_SITUACAO: Record<SituacaoPendencia, string> = {
   LIMITE_ATINGIDO: "bg-amber-100 text-amber-900",
 };
 const ROTULO_CANAL = { push: "Notificação no app", whatsapp: "WhatsApp da escola", nenhum: "Sem canal (não instalou o app nem tem WhatsApp)" };
+
+const COR_ENTREGA: Record<SituacaoEntrega["status"], string> = {
+  ENVIADO: "text-slate-600",
+  ENTREGUE: "text-emerald-700",
+  LIDO: "text-emerald-800 font-semibold",
+  FALHOU: "text-red-700 font-semibold",
+};
+
+function Entrega({ e }: { e: SituacaoEntrega }) {
+  const quando = e.em ? ` em ${formatarDataHora(e.em)}` : "";
+  if (e.semConfirmacao) {
+    return (
+      <span className="block text-xs font-semibold text-amber-800">
+        ⚠ WhatsApp enviado{quando} e sem confirmação de entrega há mais de 24 h: confirme com a família por outro meio.
+      </span>
+    );
+  }
+  return (
+    <span className={`block text-xs ${COR_ENTREGA[e.status]}`}>
+      {e.status === "FALHOU" ? "⚠ " : e.status === "ENVIADO" ? "" : "✓ "}
+      {ROTULO_ENTREGA[e.status]}
+      {quando}
+      {e.status === "FALHOU" && e.motivo ? `: ${e.motivo} Sai de novo no próximo envio.` : ""}
+    </span>
+  );
+}
 
 function dataCurta(valor: string | null): string {
   return valor ? new Date(valor).toLocaleDateString("pt-BR") : "—";
@@ -243,6 +271,7 @@ function Conteudo() {
                             {p.ultimoEnvioEm ? ` · último em ${formatarDataHora(p.ultimoEnvioEm)}` : ""}
                             {p.proximoEm && p.situacao !== "PRONTA" ? ` · próximo por volta de ${dataCurta(p.proximoEm)}` : ""}
                           </span>
+                          {p.entrega && <Entrega e={p.entrega} />}
                         </span>
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${COR_SITUACAO[p.situacao]}`}>{ROTULO_SITUACAO[p.situacao]}</span>
                       </li>

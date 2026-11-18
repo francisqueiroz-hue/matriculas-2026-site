@@ -7,6 +7,7 @@ import { planejarDaEscola, pendenciasDaEscola } from "@/lib/lembretes-server";
 import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { ehDomingo } from "@/lib/lembretes";
 import { resumoFalhasRecentes } from "@/lib/whatsapp-falhas";
+import { situacaoEntrega } from "@/lib/lembrete-entrega";
 
 /**
  * Resumo para a direção: configuração, pendências das famílias (com quantos lembretes já
@@ -25,6 +26,13 @@ export async function GET() {
       select: { id: true, name: true, phone: true, _count: { select: { pushTokens: true } } },
     });
     const porId = new Map(pessoas.map((p) => [p.id, p]));
+    // Situação de entrega do último lembrete pelo WhatsApp (gravada pelo webhook da Meta).
+    const registros = await prisma.lembretePendencia.findMany({
+      where: { schoolId: session.schoolId, resolvidoEm: null, ultimoEnvioStatus: { not: null } },
+      select: { tipo: true, referenciaId: true, responsavelId: true, ultimoEnvioStatus: true, ultimoEnvioStatusEm: true, ultimoEnvioFalha: true },
+    });
+    const chave = (r: { tipo: string; referenciaId: string; responsavelId: string }) => `${r.tipo}|${r.referenciaId}|${r.responsavelId}`;
+    const entregaPor = new Map(registros.map((r) => [chave(r), r]));
     const whatsapp = isWhatsAppConfigured();
 
     const familias = new Map<
@@ -44,6 +52,7 @@ export async function GET() {
         ultimoEnvioEm: a.ultimoEnvioEm,
         situacao: a.situacao,
         proximoEm: a.proximoEm,
+        entrega: situacaoEntrega(entregaPor.get(chave(a)), agora),
       });
       familias.set(a.responsavelId, familia);
     }
