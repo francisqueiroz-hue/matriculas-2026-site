@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const prismaMock = vi.hoisted(() => ({
   whatsappFalha: { upsert: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
   user: { findMany: vi.fn() },
+  lembretePendencia: { findMany: vi.fn(async () => [] as { responsavelId: string; ultimoEnvioStatusEm: Date | null }[]) },
   school: { findUnique: vi.fn(async () => null as { whatsappEntregueEm: Date | null } | null), updateMany: vi.fn() },
 }));
 const achaFamilia = vi.hoisted(() => vi.fn());
@@ -26,6 +27,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   achaFamilia.mockResolvedValue(null);
   achaEquipe.mockResolvedValue(null);
+  prismaMock.school.findUnique.mockResolvedValue(null);
+  prismaMock.lembretePendencia.findMany.mockResolvedValue([]);
 });
 
 describe("explicarCodigoFalha", () => {
@@ -83,6 +86,42 @@ describe("resumoFalhasRecentes", () => {
     const filtro = prismaMock.whatsappFalha.findMany.mock.calls[0][0].where;
     expect(filtro.schoolId).toBe("s1");
     expect(filtro.createdAt.gte).toEqual(new Date("2026-11-10T15:00:00Z"));
+  });
+
+  it("cobrança quitada: recusas 131042 anteriores a uma entrega confirmada saem do quadro", async () => {
+    prismaMock.whatsappFalha.findMany.mockResolvedValue([
+      { userId: "g1", codigo: 131042, createdAt: new Date("2026-11-11T15:39:00Z") },
+      { userId: "g2", codigo: 131026, createdAt: new Date("2026-11-11T15:38:00Z") },
+    ]);
+    prismaMock.school.findUnique.mockResolvedValue({ whatsappEntregueEm: new Date("2026-11-12T12:40:00Z") });
+    prismaMock.lembretePendencia.findMany.mockResolvedValue([]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: "g2", name: "Bia" }]);
+    const r = await resumoFalhasRecentes("s1", AGORA);
+    // O número sem WhatsApp (131026) continua: a entrega a outras famílias não resolve o caso dela.
+    expect(r).toMatchObject({ total: 1, pessoas: 1, cobrancaPendente: false });
+    expect(r.ultimas.map((u) => u.nome)).toEqual(["Bia"]);
+  });
+
+  it("família cujo lembrete foi entregue depois da falha sai do quadro", async () => {
+    prismaMock.whatsappFalha.findMany.mockResolvedValue([
+      { userId: "g1", codigo: 131047, createdAt: new Date("2026-11-11T15:39:00Z") },
+      { userId: "g2", codigo: 131047, createdAt: new Date("2026-11-11T15:38:00Z") },
+    ]);
+    prismaMock.school.findUnique.mockResolvedValue({ whatsappEntregueEm: null });
+    prismaMock.lembretePendencia.findMany.mockResolvedValue([
+      { responsavelId: "g1", ultimoEnvioStatusEm: new Date("2026-11-12T12:40:00Z") },
+      { responsavelId: "g2", ultimoEnvioStatusEm: new Date("2026-11-10T12:40:00Z") }, // antes da falha: não conta
+    ]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: "g2", name: "Bia" }]);
+    const r = await resumoFalhasRecentes("s1", AGORA);
+    expect(r.ultimas.map((u) => u.nome)).toEqual(["Bia"]);
+  });
+
+  it("só recuperadas: quadro some", async () => {
+    prismaMock.whatsappFalha.findMany.mockResolvedValue([{ userId: "g1", codigo: 131042, createdAt: new Date("2026-11-11T15:39:00Z") }]);
+    prismaMock.school.findUnique.mockResolvedValue({ whatsappEntregueEm: new Date("2026-11-12T12:40:00Z") });
+    prismaMock.lembretePendencia.findMany.mockResolvedValue([]);
+    expect(await resumoFalhasRecentes("s1", AGORA)).toMatchObject({ total: 0, cobrancaPendente: false });
   });
 });
 
