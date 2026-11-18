@@ -3,7 +3,7 @@ import { TRIMESTRES, TRIMESTRE_LABEL } from "@/lib/notas";
 import type { LinhaBoletim } from "@/lib/boletim";
 
 /**
- * Boletim em PDF para impressão (A4 em pé, uma página por aluno). Gerado no servidor só para a
+ * Boletim em PDF para impressão (A4 em pé; cada aluno começa numa página nova e continua na seguinte se tiver muitas disciplinas). Gerado no servidor só para a
  * direção e a coordenação; famílias e professores consultam no app, sem exportar.
  */
 
@@ -50,27 +50,26 @@ export function formatarNota(v: number | null): string {
   return v === null ? "—" : v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 }
 
-function desenharPagina(
-  page: PDFPage,
-  fontes: { normal: PDFFont; negrito: PDFFont },
-  dados: { escola: string; ano: number; emitidoEm: string },
-  b: BoletimParaImpressao,
-) {
+type Fontes = { normal: PDFFont; negrito: PDFFont };
+type DadosCabecalho = { escola: string; ano: number; emitidoEm: string };
+
+/** Altura mínima livre embaixo para a legenda e as assinaturas da última página. */
+const ESPACO_RODAPE = 120;
+/** Limite inferior das linhas da tabela numa página que continua na seguinte. */
+const LIMITE_LINHAS = MARGEM + 30;
+
+/**
+ * Desenha o boletim de um aluno. Muitas disciplinas continuam em páginas seguintes (com o nome do
+ * aluno e o cabeçalho da tabela repetidos); legenda e assinaturas saem só na última página.
+ */
+function desenharBoletim(pdf: PDFDocument, fontes: Fontes, dados: DadosCabecalho, b: BoletimParaImpressao) {
   const { normal, negrito } = fontes;
   const largura = A4[0] - 2 * MARGEM;
+  let page: PDFPage = pdf.addPage(A4);
   let y = A4[1] - MARGEM;
 
   const texto = (t: string, x: number, yy: number, tamanho: number, fonte = normal, cor = rgb(0, 0, 0)) =>
     page.drawText(limpar(t, fonte), { x, y: yy, size: tamanho, font: fonte, color: cor });
-
-  texto(caber(limpar(dados.escola, negrito), negrito, 14, largura), MARGEM, y - 14, 14, negrito);
-  y -= 32;
-  texto(`Boletim escolar — ${dados.ano}`, MARGEM, y, 12, negrito);
-  y -= 22;
-  texto(`Aluno(a): ${caber(limpar(b.aluno, normal), normal, 11, largura - 60)}`, MARGEM, y, 11);
-  y -= 16;
-  texto(`Turma: ${caber(limpar(b.turma, normal), normal, 11, largura - 60)}`, MARGEM, y, 11);
-  y -= 24;
 
   // Colunas: Disciplina | 1º | 2º | 3º | Média final | Situação
   const colDisc = 170;
@@ -80,17 +79,37 @@ function desenharPagina(
   const titulos = ["Disciplina", ...TRIMESTRES.map((t) => TRIMESTRE_LABEL[t].replace(" Trimestre", " Trim.")), "Média final", "Situação"];
   const alturaLinha = 20;
 
-  page.drawRectangle({ x: MARGEM, y: y - 6, width: largura, height: alturaLinha, color: rgb(0.93, 0.94, 0.96) });
-  titulos.forEach((t, i) => texto(t, xs[i] + 4, y, 9, negrito));
-  y -= alturaLinha;
+  const cabecalho = (continuacao: boolean) => {
+    texto(caber(limpar(dados.escola, negrito), negrito, 14, largura), MARGEM, y - 14, 14, negrito);
+    y -= 32;
+    texto(`Boletim escolar — ${dados.ano}${continuacao ? " (continuação)" : ""}`, MARGEM, y, 12, negrito);
+    y -= 22;
+    texto(`Aluno(a): ${caber(limpar(b.aluno, normal), normal, 11, largura - 60)}`, MARGEM, y, 11);
+    y -= 16;
+    texto(`Turma: ${caber(limpar(b.turma, normal), normal, 11, largura - 60)}`, MARGEM, y, 11);
+    y -= 24;
+  };
+  const cabecalhoTabela = () => {
+    page.drawRectangle({ x: MARGEM, y: y - 6, width: largura, height: alturaLinha, color: rgb(0.93, 0.94, 0.96) });
+    titulos.forEach((t, i) => texto(t, xs[i] + 4, y, 9, negrito));
+    y -= alturaLinha;
+  };
+  const novaPagina = (comTabela: boolean) => {
+    page = pdf.addPage(A4);
+    y = A4[1] - MARGEM;
+    cabecalho(true);
+    if (comTabela) cabecalhoTabela();
+  };
 
-  const linhas = b.linhas.length ? b.linhas : null;
-  if (!linhas) {
+  cabecalho(false);
+  cabecalhoTabela();
+
+  if (!b.linhas.length) {
     texto("Nenhuma nota lançada ainda.", MARGEM + 4, y, 10, normal, CINZA);
     y -= alturaLinha;
   } else {
-    for (const l of linhas) {
-      if (y < MARGEM + 120) break; // proteção: muitas disciplinas não saem da página
+    for (const l of b.linhas) {
+      if (y < LIMITE_LINHAS) novaPagina(true);
       texto(caber(limpar(l.nome, normal), normal, 10, colDisc - 8), xs[0] + 4, y, 10);
       TRIMESTRES.forEach((t, i) => texto(formatarNota(l.trimestres[t].media), xs[i + 1] + 4, y, 10));
       texto(formatarNota(l.mediaFinal), xs[4] + 4, y, 10, negrito);
@@ -99,6 +118,9 @@ function desenharPagina(
       y -= alturaLinha;
     }
   }
+
+  // Sem espaço para legenda e assinaturas: vão para uma página seguinte.
+  if (y < MARGEM + ESPACO_RODAPE) novaPagina(false);
 
   y -= 10;
   texto("Média do trimestre: trabalho (peso 3), teste (peso 7) e prova (peso 10). Aprovação com média final 6,0.", MARGEM, y, 8, normal, CINZA);
@@ -115,15 +137,16 @@ function desenharPagina(
   }
 }
 
-/** Um PDF com uma página por aluno (o boletim individual é uma lista de um). */
+/** Um PDF com o boletim de cada aluno a partir de uma página nova (o individual é uma lista de um). */
 export async function gerarBoletimPdf(dados: { escola: string; ano: number; agora?: Date }, boletins: BoletimParaImpressao[]): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle(boletins.length === 1 ? `Boletim ${dados.ano} - ${boletins[0].aluno}` : `Boletins ${dados.ano}`);
   pdf.setCreator("ClassLink");
   const fontes = { normal: await pdf.embedFont(StandardFonts.Helvetica), negrito: await pdf.embedFont(StandardFonts.HelveticaBold) };
   const emitidoEm = (dados.agora ?? new Date()).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
-  for (const b of boletins) desenharPagina(pdf.addPage(A4), fontes, { escola: dados.escola, ano: dados.ano, emitidoEm }, b);
-  if (boletins.length === 0) desenharPagina(pdf.addPage(A4), fontes, { escola: dados.escola, ano: dados.ano, emitidoEm }, { aluno: "—", turma: "—", linhas: [] });
+  const cab = { escola: dados.escola, ano: dados.ano, emitidoEm };
+  for (const b of boletins) desenharBoletim(pdf, fontes, cab, b);
+  if (boletins.length === 0) desenharBoletim(pdf, fontes, cab, { aluno: "—", turma: "—", linhas: [] });
   return pdf.save();
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFPage } from "pdf-lib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
@@ -108,6 +108,30 @@ describe("conteúdo do boletim", () => {
     const pdf = await gerarBoletimPdf({ escola: "Escola Fokus 🎒", ano: 2026 }, [{ aluno: "Conceição Ávila", turma: "Maternal II", linhas: [] }]);
     expect(new TextDecoder("latin1").decode(pdf.subarray(0, 5))).toBe("%PDF-");
     expect((await PDFDocument.load(pdf)).getPageCount()).toBe(1);
+  });
+
+  it("muitas disciplinas continuam na página seguinte, sem perder nenhuma", async () => {
+    const disciplinas = Array.from({ length: 45 }, (_, i) => ({ id: `d${i}`, nome: `Disciplina ${i + 1}` }));
+    const linhas = linhasDoBoletim(disciplinas, []);
+    const desenhados: string[] = [];
+    const original = PDFPage.prototype.drawText;
+    const espiao = vi.spyOn(PDFPage.prototype, "drawText").mockImplementation(function (this: PDFPage, t, o) {
+      desenhados.push(t);
+      return original.call(this, t, o);
+    });
+    try {
+      const pdf = await gerarBoletimPdf({ escola: "Escola Fokus", ano: 2026 }, [
+        { aluno: "Maria", turma: "5º Ano", linhas },
+        { aluno: "João", turma: "5º Ano", linhas: linhasDoBoletim(disciplinas.slice(0, 2), []) },
+      ]);
+      // Maria: 2 páginas (45 linhas); João começa numa página nova.
+      expect((await PDFDocument.load(pdf)).getPageCount()).toBe(3);
+    } finally {
+      espiao.mockRestore();
+    }
+    for (const d of disciplinas) expect(desenhados).toContain(d.nome);
+    expect(desenhados.filter((t) => t.includes("(continuação)"))).toHaveLength(1);
+    expect(desenhados.filter((t) => t === "Direção")).toHaveLength(2); // assinaturas só na última página de cada aluno
   });
 
   it("nome do arquivo sem acentos nem espaços", () => {
