@@ -7,10 +7,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // A Secretaria é ADMIN (cadastros, turmas, acessos, matrículas), mas não é Direção. Aqui a sessão
 // é a de verdade (lib/session), com o token e o banco simulados.
 
-type Pessoa = { role: "ADMIN" | "STAFF" | "GUARDIAN"; funcao: string | null };
+type Pessoa = { role: "ADMIN" | "STAFF" | "GUARDIAN"; funcao: string | null; isCoordenacao?: boolean };
 const estado = vi.hoisted(() => ({
   token: { sub: "dir", role: "ADMIN", schoolId: "s1", name: "Direção" } as { sub: string; role: string; schoolId: string; name: string },
-  pessoas: {} as Record<string, { role: string; funcao: string | null; id?: string }>,
+  pessoas: {} as Record<string, { role: string; funcao: string | null; isCoordenacao?: boolean; id?: string }>,
 }));
 
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => ({ value: "tok" }) }) }));
@@ -118,13 +118,22 @@ describe("Secretaria nas rotas do servidor", () => {
 
     for (const [id, pessoa] of [
       ["sec", { role: "ADMIN", funcao: "SECRETARIA" }],
-      ["coord", { role: "STAFF", funcao: "COORDENACAO" }],
-      ["prof", { role: "STAFF", funcao: "PROFESSOR" }],
+      ["coord", { role: "STAFF", funcao: "COORDENACAO", isCoordenacao: true }],
     ] as const) {
       entrarComo(id, pessoa);
       const outro = (await (await listarAlunos(new NextRequest("http://t/api/admin/students"))).json()).students[0];
       expect(outro).toEqual({ id: "a1", name: "Ana", class: { id: "t1" }, guardians: [] });
     }
+  });
+
+  it("lista de alunos: professor recebe só os alunos das próprias turmas, sem contatos dos responsáveis", async () => {
+    prismaMock.student.findMany.mockResolvedValue([{ id: "a1", name: "Ana", classId: "t1", class: { id: "t1" } }]);
+    entrarComo("prof", { role: "STAFF", funcao: "PROFESSOR", isCoordenacao: false });
+    const lista = (await (await listarAlunos(new NextRequest("http://t/api/admin/students?classId=t1"))).json()).students;
+    expect(lista).toEqual([{ id: "a1", name: "Ana", classId: "t1", class: { id: "t1" } }]);
+    const consulta = prismaMock.student.findMany.mock.calls[0][0];
+    expect(consulta.where).toMatchObject({ classId: "t1", class: { teachers: { some: { teacherId: "prof" } } } });
+    expect(consulta.select).not.toHaveProperty("guardians");
   });
 
   it("não ganha nem dá acesso de Direção pela Equipe", async () => {

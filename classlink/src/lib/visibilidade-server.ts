@@ -9,16 +9,20 @@ import {
   ehPapel,
   papelVisibilidade,
   type AreaVisibilidade,
-  type EscolhasVisibilidade,
   type PapelVisibilidade,
 } from "@/lib/visibilidade";
 
 type SessaoMinima = { sub: string; role: string; schoolId: string };
 
+/** Colunas cujas escolhas valem para o perfil (auxiliares herdam a antiga coluna "Professores e auxiliares"). */
+function papeisConsultados(papel: PapelVisibilidade): PapelVisibilidade[] {
+  return papel === "AUXILIARES" ? ["AUXILIARES", "PROFESSORES"] : [papel];
+}
+
 /** Escolhas salvas pela direção para a escola (linhas inválidas são ignoradas: valem os padrões). */
 export async function escolhasDaEscola(schoolId: string, papel?: PapelVisibilidade): Promise<Map<string, boolean>> {
   const linhas = await prisma.visibilidadeArea.findMany({
-    where: { schoolId, ...(papel ? { papel } : {}) },
+    where: { schoolId, ...(papel ? { papel: { in: papeisConsultados(papel) } } : {}) },
     select: { area: true, papel: true, liberado: true },
   });
   const escolhas = new Map<string, boolean>();
@@ -34,8 +38,8 @@ export async function escolhasDaEscola(schoolId: string, papel?: PapelVisibilida
  */
 export async function papelDaSessao(session: SessaoMinima): Promise<PapelVisibilidade | null> {
   if (session.role !== "STAFF") return papelVisibilidade(session);
-  const user = await prisma.user.findUnique({ where: { id: session.sub }, select: { isCoordenacao: true } });
-  return papelVisibilidade({ role: "STAFF", isCoordenacao: user?.isCoordenacao ?? false });
+  const user = await prisma.user.findUnique({ where: { id: session.sub }, select: { isCoordenacao: true, funcao: true } });
+  return papelVisibilidade({ role: "STAFF", isCoordenacao: user?.isCoordenacao ?? false, funcao: user?.funcao ?? null });
 }
 
 /**
@@ -47,11 +51,14 @@ export async function exigirArea(session: SessaoMinima, area: AreaVisibilidade):
   if (session.role === "ADMIN") return;
   const papel = await papelDaSessao(session);
   if (!papel) throw new AuthError(MENSAGEM_AREA_DESATIVADA, 403);
-  const linha = await prisma.visibilidadeArea.findUnique({
-    where: { schoolId_area_papel: { schoolId: session.schoolId, area, papel } },
-    select: { liberado: true },
-  });
-  const escolhas: EscolhasVisibilidade = linha ? new Map([[chaveEscolha(area, papel), linha.liberado]]) : new Map();
+  const escolhas = new Map<string, boolean>();
+  for (const p of papeisConsultados(papel)) {
+    const linha = await prisma.visibilidadeArea.findUnique({
+      where: { schoolId_area_papel: { schoolId: session.schoolId, area, papel: p } },
+      select: { liberado: true },
+    });
+    if (linha) escolhas.set(chaveEscolha(area, p), linha.liberado);
+  }
   if (!areaLiberada(area, papel, escolhas)) throw new AuthError(MENSAGEM_AREA_DESATIVADA, 403);
 }
 
@@ -59,6 +66,7 @@ export async function exigirArea(session: SessaoMinima, area: AreaVisibilidade):
 export async function areasBloqueadasDoUsuario(user: {
   role: string;
   isCoordenacao: boolean;
+  funcao?: string | null;
   schoolId: string;
 }): Promise<AreaVisibilidade[]> {
   const papel = papelVisibilidade(user);

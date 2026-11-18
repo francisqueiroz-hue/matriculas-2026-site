@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
+import { ehGestao, perfilAcessoDe, podePublicar } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora, rotuloDiaRelativo } from "@/lib/datas";
 import { separarEventos } from "@/lib/agenda";
@@ -119,7 +120,7 @@ export default function AgendaPage() {
     load();
   }
 
-  const canCreate = user.role === "ADMIN" || user.role === "STAFF";
+  const canCreate = podePublicar(perfilAcessoDe(user));
   const { proximos, anteriores } = separarEventos(events ?? []);
 
   return (
@@ -212,7 +213,7 @@ export default function AgendaPage() {
             ) : (
               <ul className="space-y-2">
                 {proximos.map((ev, i) => (
-                  <EventoItem key={ev.id} ev={ev} destaque={i === 0} podeRemover={user.role === "ADMIN" || user.id === ev.author.id} onRemover={handleDelete} />
+                  <EventoItem key={ev.id} ev={ev} destaque={i === 0} podeRemover={ehGestao(perfilAcessoDe(user)) || user.id === ev.author.id} onRemover={handleDelete} />
                 ))}
               </ul>
             )}
@@ -228,7 +229,7 @@ export default function AgendaPage() {
               </summary>
               <ul className="space-y-2 border-t border-slate-100 p-3 dark:border-slate-800">
                 {anteriores.map((ev) => (
-                  <EventoItem key={ev.id} ev={ev} passado podeRemover={user.role === "ADMIN" || user.id === ev.author.id} onRemover={handleDelete} />
+                  <EventoItem key={ev.id} ev={ev} passado podeRemover={ehGestao(perfilAcessoDe(user)) || user.id === ev.author.id} onRemover={handleDelete} />
                 ))}
               </ul>
             </details>

@@ -16,10 +16,11 @@ describe("menu lateral agrupado", () => {
     expect(grupos.find((g) => g.titulo === "Gestão")?.links.some((l) => l.label === "Painel")).toBe(true);
   });
 
-  it("professor sem coordenação: Comunicação, Dia a dia e a ficha da matrícula (Secretaria)", () => {
+  it("professor sem coordenação: Comunicação, Dia a dia, Notas (leitura) e a ficha da matrícula (Secretaria)", () => {
     expect(agruparLinks(getNavLinks({ role: "STAFF", isCoordenacao: false })).map((g) => g.titulo)).toEqual([
       "Comunicação",
       "Dia a dia",
+      "Pedagógico",
       "Secretaria",
       "Ajuda",
     ]);

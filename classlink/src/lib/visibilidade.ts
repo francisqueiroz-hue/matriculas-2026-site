@@ -13,12 +13,13 @@
  * Este arquivo não acessa o banco: é usado também no navegador (menu e tela de Configurações).
  */
 
-export const PAPEIS_VISIBILIDADE = ["COORDENACAO", "PROFESSORES", "FAMILIAS"] as const;
+export const PAPEIS_VISIBILIDADE = ["COORDENACAO", "PROFESSORES", "AUXILIARES", "FAMILIAS"] as const;
 export type PapelVisibilidade = (typeof PAPEIS_VISIBILIDADE)[number];
 
 export const NOME_PAPEL: Record<PapelVisibilidade, string> = {
   COORDENACAO: "Coordenação",
-  PROFESSORES: "Professores e auxiliares",
+  PROFESSORES: "Professores",
+  AUXILIARES: "Auxiliares",
   FAMILIAS: "Famílias",
 };
 
@@ -60,6 +61,7 @@ const sensivel = (padrao = true): Celula => ({ tipo: "configuravel", padrao, sen
 const fixo = (motivo: string): Celula => ({ tipo: "fixo", motivo });
 
 const SO_DIRECAO = "Só a direção";
+const SEM_AUXILIARES = "Auxiliares não acessam";
 const NAO_SE_APLICA = "Não se aplica";
 
 export const DEFINICOES_AREAS: DefinicaoArea[] = [
@@ -68,58 +70,60 @@ export const DEFINICOES_AREAS: DefinicaoArea[] = [
     nome: "Mural",
     descricao: "Fotos e recados da escola e da turma.",
     telas: ["/dashboard/mural"],
-    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), FAMILIAS: livre() },
+    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), AUXILIARES: livre(), FAMILIAS: livre() },
   },
   {
     id: "COMUNICADOS",
     nome: "Comunicados",
     descricao: "Comunicados, circulares e autorizações com resposta.",
     telas: ["/dashboard/comunicados"],
-    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), FAMILIAS: livre() },
+    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), AUXILIARES: livre(), FAMILIAS: livre() },
   },
   {
     id: "ENQUETES",
     nome: "Enquetes",
     descricao: "Enquetes e seus resultados.",
     telas: ["/dashboard/enquetes"],
-    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), FAMILIAS: livre() },
+    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), AUXILIARES: livre(), FAMILIAS: livre() },
   },
   {
     id: "MENSAGENS",
     nome: "Mensagens",
     descricao: "Conversas entre a escola e as famílias, e da equipe entre si.",
     telas: ["/dashboard/mensagens"],
-    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), FAMILIAS: livre() },
+    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), AUXILIARES: livre(), FAMILIAS: livre() },
   },
   {
     id: "AGENDA",
     nome: "Agenda",
     descricao: "Eventos e datas da escola e da turma.",
     telas: ["/dashboard/agenda"],
-    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), FAMILIAS: livre() },
+    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), AUXILIARES: fixo(SEM_AUXILIARES), FAMILIAS: livre() },
   },
   {
     id: "CARDAPIO",
     nome: "Cardápio",
     descricao: "Cardápio da semana.",
     telas: ["/dashboard/cardapio"],
-    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), FAMILIAS: livre() },
+    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), AUXILIARES: livre(), FAMILIAS: livre() },
   },
   {
     id: "FREQUENCIA",
     nome: "Frequência",
     descricao: "Presenças e faltas dos alunos.",
     telas: ["/dashboard/frequencia"],
-    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), FAMILIAS: sensivel() },
+    celulas: { COORDENACAO: livre(), PROFESSORES: livre(), AUXILIARES: fixo(SEM_AUXILIARES), FAMILIAS: sensivel() },
   },
   {
     id: "NOTAS",
     nome: "Notas e boletim",
-    descricao: "Coordenação lança as notas; a família vê o boletim do filho.",
+    descricao:
+      "Direção e coordenação lançam as notas; professores veem (sem editar) as notas das próprias turmas; a família vê o boletim do filho.",
     telas: ["/dashboard/notas", "/dashboard/boletim"],
     celulas: {
       COORDENACAO: sensivel(),
-      PROFESSORES: fixo("Só direção e coordenação"),
+      PROFESSORES: sensivel(),
+      AUXILIARES: fixo(SEM_AUXILIARES),
       FAMILIAS: sensivel(),
     },
   },
@@ -128,21 +132,21 @@ export const DEFINICOES_AREAS: DefinicaoArea[] = [
     nome: "Financeiro e boletos",
     descricao: "A família vê só os próprios boletos. Valores da escola ficam sempre só com a direção.",
     telas: ["/dashboard/financeiro"],
-    celulas: { COORDENACAO: fixo(SO_DIRECAO), PROFESSORES: fixo(SO_DIRECAO), FAMILIAS: sensivel() },
+    celulas: { COORDENACAO: fixo(SO_DIRECAO), PROFESSORES: fixo(SO_DIRECAO), AUXILIARES: fixo(SO_DIRECAO), FAMILIAS: sensivel() },
   },
   {
     id: "CONTRATOS",
     nome: "Contratos",
     descricao: "A família vê e assina só o próprio contrato. Os contratos da escola ficam sempre só com a direção.",
     telas: ["/dashboard/contratos"],
-    celulas: { COORDENACAO: fixo(SO_DIRECAO), PROFESSORES: fixo(SO_DIRECAO), FAMILIAS: sensivel() },
+    celulas: { COORDENACAO: fixo(SO_DIRECAO), PROFESSORES: fixo(SO_DIRECAO), AUXILIARES: fixo(SO_DIRECAO), FAMILIAS: sensivel() },
   },
   {
     id: "FICHAS",
     nome: "Fichas de matrícula",
     descricao: "Documentos entregues, autorizações (LGPD) e dados da matrícula de cada aluno.",
     telas: ["/dashboard/fichas"],
-    celulas: { COORDENACAO: sensivel(), PROFESSORES: sensivel(), FAMILIAS: fixo(NAO_SE_APLICA) },
+    celulas: { COORDENACAO: sensivel(), PROFESSORES: sensivel(), AUXILIARES: sensivel(), FAMILIAS: fixo(NAO_SE_APLICA) },
   },
   {
     id: "CONSULTA_ALUNOS",
@@ -152,6 +156,7 @@ export const DEFINICOES_AREAS: DefinicaoArea[] = [
     celulas: {
       COORDENACAO: sensivel(),
       PROFESSORES: fixo("Só direção e coordenação"),
+      AUXILIARES: fixo("Só direção e coordenação"),
       FAMILIAS: fixo(NAO_SE_APLICA),
     },
   },
@@ -163,6 +168,7 @@ export const DEFINICOES_AREAS: DefinicaoArea[] = [
     celulas: {
       COORDENACAO: sensivel(),
       PROFESSORES: fixo("Só direção, secretaria e coordenação"),
+      AUXILIARES: fixo("Só direção, secretaria e coordenação"),
       FAMILIAS: sensivel(),
     },
   },
@@ -184,10 +190,21 @@ export function ehPapel(valor: unknown): valor is PapelVisibilidade {
   return typeof valor === "string" && (PAPEIS_VISIBILIDADE as readonly string[]).includes(valor);
 }
 
-/** Perfil da pessoa na tabela de visibilidade. Direção (ADMIN) não entra: null = sem restrição daqui. */
-export function papelVisibilidade(user: { role: string; isCoordenacao?: boolean | null }): PapelVisibilidade | null {
+/**
+ * Perfil da pessoa na tabela de visibilidade. Direção e secretaria (ADMIN) não entram: null = sem
+ * restrição daqui. Equipe com a função Auxiliar tem coluna própria; quem não tem função
+ * (cadastro antigo) conta como professor.
+ */
+export function papelVisibilidade(user: {
+  role: string;
+  isCoordenacao?: boolean | null;
+  funcao?: string | null;
+}): PapelVisibilidade | null {
   if (user.role === "GUARDIAN") return "FAMILIAS";
-  if (user.role === "STAFF") return user.isCoordenacao ? "COORDENACAO" : "PROFESSORES";
+  if (user.role === "STAFF") {
+    if (user.isCoordenacao) return "COORDENACAO";
+    return user.funcao === "AUXILIAR" ? "AUXILIARES" : "PROFESSORES";
+  }
   return null;
 }
 
@@ -207,7 +224,12 @@ export function areaLiberada(area: AreaVisibilidade, papel: PapelVisibilidade, e
   if (!def) return false;
   const celula = def.celulas[papel];
   if (!celula || celula.tipo === "fixo") return false;
-  return escolhas.get(chaveEscolha(area, papel)) ?? celula.padrao;
+  const escolha = escolhas.get(chaveEscolha(area, papel));
+  if (escolha !== undefined) return escolha;
+  // Antes, professores e auxiliares eram uma coluna só ("Professores e auxiliares"). Enquanto a
+  // direção não mexer na coluna Auxiliares, vale o que ela já tinha escolhido para os dois.
+  if (papel === "AUXILIARES") return escolhas.get(chaveEscolha(area, "PROFESSORES")) ?? celula.padrao;
+  return celula.padrao;
 }
 
 /** Áreas que o perfil NÃO pode ver (usado para esconder itens do menu e as telas). */

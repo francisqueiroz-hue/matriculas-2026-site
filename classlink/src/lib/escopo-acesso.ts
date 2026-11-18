@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { turmasQueLeciona } from "@/lib/turmas-acesso";
+import { ehCoordenacaoNoBanco, turmasQueLeciona } from "@/lib/turmas-acesso";
 
 /**
  * Escopo de acesso: a quais alunos e turmas cada pessoa está ligada.
@@ -8,7 +8,7 @@ import { turmasQueLeciona } from "@/lib/turmas-acesso";
  * (mural, agenda, cardápios, comunicados, enquetes e boletos):
  * - família (GUARDIAN): só os filhos vinculados que não foram excluídos;
  * - professor (STAFF): só as turmas em que dá aula (ver `turmasQueLeciona`);
- * - direção (ADMIN): a escola toda.
+ * - direção/secretaria (ADMIN) e coordenação: a escola toda.
  * Cada tela decide o que fazer com o escopo (ex.: a coordenação vê todos os cardápios);
  * este módulo só responde "quais alunos/turmas". As regras de PERMISSÃO para um aluno ou uma
  * turma específica (frequência, boletim, publicar) ficam em `turmas-acesso.ts`.
@@ -38,7 +38,11 @@ export async function turmasDaFamilia(guardianId: string): Promise<string[]> {
  */
 export async function turmasQueAcompanha(session: SessaoMinima): Promise<string[] | null> {
   if (session.role === "GUARDIAN") return turmasDaFamilia(session.sub);
-  if (session.role === "STAFF") return turmasQueLeciona(session.sub);
+  if (session.role === "STAFF") {
+    // A coordenação acompanha todas as turmas, como a direção.
+    if (await ehCoordenacaoNoBanco(session.sub)) return null;
+    return turmasQueLeciona(session.sub);
+  }
   return null;
 }
 
@@ -54,7 +58,7 @@ export type CondicaoPublico =
  * - família: escola + turmas dos filhos + itens individuais dos próprios filhos
  *   (nunca os individuais de outros alunos da mesma turma);
  * - equipe: escola + turmas em que dá aula + individuais de alunos dessas turmas;
- * - direção (e qualquer outro papel): sem restrição (`condicoes` = undefined), como antes.
+ * - direção, secretaria e coordenação (e qualquer outro papel): sem restrição (`condicoes` = undefined), como antes.
  * Devolve também os vínculos da família, que as telas usam para contar filhos alcançados.
  */
 export async function visibilidadePorPublico(
@@ -71,7 +75,7 @@ export async function visibilidadePorPublico(
       ],
     };
   }
-  if (session.role === "STAFF") {
+  if (session.role === "STAFF" && !(await ehCoordenacaoNoBanco(session.sub))) {
     const turmas = await turmasQueLeciona(session.sub);
     return {
       vinculos: [],

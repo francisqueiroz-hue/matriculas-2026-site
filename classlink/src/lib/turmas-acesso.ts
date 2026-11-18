@@ -5,7 +5,8 @@ import type { AccessTokenPayload } from "@/lib/auth";
 /**
  * Regras de acesso por turma, num lugar só (antes cada rota repetia a consulta):
  * - ADMIN: todas as turmas da escola;
- * - STAFF: só as turmas em que leciona (ClassTeacher);
+ * - coordenação (STAFF com isCoordenacao): todas as turmas, como a direção (lê do banco);
+ * - demais STAFF: só as turmas em que leciona (ClassTeacher);
  * - leitura de frequência/boletim de um aluno: também a coordenação e o responsável vinculado.
  */
 type Sessao = Pick<AccessTokenPayload, "sub" | "role" | "schoolId">;
@@ -21,10 +22,21 @@ export async function turmasQueLeciona(professorId: string): Promise<string[]> {
   return [...new Set(vinculos.map((v) => v.classId))];
 }
 
-/** Professor (STAFF) precisa lecionar na turma; ADMIN passa direto. Turma já conferida como da escola. */
+/** Coordenação pedagógica? Lido do banco (não do token): tirar a função vale na hora. */
+export async function ehCoordenacaoNoBanco(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, isCoordenacao: true } });
+  return user?.role === "STAFF" && Boolean(user.isCoordenacao);
+}
+
+/**
+ * Professor (STAFF) precisa lecionar na turma; ADMIN e coordenação passam direto (cuidam de
+ * todas as turmas). Turma já conferida como da escola.
+ */
 export async function exigirLecionaNaTurma(sessao: Sessao, classId: string, mensagem = "Você não leciona nesta turma."): Promise<void> {
   if (sessao.role === "ADMIN") return;
-  if (!(await lecionaNaTurma(sessao.sub, classId))) throw new ErroDeUsuario(mensagem, 403);
+  if (await lecionaNaTurma(sessao.sub, classId)) return;
+  if (sessao.role === "STAFF" && (await ehCoordenacaoNoBanco(sessao.sub))) return;
+  throw new ErroDeUsuario(mensagem, 403);
 }
 
 /** A turma existe nesta escola e quem publica pode usá-la (ADMIN, ou STAFF que leciona nela). */

@@ -5,11 +5,28 @@ import { handleApiError } from "@/lib/http";
 import { novoAlunoSchema } from "@/lib/validators";
 import { nomesSemelhantes } from "@/lib/nomes-semelhantes";
 import { ehDirecao } from "@/lib/equipe";
+import { ehCoordenacaoNoBanco } from "@/lib/turmas-acesso";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
     const classId = request.nextUrl.searchParams.get("classId") ?? undefined;
+
+    // Professores e auxiliares: só os alunos das turmas em que lecionam, sem contatos dos
+    // responsáveis (telefone e e-mail ficam com a gestão, LGPD).
+    if (session.role === "STAFF" && !(await ehCoordenacaoNoBanco(session.sub))) {
+      const alunos = await prisma.student.findMany({
+        where: {
+          schoolId: session.schoolId,
+          deletedAt: null,
+          class: { teachers: { some: { teacherId: session.sub } } },
+          ...(classId ? { classId } : {}),
+        },
+        select: { id: true, name: true, classId: true, class: { select: { id: true, name: true, year: true } } },
+        orderBy: { name: "asc" },
+      });
+      return NextResponse.json({ students: alunos });
+    }
 
     const students = await prisma.student.findMany({
       where: { schoolId: session.schoolId, deletedAt: null, ...(classId ? { classId } : {}) },

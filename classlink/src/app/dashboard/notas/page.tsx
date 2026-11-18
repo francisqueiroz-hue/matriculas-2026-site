@@ -1,8 +1,9 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { CoordenacaoGuard } from "@/components/CoordenacaoGuard";
+import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
+import { podeLancarNotas } from "@/lib/equipe";
 
 interface ClassOption {
   id: string;
@@ -47,7 +48,11 @@ const SITUACAO_LABEL: Record<BoletimLinha["situacao"], string> = {
   EM_ANDAMENTO: "Em andamento",
 };
 
-function NotasContent() {
+/**
+ * Notas: direção e coordenação lançam; secretaria e professores (das próprias turmas) só veem.
+ * O servidor confere as duas coisas: quem lança (requireLancarNotas) e de quais alunos vê.
+ */
+function NotasContent({ podeEditar }: { podeEditar: boolean }) {
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [classId, setClassId] = useState("");
   const [students, setStudents] = useState<StudentOption[]>([]);
@@ -117,7 +122,12 @@ function NotasContent() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Lançamento de notas</h1>
+      <h1 className="text-xl font-bold">{podeEditar ? "Lançamento de notas" : "Notas e boletim"}</h1>
+      {!podeEditar && (
+        <p className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          Somente leitura. Quem lança as notas é a direção ou a coordenação.
+        </p>
+      )}
       <p className="text-sm text-slate-500">
         Escala de 0 a 10. Média do trimestre pondera trabalho (peso 3), teste (peso 7) e prova (peso 10). Média final é a
         média dos 3 trimestres; aprovação exige média final ≥ 6.
@@ -167,6 +177,7 @@ function NotasContent() {
         </div>
       </div>
 
+      {podeEditar && (
       <form onSubmit={handleAddDisciplina} className="flex items-end gap-2">
         <div>
           <label htmlFor="notas-nova-disciplina" className="mb-1 block text-xs font-medium">Nova disciplina</label>
@@ -185,10 +196,11 @@ function NotasContent() {
           Adicionar disciplina
         </button>
       </form>
+      )}
 
       {erro && <p className="text-sm text-red-600">{erro}</p>}
 
-      {!studentId && <p className="text-sm text-slate-500">Selecione uma turma e um aluno para lançar as notas.</p>}
+      {!studentId && <p className="text-sm text-slate-500">Selecione uma turma e um aluno para {podeEditar ? "lançar" : "ver"} as notas.</p>}
       {studentId && boletim === null && <p className="text-sm text-slate-500">Carregando boletim...</p>}
 
       {studentId && boletim && (
@@ -234,6 +246,9 @@ function NotasContent() {
                       <Fragment key={t}>
                         {CAMPOS.map((campo) => (
                           <td key={campo} className="border-l border-slate-100 px-1 py-1">
+                            {!podeEditar ? (
+                              <span className="block w-14 px-1 py-1 text-center text-sm">{v[campo] ?? "—"}</span>
+                            ) : (
                             <input
                               key={`${studentId}-${linha.disciplinaId}-${t}-${campo}-${v[campo] ?? ""}`}
                               type="text"
@@ -244,6 +259,7 @@ function NotasContent() {
                               disabled={salvando === `${linha.disciplinaId}-${t}-${campo}`}
                               className="w-14 rounded border border-slate-200 px-1 py-1 text-center text-sm disabled:opacity-50"
                             />
+                            )}
                           </td>
                         ))}
                         <td className="border-l border-slate-100 px-2 py-1 text-center text-slate-500">{v.media ?? "—"}</td>
@@ -274,9 +290,10 @@ function NotasContent() {
 }
 
 export default function NotasPage() {
-  return (
-    <CoordenacaoGuard>
-      <NotasContent />
-    </CoordenacaoGuard>
-  );
+  const user = useCurrentUser();
+  if (user.role !== "ADMIN" && user.role !== "STAFF") {
+    return <p className="text-sm text-slate-500">Área restrita à equipe da escola.</p>;
+  }
+  const podeEditar = podeLancarNotas({ role: user.role, funcao: user.funcao ?? null, isCoordenacao: Boolean(user.isCoordenacao) });
+  return <NotasContent podeEditar={podeEditar} />;
 }

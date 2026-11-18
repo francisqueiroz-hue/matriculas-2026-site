@@ -38,3 +38,56 @@ export function ehDirecao(user: { role: Role; funcao: FuncaoEquipe | null }): bo
 
 export const MENSAGEM_SO_DIRECAO =
   "Somente a direção tem acesso ao financeiro, às mensalidades e aos contratos. Peça à direção.";
+
+/** Dados do perfil usados nas regras de acesso (lidos do banco, nunca só do token). */
+export interface PerfilAcesso {
+  role: Role;
+  funcao: FuncaoEquipe | null;
+  isCoordenacao: boolean;
+}
+
+/** Coordenação pedagógica: equipe (STAFF) marcada como coordenação. */
+export function ehCoordenacao(user: PerfilAcesso): boolean {
+  return user.role === "STAFF" && user.isCoordenacao;
+}
+
+/** Auxiliar: equipe com a função Auxiliar (sem coordenação). */
+export function ehAuxiliar(user: PerfilAcesso): boolean {
+  return user.role === "STAFF" && !user.isCoordenacao && user.funcao === "AUXILIAR";
+}
+
+/**
+ * Gestão da escola: direção, secretaria (ADMIN) e coordenação. Publica para a escola toda e em
+ * qualquer turma, marca frequência de qualquer turma e cuida do que as outras pessoas da equipe
+ * criaram. Financeiro, contratos e lembretes continuam só com a direção (`ehDirecao`).
+ */
+export function ehGestao(user: PerfilAcesso): boolean {
+  return user.role === "ADMIN" || ehCoordenacao(user);
+}
+
+/** Lançar notas (e cadastrar disciplinas): só direção e coordenação. A secretaria não lança. */
+export function podeLancarNotas(user: PerfilAcesso): boolean {
+  return ehDirecao(user) || ehCoordenacao(user);
+}
+
+/**
+ * Professores publicam no mural, comunicados, enquetes e agenda das próprias turmas?
+ * Matriz da escola (18/11/2026): professores e auxiliares só veem; quem publica é a gestão.
+ * Auxiliares nunca publicam, qualquer que seja este valor.
+ */
+export const PROFESSORES_PUBLICAM = false;
+
+/** Pode publicar no mural, comunicados, enquetes e agenda (a turma ainda é conferida na rota). */
+export function podePublicar(user: PerfilAcesso): boolean {
+  if (ehGestao(user)) return true;
+  return PROFESSORES_PUBLICAM && user.role === "STAFF" && !ehAuxiliar(user);
+}
+
+export const MENSAGEM_SO_NOTAS = "Somente a direção e a coordenação lançam notas.";
+export const MENSAGEM_SO_GESTAO_PUBLICA = "Somente a direção, a secretaria e a coordenação publicam aqui.";
+export const MENSAGEM_SO_GESTAO_ESCOLA = "Somente a direção, a secretaria e a coordenação publicam para toda a escola.";
+
+/** Perfil a partir do usuário da tela (UserContext) ou de um cadastro com campos opcionais. */
+export function perfilAcessoDe(user: { role: string; funcao?: FuncaoEquipe | null; isCoordenacao?: boolean | null }): PerfilAcesso {
+  return { role: user.role as Role, funcao: user.funcao ?? null, isCoordenacao: Boolean(user.isCoordenacao) };
+}

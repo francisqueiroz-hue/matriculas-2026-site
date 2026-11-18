@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireRole, requireSession } from "@/lib/session";
+import { ehGestaoDaSessao, exigirPodePublicar, requireRole, requireSession } from "@/lib/session";
+import { MENSAGEM_SO_GESTAO_ESCOLA } from "@/lib/equipe";
 import { handleApiError } from "@/lib/http";
 import { createEnqueteSchema } from "@/lib/validators";
 import { notifyUsers } from "@/lib/push";
@@ -61,10 +62,11 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireRole("ADMIN", "STAFF");
     await exigirArea(session, "ENQUETES");
+    await exigirPodePublicar(session);
     const body = createEnqueteSchema.parse(await request.json());
 
-    if (body.audience === "SCHOOL" && session.role !== "ADMIN") {
-      throw new ErroDeUsuario("Apenas administradores publicam enquetes para toda a escola.", 403);
+    if (body.audience === "SCHOOL" && !(await ehGestaoDaSessao(session))) {
+      throw new ErroDeUsuario(MENSAGEM_SO_GESTAO_ESCOLA, 403);
     }
 
     let classId: string | null = null;

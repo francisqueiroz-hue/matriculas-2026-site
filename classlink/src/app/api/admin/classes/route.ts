@@ -3,12 +3,16 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { createClassSchema } from "@/lib/validators";
+import { ehCoordenacaoNoBanco } from "@/lib/turmas-acesso";
 
 export async function GET() {
   try {
     const session = await requireRole("ADMIN", "STAFF");
+    // Professores e auxiliares listam só as turmas em que lecionam; direção, secretaria e
+    // coordenação, todas.
+    const soAsDele = session.role === "STAFF" && !(await ehCoordenacaoNoBanco(session.sub));
     const classes = await prisma.class.findMany({
-      where: { schoolId: session.schoolId },
+      where: { schoolId: session.schoolId, ...(soAsDele ? { teachers: { some: { teacherId: session.sub } } } : {}) },
       include: { _count: { select: { students: true } } },
       orderBy: [{ year: "desc" }, { name: "asc" }],
     });

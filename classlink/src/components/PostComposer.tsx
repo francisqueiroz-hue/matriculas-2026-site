@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
+import { ehGestao, perfilAcessoDe } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { uploadMediaFile } from "@/lib/upload-client";
 import type { PostItem } from "@/components/PostCard";
@@ -13,10 +14,12 @@ interface ClassOption {
 
 export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => void }) {
   const user = useCurrentUser();
+  const gestao = ehGestao(perfilAcessoDe(user));
+  // Gestão (direção, secretaria e coordenação) publica para a escola toda e em qualquer turma.
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [audience, setAudience] = useState<"SCHOOL" | "CLASS">(user.role === "STAFF" ? "CLASS" : "SCHOOL");
+  const [audience, setAudience] = useState<"SCHOOL" | "CLASS">(!gestao ? "CLASS" : "SCHOOL");
   const [classId, setClassId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,10 +32,10 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
     apiJson<{ classes: ClassOption[] }>("/api/admin/classes")
       .then((data) => {
         setClasses(data.classes);
-        if (data.classes.length && user.role === "STAFF") setClassId(data.classes[0].id);
+        if (data.classes.length && !gestao) setClassId(data.classes[0].id);
       })
       .catch(() => setError("Não foi possível carregar as turmas. Atualize a página para tentar de novo."));
-  }, [user.role]);
+  }, [gestao]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -117,7 +120,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
       />
 
       <div className="flex flex-wrap items-center gap-3">
-        {user.role === "ADMIN" && (
+        {gestao && (
           <select
             aria-label="Quem recebe"
             value={audience}
