@@ -81,6 +81,8 @@ const ITENS_REQUISICAO = [
   "Pasta de dente",
   "Escova de dente",
   "Troca de roupa",
+  "Condicionador",
+  "Leite fórmula",
 ];
 
 const CANAL_LABEL: Record<Canal, string> = { APP: "ClassLink", WHATSAPP: "WhatsApp", EMAIL: "E-mail" };

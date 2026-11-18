@@ -35,6 +35,7 @@ export const AREAS_VISIBILIDADE = [
   "CONTRATOS",
   "FICHAS",
   "CONSULTA_ALUNOS",
+  "ROTINA",
 ] as const;
 export type AreaVisibilidade = (typeof AREAS_VISIBILIDADE)[number];
 
@@ -152,6 +153,17 @@ export const DEFINICOES_AREAS: DefinicaoArea[] = [
       COORDENACAO: sensivel(),
       PROFESSORES: fixo("Só direção e coordenação"),
       FAMILIAS: fixo(NAO_SE_APLICA),
+    },
+  },
+  {
+    id: "ROTINA",
+    nome: "Rotina diária",
+    descricao: "Alimentação, sono, evacuação, banho e medicação do dia. Direção e secretaria preenchem; a família vê a do próprio filho.",
+    telas: ["/dashboard/rotina"],
+    celulas: {
+      COORDENACAO: fixo("Só direção e secretaria"),
+      PROFESSORES: fixo("Só direção e secretaria"),
+      FAMILIAS: sensivel(),
     },
   },
 ];

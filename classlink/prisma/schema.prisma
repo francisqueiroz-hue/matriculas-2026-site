@@ -136,6 +136,7 @@ model School {
   consentimentosLgpd    ConsentimentoLgpd[]
   lembretesPendencia    LembretePendencia[]
   fichasSaude           FichaSaude[]
+  rotinasDiarias        RotinaDiaria[]
   pessoasAutorizadas    PessoaAutorizada[]
 }
 
@@ -340,6 +341,7 @@ model Student {
   documentosMatricula    MatriculaDocumento[]
   consentimentosLgpd     ConsentimentoLgpd[]
   fichaSaude             FichaSaude?
+  rotinasDiarias         RotinaDiaria[]
   pessoasAutorizadas     PessoaAutorizada[]
 
   @@index([schoolId])
@@ -1296,4 +1298,35 @@ model VisibilidadeHistorico {
   createdAt DateTime @default(now())
 
   @@index([schoolId, createdAt])
+}
+
+// Rotina diária da criança (educação infantil), preenchida pela direção ou secretaria e vista
+// pela família do aluno no app (somente leitura). Uma por aluno por dia.
+model RotinaDiaria {
+  id                String    @id @default(cuid())
+  schoolId          String
+  studentId         String
+  data              DateTime  @db.Date
+  // Aceitação da refeição: TUDO, BEM, POUCO, NADA (null = não registrada ou não se aplica).
+  colacao           String?
+  almoco            String?
+  lanche            String?
+  janta             String?
+  sono              String[]  @default([]) // MANHA, TARDE ou NAO
+  evacuacao         String[]  @default([]) // NORMAL, PASTOSA, LIQUIDA ou NAO
+  banho             Boolean?
+  // Lista de { horario, nome, dosagem, responsavel }.
+  medicacoes        Json      @default("[]")
+  observacoes       String?
+  preenchidoPorNome String
+  // Quando a família foi avisada no app (uma vez por dia; correções não avisam de novo).
+  familiaAvisadaEm  DateTime?
+  createdAt         DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, data])
+  @@index([schoolId, data])
 }
