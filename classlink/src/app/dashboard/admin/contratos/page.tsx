@@ -11,6 +11,8 @@ import { AcoesPdf } from "@/components/AcoesPdf";
 import { ContratoModeloPainel } from "./ContratoModeloPainel";
 import { ConferenciaAssinatura } from "./ConferenciaAssinatura";
 import { ConfirmarRenovacao } from "./ConfirmarRenovacao";
+import { gerarPlanilhaContratos, nomeArquivoPlanilha } from "@/lib/contratos-planilha";
+import { MIME_XLSX } from "@/lib/xlsx";
 import {
   CONTRATO_LIMITE_ENVIO_SERVIDOR,
   ContratoErro,
@@ -805,6 +807,19 @@ function ContratosContent() {
     () => new Set((dados?.contratos ?? []).filter((c) => c.modelo === MODELO_CONTRATO_2027).map((c) => c.student.id)),
     [dados],
   );
+  // Baixa a listagem como está na tela (ano e situação escolhidos), com a aba "Mensalidades <ano>".
+  function exportarExcel() {
+    if (!dados || visiveis.length === 0) return;
+    const bytes = gerarPlanilhaContratos(visiveis, ano);
+    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: MIME_XLSX }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomeArquivoPlanilha(ano);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
   const anosDisponiveis = [...new Set([CAMPANHA_REMATRICULA.ano, ...(dados?.anos ?? [])])].sort((a, b) => b - a);
 
   return (
@@ -814,7 +829,16 @@ function ContratosContent() {
           <h1 className="text-xl font-bold">Contratos {ano}</h1>
           <p className="text-sm text-slate-500">Envio, assinatura e conferência dos contratos de matrícula — sem custo de plataforma.</p>
         </div>
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={exportarExcel}
+            disabled={!dados || visiveis.length === 0}
+            className={btnSecundario}
+            title="Baixa a lista em Excel, com a aba de mensalidades do ano já corrigida"
+          >
+            Exportar Excel{dados ? ` (${visiveis.length})` : ""}
+          </button>
           <label htmlFor="filtro-ano" className="sr-only">
             Ano letivo
           </label>
