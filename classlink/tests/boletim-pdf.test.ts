@@ -42,7 +42,7 @@ import { GET as pdfTurma } from "@/app/api/notas/turma/[classId]/pdf/route";
 import { GET as editavel } from "@/app/api/notas/boletim-editavel/route";
 import { GET as lerModelo, PUT as salvarModelo } from "@/app/api/notas/boletim-modelo/route";
 import { POST as pdfEditado } from "@/app/api/notas/boletim-pdf/route";
-import { gerarBoletimPdf, nomeArquivoBoletim, type BoletimParaImpressao } from "@/lib/boletim-pdf";
+import { ESPACAMENTO_COMPACTO, distribuirSobra, gerarBoletimPdf, nomeArquivoBoletim, type BoletimParaImpressao } from "@/lib/boletim-pdf";
 import { MODELO_PADRAO, calcularLinhas, errosDoBoletim, localDataPadrao, modeloDe } from "@/lib/boletim-modelo";
 import { linhasDoBoletim } from "@/lib/boletim";
 
@@ -125,10 +125,11 @@ describe("conteúdo do boletim", () => {
   });
 
   it("muitas disciplinas continuam na página seguinte, sem perder nenhuma", async () => {
-    const desenhados: string[] = [];
+    // Só o que vai para o PDF final (o ensaio de medida usa outra folha, sem título).
+    const desenhos: { doc: PDFDocument; t: string }[] = [];
     const original = PDFPage.prototype.drawText;
     const espiao = vi.spyOn(PDFPage.prototype, "drawText").mockImplementation(function (this: PDFPage, t, o) {
-      desenhados.push(t);
+      desenhos.push({ doc: this.doc, t });
       return original.call(this, t, o);
     });
     try {
@@ -138,11 +139,50 @@ describe("conteúdo do boletim", () => {
     } finally {
       espiao.mockRestore();
     }
+    const desenhados = desenhos.filter((d) => d.doc.getTitle()).map((d) => d.t);
     for (let i = 0; i < 60; i++) expect(desenhados).toContain(`DISCIPLINA ${i + 1}`);
     expect(desenhados.filter((t) => t.includes("Maria (continuação)")).length).toBeGreaterThanOrEqual(1);
     expect(desenhados.filter((t) => t.startsWith("Responsável pedagógico"))).toHaveLength(2); // assinaturas uma vez por aluno
     expect(desenhados).toContain(MODELO_PADRAO.cabecalho[0]);
     expect(desenhados).toContain(MODELO_PADRAO.rodape[0]);
+  });
+
+  it("boletim de uma página ocupa a folha: linhas maiores, vãos e assinaturas no pé", async () => {
+    const posicoes: { doc: PDFDocument; t: string; y: number }[] = [];
+    const original = PDFPage.prototype.drawText;
+    const espiao = vi.spyOn(PDFPage.prototype, "drawText").mockImplementation(function (this: PDFPage, t, o) {
+      posicoes.push({ doc: this.doc, t, y: o?.y ?? 0 });
+      return original.call(this, t, o);
+    });
+    try {
+      for (const n of [3, 10, 25]) {
+        posicoes.length = 0;
+        const pdf = await gerarBoletimPdf({ modelo: MODELO_PADRAO, ano: 2026 }, [boletim("Maria", n)]);
+        expect((await PDFDocument.load(pdf)).getPageCount()).toBe(1); // até 25 disciplinas cabem numa folha
+        const finais = posicoes.filter((p) => p.doc.getTitle());
+        const ass = finais.find((p) => p.t.startsWith("Responsável pedagógico"));
+        // Assinatura do responsável logo acima do rodapé (antes ficava no meio da folha).
+        expect(ass!.y).toBeLessThan(110);
+        expect(ass!.y).toBeGreaterThan(60);
+      }
+    } finally {
+      espiao.mockRestore();
+    }
+  });
+
+  it("reparte a sobra sem passar dela", () => {
+    expect(distribuirSobra(0, { linhas: 10, grafico: true, vaos: 3 })).toEqual(ESPACAMENTO_COMPACTO);
+    for (const [sobra, linhas, grafico, vaos] of [[250, 10, true, 3], [500, 3, true, 2], [300, 10, false, 2], [40, 20, true, 3]] as const) {
+      const e = distribuirSobra(sobra, { linhas, grafico, vaos });
+      const usado =
+        (e.hLinha - ESPACAMENTO_COMPACTO.hLinha) * linhas +
+        2 * (e.hCabecalho - ESPACAMENTO_COMPACTO.hCabecalho) +
+        (e.alturaBarras - ESPACAMENTO_COMPACTO.alturaBarras) * (grafico ? 1 : 0) +
+        e.vao * vaos;
+      expect(usado).toBeLessThanOrEqual(sobra);
+      expect(e.hLinha).toBeLessThanOrEqual(21);
+      expect(e.assinaturasNoPe).toBe(true);
+    }
   });
 
   it("média final, frequência e situação a partir dos valores do formulário", () => {
