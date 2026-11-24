@@ -356,9 +356,7 @@ function MatriculasContent() {
     const anterior = solicitacoes?.find((s) => s.id === item.id);
     if (anterior && anterior.status !== item.status) {
       // O funil depende do status: recalcula no servidor (contagens, conversão e paradas).
-      apiJson<{ funil: Funil }>(`/api/admin/matriculas?${query()}`)
-        .then((data) => setFunil(data.funil))
-        .catch(() => {});
+      recarregarFunil();
       setResumo((prev) => {
         const next = prev.map((r) =>
           r.tipo === item.tipo && r.status === anterior.status ? { ...r, total: r.total - 1 } : r,
@@ -371,8 +369,15 @@ function MatriculasContent() {
     }
   }
 
+  function recarregarFunil() {
+    apiJson<{ funil: Funil }>(`/api/admin/matriculas?${query()}`)
+      .then((data) => setFunil(data.funil))
+      .catch(() => {});
+  }
+
   function removerItem(id: string) {
     const item = solicitacoes?.find((s) => s.id === id);
+    recarregarFunil();
     setSolicitacoes((prev) => prev?.filter((s) => s.id !== id) ?? null);
     if (item) {
       setResumo((prev) => prev.map((r) => (r.tipo === item.tipo && r.status === item.status ? { ...r, total: r.total - 1 } : r)));
