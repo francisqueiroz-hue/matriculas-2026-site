@@ -5,10 +5,16 @@ import { LOGO_ESPACO_KIDS_PNG, LOGO_INSTITUTO_FOKUS_PNG } from "@/lib/boletim-lo
 
 /**
  * Boletim em PDF no modelo da escola (A4 em pé): moldura laranja, logos do Espaço Kids e do
- * Instituto Fokus, cabeçalho com a portaria, tabela por trimestre (nota, faltas, % de frequência),
+ * Instituto Fokus no topo, cabeçalho com a portaria logo abaixo das logos, tabela por trimestre (nota, faltas, % de frequência),
  * média final e situação, gráfico das médias, local e data, assinaturas e rodapé com endereço.
  * Cada aluno começa numa página nova; disciplinas, gráfico ou assinaturas que não cabem continuam
  * na página seguinte. Gerado no servidor só para a direção e a coordenação.
+ *
+ * Distribuição na folha: quando o boletim cabe numa página, ele é medido antes (ensaio numa
+ * folha descartável) e a sobra é repartida — linhas da tabela mais altas, gráfico maior e
+ * espaços iguais entre os blocos — para que as assinaturas cheguem perto do rodapé em vez de
+ * tudo ficar na parte de cima. Quando não cabe, mantém o tamanho compacto e continua na
+ * página seguinte.
  */
 
 export type BoletimParaImpressao = BoletimEditavel & { aluno: string };
@@ -30,6 +36,16 @@ const BORDA = rgb(0.7, 0.74, 0.78);
 const BRANCO = rgb(1, 1, 1);
 
 type Fontes = { normal: PDFFont; negrito: PDFFont };
+
+/** Medidas que crescem para preencher a folha quando sobra espaço. */
+export type Espacamento = { hLinha: number; hCabecalho: number; alturaBarras: number; vao: number; assinaturasNoPe: boolean };
+export const ESPACAMENTO_COMPACTO: Espacamento = { hLinha: 13, hCabecalho: 12, alturaBarras: 120, vao: 0, assinaturasNoPe: false };
+/** Quando por pouco não cabe numa folha: linhas e gráfico um pouco menores. */
+const ESPACAMENTO_APERTADO: Espacamento = { hLinha: 10.5, hCabecalho: 10.5, alturaBarras: 55, vao: 0, assinaturasNoPe: true };
+const H_LINHA_MAX = 21;
+const CRESCIMENTO_GRAFICO_MAX = 110;
+const VAO_MAX = 36;
+const ALTURA_ASSINATURAS = 118;
 
 /** Troca o que as fontes padrão (WinAnsi) não desenham (ex.: emoji) por "?". */
 function limpar(texto: string, fonte: PDFFont): string {
@@ -78,13 +94,25 @@ export function formatarNota(v: number | null): string {
 class Desenho {
   page!: PDFPage;
   y = 0;
+  paginas = 0;
   constructor(
     private pdf: PDFDocument,
     private fontes: Fontes,
     private logos: { kids: PDFImage; fokus: PDFImage },
     private modelo: ModeloBoletim,
     private b: BoletimParaImpressao,
+    private esp: Espacamento = ESPACAMENTO_COMPACTO,
   ) {}
+
+  /** Tamanho da letra da tabela acompanha a altura da linha (7,5 → 9). */
+  get letraTabela() {
+    return Math.min(9, 7.5 + (this.esp.hLinha - ESPACAMENTO_COMPACTO.hLinha) * 0.2);
+  }
+
+  /** Espaço entre blocos (zero no modo compacto). */
+  vao() {
+    if (this.esp.vao > 0 && this.y - this.esp.vao >= LIMITE_INFERIOR) this.y -= this.esp.vao;
+  }
 
   texto(t: string, x: number, y: number, tamanho: number, fonte: PDFFont = this.fontes.normal, cor = PRETO) {
     this.page.drawText(limpar(t, fonte), { x, y, size: tamanho, font: fonte, color: cor });
@@ -110,24 +138,24 @@ class Desenho {
 
   novaPagina(continuacao: boolean) {
     this.page = this.pdf.addPage(A4);
+    this.paginas++;
     const [W, H] = A4;
     this.page.drawRectangle({ x: 18, y: 18, width: W - 36, height: H - 36, borderColor: LARANJA, borderWidth: 1.5 });
 
     // Logos e cabeçalho
     const topo = H - MARGEM;
-    const kids = this.logos.kids.scaleToFit(112, 50);
+    // Logos numa faixa própria; a portaria e o título vêm logo abaixo, centralizados na largura toda.
+    const kids = this.logos.kids.scaleToFit(124, 56);
     this.page.drawImage(this.logos.kids, { x: MARGEM, y: topo - kids.height, width: kids.width, height: kids.height });
-    const fokus = this.logos.fokus.scaleToFit(54, 54);
+    const fokus = this.logos.fokus.scaleToFit(60, 60);
     this.page.drawImage(this.logos.fokus, { x: W - MARGEM - fokus.width, y: topo - fokus.height, width: fokus.width, height: fokus.height });
-    const x0 = MARGEM + 120;
-    const largura = LARGURA - 120 - 64;
-    let y = topo - 10;
+    let y = topo - Math.max(kids.height, fokus.height) - 18;
     for (const linha of this.modelo.cabecalho.filter(Boolean)) {
-      const { x, w } = this.centro(linha, y, 9, this.fontes.negrito, PRETO, x0, largura);
+      const { x, w } = this.centro(linha, y, 9.5, this.fontes.negrito, PRETO);
       this.page.drawLine({ start: { x, y: y - 1.5 }, end: { x: x + w, y: y - 1.5 }, thickness: 0.6, color: PRETO });
-      y -= 12.5;
+      y -= 13.5;
     }
-    this.y = Math.min(y, topo - 58) - 8;
+    this.y = y - 6;
 
     // Rodapé
     const rodape = this.modelo.rodape.filter(Boolean);
@@ -155,7 +183,7 @@ class Desenho {
 
   cabecalhoTabela() {
     const c = Desenho.COL;
-    const h = 12;
+    const h = this.esp.hCabecalho;
     const situacao = LARGURA - c.disc - 3 * (c.nota + c.faltas + c.freq) - c.media - c.freqTotal;
     const negrito = this.fontes.negrito;
     let x = MARGEM;
@@ -178,29 +206,31 @@ class Desenho {
 
   linhaTabela(l: LinhaCalculada, par: boolean) {
     const c = Desenho.COL;
-    const h = 13;
+    const h = this.esp.hLinha;
+    const t = this.letraTabela;
     const situacao = LARGURA - c.disc - 3 * (c.nota + c.faltas + c.freq) - c.media - c.freqTotal;
     const fundo = par ? AZUL_CLARO : undefined;
     const corNota = (n: number | null) => (n !== null && n < MEDIA_APROVACAO ? VERMELHO : PRETO);
     const pct = (p: number | null) => (p === null ? "—" : `${p}%`);
     this.y -= h;
     let x = MARGEM;
-    this.celula(x, this.y, c.disc, h, l.disciplina.toLocaleUpperCase("pt-BR"), { esquerda: true, fundo, fonte: this.fontes.negrito, tamanho: 7 });
+    this.celula(x, this.y, c.disc, h, l.disciplina.toLocaleUpperCase("pt-BR"), { esquerda: true, fundo, fonte: this.fontes.negrito, tamanho: t - 0.5 });
     x += c.disc;
-    for (const t of l.trimestres) {
-      this.celula(x, this.y, c.nota, h, formatarNumero(t.nota), { fundo, fonte: this.fontes.negrito, cor: corNota(t.nota) });
-      this.celula(x + c.nota, this.y, c.faltas, h, t.faltas === null ? "—" : String(t.faltas), { fundo });
-      this.celula(x + c.nota + c.faltas, this.y, c.freq, h, pct(t.freq), { fundo });
+    for (const tri of l.trimestres) {
+      this.celula(x, this.y, c.nota, h, formatarNumero(tri.nota), { fundo, fonte: this.fontes.negrito, cor: corNota(tri.nota), tamanho: t });
+      this.celula(x + c.nota, this.y, c.faltas, h, tri.faltas === null ? "—" : String(tri.faltas), { fundo, tamanho: t });
+      this.celula(x + c.nota + c.faltas, this.y, c.freq, h, pct(tri.freq), { fundo, tamanho: t });
       x += c.nota + c.faltas + c.freq;
     }
-    this.celula(x, this.y, c.media, h, formatarNumero(l.media), { fundo, fonte: this.fontes.negrito, cor: corNota(l.media) });
-    this.celula(x + c.media, this.y, c.freqTotal, h, pct(l.freqTotal), { fundo });
+    this.celula(x, this.y, c.media, h, formatarNumero(l.media), { fundo, fonte: this.fontes.negrito, cor: corNota(l.media), tamanho: t });
+    this.celula(x + c.media, this.y, c.freqTotal, h, pct(l.freqTotal), { fundo, tamanho: t });
     const corSit = l.situacao === "Reprovado" ? VERMELHO : l.situacao === "Aprovado" ? VERDE : CINZA;
-    this.celula(x + c.media + c.freqTotal, this.y, situacao, h, l.situacao, { fundo, cor: corSit, fonte: this.fontes.negrito });
+    this.celula(x + c.media + c.freqTotal, this.y, situacao, h, l.situacao, { fundo, cor: corSit, fonte: this.fontes.negrito, tamanho: Math.min(t, 8.5) });
   }
 
   tabela(linhas: LinhaCalculada[]) {
-    this.garantir(24 + 13 * Math.min(3, Math.max(1, linhas.length)));
+    const h = this.esp.hLinha;
+    this.garantir(2 * this.esp.hCabecalho + h * Math.min(3, Math.max(1, linhas.length)));
     this.cabecalhoTabela();
     if (!linhas.length) {
       this.y -= 14;
@@ -208,7 +238,7 @@ class Desenho {
       return;
     }
     linhas.forEach((l, i) => {
-      if (this.garantir(13)) this.cabecalhoTabela();
+      if (this.garantir(h)) this.cabecalhoTabela();
       this.linhaTabela(l, i % 2 === 1);
     });
     this.y -= 4;
@@ -227,6 +257,7 @@ class Desenho {
     if (!texto.trim()) return;
     const linhas = quebrar(limpar(texto, this.fontes.normal), this.fontes.normal, 8, LARGURA - 12);
     const h = 16 + linhas.length * 10;
+    this.vao();
     this.garantir(h + 6);
     this.y -= h;
     this.page.drawRectangle({ x: MARGEM, y: this.y, width: LARGURA, height: h, borderColor: BORDA, borderWidth: 0.6 });
@@ -239,8 +270,9 @@ class Desenho {
     if (!this.modelo.mostrarGrafico || !linhas.length) return;
     const rotacionar = LARGURA / linhas.length < 46;
     const alturaRotulos = rotacionar ? 46 : 16;
-    const alturaBarras = 120;
+    const alturaBarras = this.esp.alturaBarras;
     const total = 16 + alturaBarras + alturaRotulos + 8;
+    this.vao();
     this.garantir(total);
     const topo = this.y;
     this.centro("Médias por disciplina", topo - 11, 9, this.fontes.negrito, CINZA);
@@ -281,7 +313,10 @@ class Desenho {
 
   assinaturas() {
     const b = this.b;
-    this.garantir(118);
+    this.vao();
+    this.garantir(ALTURA_ASSINATURAS);
+    // Boletim de uma página: local, data e assinaturas ficam no pé da folha, logo acima do rodapé.
+    if (this.esp.assinaturasNoPe) this.y = Math.min(this.y, LIMITE_INFERIOR + ALTURA_ASSINATURAS);
     this.y -= 16;
     if (b.localData) this.centro(b.localData, this.y, 9.5);
     this.y -= 46;
@@ -310,16 +345,60 @@ export async function gerarBoletimPdf(dados: { modelo: ModeloBoletim; ano: numbe
   pdf.setCreator("ClassLink");
   const fontes = { normal: await pdf.embedFont(StandardFonts.Helvetica), negrito: await pdf.embedFont(StandardFonts.HelveticaBold) };
   const logos = { kids: await pdf.embedPng(LOGO_ESPACO_KIDS_PNG), fokus: await pdf.embedPng(LOGO_INSTITUTO_FOKUS_PNG) };
+  // Folha de ensaio: mede cada boletim antes de desenhar de verdade (nunca é salva).
+  const ensaio = await PDFDocument.create();
   for (const b of boletins) {
-    const d = new Desenho(pdf, fontes, logos, dados.modelo, b);
     const linhas = calcularLinhas(b);
-    d.novaPagina(false);
-    d.tabela(linhas);
-    d.observacoes(b.observacoes);
-    d.grafico(linhas);
-    d.assinaturas();
+    const desenhar = (doc: PDFDocument, esp: Espacamento) => {
+      const d = new Desenho(doc, fontes, logos, dados.modelo, b, esp);
+      d.novaPagina(false);
+      d.tabela(linhas);
+      d.observacoes(b.observacoes);
+      d.grafico(linhas);
+      d.assinaturas();
+      return d;
+    };
+    const medida = desenhar(ensaio, ESPACAMENTO_COMPACTO);
+    let esp = ESPACAMENTO_COMPACTO;
+    if (medida.paginas === 1) {
+      esp = distribuirSobra(medida.y - LIMITE_INFERIOR, {
+        linhas: linhas.length,
+        grafico: dados.modelo.mostrarGrafico && linhas.length > 0,
+        vaos: 1 + (b.observacoes.trim() ? 1 : 0) + (dados.modelo.mostrarGrafico && linhas.length > 0 ? 1 : 0),
+      });
+    } else if (medida.paginas === 2 && desenhar(ensaio, ESPACAMENTO_APERTADO).paginas === 1) {
+      // Por pouco (ex.: só as assinaturas iam para a 2ª folha): aperta um pouco e fica numa só.
+      esp = ESPACAMENTO_APERTADO;
+    }
+    desenhar(pdf, esp);
   }
   return pdf.save();
+}
+
+/**
+ * Reparte a sobra vertical (em pontos) de um boletim de uma página: primeiro linhas mais altas na
+ * tabela (35% da sobra, ou 60% sem gráfico), depois o gráfico maior (até 45% do que resta) e, por
+ * fim, vãos iguais entre os blocos (tabela, observações, gráfico, assinaturas). O que ainda sobrar
+ * fica acima das assinaturas, que vão para o pé da folha. Nunca ultrapassa a sobra medida.
+ */
+export function distribuirSobra(sobra: number, o: { linhas: number; grafico: boolean; vaos: number }): Espacamento {
+  const base = ESPACAMENTO_COMPACTO;
+  let resto = Math.max(0, sobra - 4); // folga para arredondamentos
+  if (resto <= 0) return base;
+  const fatiaLinhas = o.grafico ? 0.35 : 0.6;
+  // +1: o cabeçalho da tabela (dois andares) cresce metade disso em cada andar.
+  const crescLinha = o.linhas > 0 ? Math.min(H_LINHA_MAX - base.hLinha, (resto * fatiaLinhas) / (o.linhas + 1)) : 0;
+  resto -= crescLinha * (o.linhas + 1);
+  const crescGrafico = o.grafico ? Math.min(CRESCIMENTO_GRAFICO_MAX, resto * 0.45) : 0;
+  resto -= crescGrafico;
+  const vao = Math.min(VAO_MAX, resto / Math.max(1, o.vaos));
+  return {
+    hLinha: base.hLinha + crescLinha,
+    hCabecalho: base.hCabecalho + crescLinha / 2,
+    alturaBarras: base.alturaBarras + crescGrafico,
+    vao,
+    assinaturasNoPe: true,
+  };
 }
 
 /** Nome de arquivo seguro: "boletim-2026-maria-silva.pdf". */
