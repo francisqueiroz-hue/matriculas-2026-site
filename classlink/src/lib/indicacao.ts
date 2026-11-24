@@ -16,6 +16,17 @@ const ANO_LETIVO_MATRICULAS = CAMPANHA_REMATRICULA.ano;
 export const BENEFICIO_INDICACAO =
   "Quando a família indicada faz a matrícula, quem indicou ganha um benefício em material pedagógico ou escolar. Os detalhes são combinados com a secretaria.";
 
+/**
+ * Sorteio entre quem indicou, pedido pela direção em 24/11/2026: depois das matrículas e antes do
+ * início das aulas do ano letivo. Sem prêmio, data ou regra definidos, o texto não cita nenhum deles.
+ * ATENÇÃO: sorteio a título de propaganda depende de autorização prévia da Secretaria de Prêmios e
+ * Apostas (Lei 5.768/1971, art. 1º; Decreto 70.951/1972), e prometê-lo publicamente sem ela também é
+ * infração (art. 12, § 1º). Confirmar antes de divulgar.
+ */
+export function avisoSorteioIndicacao(ano = ANO_LETIVO_MATRICULAS): string {
+  return `Depois das matrículas e antes do início das aulas de ${ano}, a escola fará um sorteio entre as famílias que indicaram. As regras serão divulgadas pela escola.`;
+}
+
 /** Nome que vai no link: só o primeiro e o último nome, para não expor o nome completo. */
 export function nomeParaIndicacao(nomeCompleto: string): string {
   const partes = nomeCompleto.trim().split(/\s+/).filter(Boolean);
