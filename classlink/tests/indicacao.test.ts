@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BENEFICIO_INDICACAO, avisoSorteioIndicacao, linkIndicacao, linkWhatsAppIndicacao, mensagemIndicacao, nomeParaIndicacao } from "@/lib/indicacao";
+import { BENEFICIO_INDICACAO, linkIndicacao, linkWhatsAppIndicacao, mensagemIndicacao, nomeParaIndicacao } from "@/lib/indicacao";
 
 describe("indique uma família", () => {
   it("usa só o primeiro e o último nome de quem indica", () => {
@@ -26,17 +26,9 @@ describe("indique uma família", () => {
 });
 
 describe("benefício da indicação", () => {
-  it("cita material pedagógico ou escolar sem prometer valor", () => {
-    expect(BENEFICIO_INDICACAO).toContain("material pedagógico ou escolar");
+  it("cita benefício na parte pedagógica escolar sem dizer qual nem prometer valor", () => {
+    expect(BENEFICIO_INDICACAO).toContain("benefício na parte pedagógica escolar");
+    expect(BENEFICIO_INDICACAO).not.toMatch(/material|sorteio/i);
     expect(BENEFICIO_INDICACAO).not.toMatch(/R\$|%|\d/);
-  });
-});
-
-describe("sorteio entre quem indicou", () => {
-  it("cita o sorteio antes das aulas do ano letivo, sem prêmio nem data", () => {
-    const texto = avisoSorteioIndicacao(2027);
-    expect(texto).toContain("sorteio entre as famílias que indicaram");
-    expect(texto).toContain("antes do início das aulas de 2027");
-    expect(texto.replace("2027", "")).not.toMatch(/R\$|%|\d/);
   });
 });

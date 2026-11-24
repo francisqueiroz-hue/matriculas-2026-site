@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
-import { BENEFICIO_INDICACAO, avisoSorteioIndicacao, linkIndicacao, linkWhatsAppIndicacao, nomeParaIndicacao } from "@/lib/indicacao";
+import { BENEFICIO_INDICACAO, linkIndicacao, linkWhatsAppIndicacao, nomeParaIndicacao } from "@/lib/indicacao";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
 
 const ANO_LETIVO_MATRICULAS = CAMPANHA_REMATRICULA.ano;
@@ -63,7 +63,6 @@ export function IndiqueFamiliaCard() {
             visita, e a secretaria fica sabendo que foi indicação sua.
           </p>
           <p className="mt-1 font-semibold">🎁 {BENEFICIO_INDICACAO}</p>
-          <p className="mt-1">🎉 {avisoSorteioIndicacao(ANO_LETIVO_MATRICULAS)}</p>
           <p className="mt-1 text-xs text-purple-800">
             O link leva o seu nome ({nomeParaIndicacao(user.name)}) só para a escola saber quem indicou.
           </p>
