@@ -21,7 +21,23 @@ interface Solicitacao {
   observacoes: string | null;
   observacoesInternas: string | null;
   responsavelId: string | null;
+  comoConheceu: string | null;
+  indicadoPor: string | null;
+  campanha: string | null;
+  primeiroContatoEm: string | null;
   createdAt: string;
+}
+
+interface Funil {
+  leads: number;
+  atendidos: number;
+  visitas: number;
+  matriculados: number;
+  desistencias: number;
+  semRetorno: number;
+  horasAtePrimeiroContato: number | null;
+  conversao: number | null;
+  canais: { canal: string; rotulo: string; leads: number; matriculados: number }[];
 }
 
 interface Resumo {
@@ -38,6 +54,105 @@ const STATUS_LABEL: Record<Status, string> = {
   MATRICULADO: "Matriculado",
   DESISTIU: "Desistiu",
 };
+// Espelha COMO_CONHECEU de solicitacoes-matricula.ts (rótulos exibidos à equipe).
+const COMO_CONHECEU_LABEL: Record<string, string> = {
+  INDICACAO: "Indicação de outra família",
+  INSTAGRAM: "Instagram",
+  FACEBOOK: "Facebook",
+  GOOGLE: "Google / Maps",
+  FACHADA: "Passou em frente à escola",
+  EVENTO: "Evento ou panfleto",
+  OUTRO: "Outro",
+};
+const HORAS_SEM_RETORNO = 24;
+
+function horasDesde(iso: string) {
+  return (Date.now() - new Date(iso).getTime()) / 3_600_000;
+}
+
+function estaParada(s: Solicitacao) {
+  return s.tipo === "PRE_MATRICULA" && s.status === "NOVA" && horasDesde(s.createdAt) > HORAS_SEM_RETORNO;
+}
+
+function tempoLegivel(horas: number) {
+  if (horas < 1) return "menos de 1 h";
+  if (horas < 48) return `${Math.round(horas)} h`;
+  return `${Math.round(horas / 24)} dias`;
+}
+
+function pct(parte: number, todo: number) {
+  return todo ? `${Math.round((parte / todo) * 100)}%` : "—";
+}
+
+function PainelFunil({ f, onVerParadas }: { f: Funil; onVerParadas: () => void }) {
+  const etapas = [
+    { label: "Pré-matrículas", valor: f.leads, taxa: null as string | null },
+    { label: "Atendidas", valor: f.atendidos, taxa: pct(f.atendidos, f.leads) },
+    { label: "Visitas", valor: f.visitas, taxa: pct(f.visitas, f.leads) },
+    { label: "Matrículas", valor: f.matriculados, taxa: pct(f.matriculados, f.leads) },
+  ];
+  return (
+    <section aria-labelledby="titulo-funil" className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="titulo-funil" className="text-base font-bold text-slate-900">
+          Funil de captação (famílias novas)
+        </h2>
+        <p className="text-xs text-slate-500">
+          1º retorno em {f.horasAtePrimeiroContato === null ? "—" : tempoLegivel(f.horasAtePrimeiroContato)} (mediana) ·{" "}
+          {f.desistencias} desistência{f.desistencias === 1 ? "" : "s"}
+        </p>
+      </div>
+      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {etapas.map((e) => (
+          <li key={e.label} className="rounded-lg bg-slate-50 p-3">
+            <p className="text-2xl font-bold text-slate-900">{e.valor}</p>
+            <p className="text-xs text-slate-600">
+              {e.label}
+              {e.taxa && <span className="ml-1 font-semibold text-indigo-700">· {e.taxa}</span>}
+            </p>
+          </li>
+        ))}
+      </ol>
+      {f.semRetorno > 0 && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-900">
+          <span>
+            <strong>{f.semRetorno}</strong> pré-matrícula{f.semRetorno === 1 ? "" : "s"} sem retorno há mais de {HORAS_SEM_RETORNO} h.
+            Responder rápido aumenta a chance de visita.
+          </span>
+          <button type="button" onClick={onVerParadas} className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
+            Ver quais
+          </button>
+        </div>
+      )}
+      {f.canais.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <caption className="mb-1 text-left text-xs font-medium text-slate-500">Como as famílias conheceram a escola</caption>
+            <thead>
+              <tr className="text-xs text-slate-500">
+                <th scope="col" className="py-1 pr-2 font-medium">Canal</th>
+                <th scope="col" className="py-1 pr-2 text-right font-medium">Pré-matrículas</th>
+                <th scope="col" className="py-1 pr-2 text-right font-medium">Matrículas</th>
+                <th scope="col" className="py-1 text-right font-medium">Conversão</th>
+              </tr>
+            </thead>
+            <tbody>
+              {f.canais.map((c) => (
+                <tr key={c.canal} className="border-t border-slate-100">
+                  <th scope="row" className="py-1.5 pr-2 font-normal text-slate-800">{c.rotulo}</th>
+                  <td className="py-1.5 pr-2 text-right">{c.leads}</td>
+                  <td className="py-1.5 pr-2 text-right">{c.matriculados}</td>
+                  <td className="py-1.5 text-right">{pct(c.matriculados, c.leads)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 const STATUS_COR: Record<Status, string> = {
   NOVA: "bg-amber-100 text-amber-900",
   EM_ATENDIMENTO: "bg-sky-100 text-sky-900",
@@ -113,6 +228,11 @@ function SolicitacaoCard({ s, onChange, onDelete }: { s: Solicitacao; onChange: 
               {new Date(s.createdAt).toLocaleString("pt-BR")} · {s.origem === "SITE" ? "site da escola" : "ClassLink"}
               {s.responsavelId && " · responsável já cadastrado"}
             </span>
+            {estaParada(s) && (
+              <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+                Sem retorno há {tempoLegivel(horasDesde(s.createdAt))}
+              </span>
+            )}
           </div>
           <p className="text-base font-semibold text-slate-900">{s.alunoNome}</p>
           <p className="text-slate-600">
@@ -123,6 +243,13 @@ function SolicitacaoCard({ s, onChange, onDelete }: { s: Solicitacao; onChange: 
           <p className="mt-1 text-slate-700">
             <span className="font-medium">{s.responsavelNome}</span> · {formatarTelefone(s.telefone)}
           </p>
+          {s.tipo === "PRE_MATRICULA" && (s.comoConheceu || s.indicadoPor || s.campanha) && (
+            <p className="mt-1 text-xs text-slate-600">
+              Conheceu por: {s.comoConheceu ? (COMO_CONHECEU_LABEL[s.comoConheceu] ?? "Outro") : "não informado"}
+              {s.indicadoPor && <> · indicado por <strong>{s.indicadoPor}</strong></>}
+              {s.campanha && <> · campanha: {s.campanha}</>}
+            </p>
+          )}
           {s.observacoes && <p className="mt-1 rounded-md bg-slate-50 p-2 text-slate-700">“{s.observacoes}”</p>}
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -192,6 +319,8 @@ function MatriculasContent() {
   const [status, setStatus] = useState<Status | "">("");
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[] | null>(null);
   const [resumo, setResumo] = useState<Resumo[]>([]);
+  const [funil, setFunil] = useState<Funil | null>(null);
+  const [soParadas, setSoParadas] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const query = useCallback(
@@ -203,11 +332,12 @@ function MatriculasContent() {
   );
 
   useEffect(() => {
-    apiJson<{ ano: number; solicitacoes: Solicitacao[]; resumo: Resumo[] }>(`/api/admin/matriculas?${query()}`)
+    apiJson<{ ano: number; solicitacoes: Solicitacao[]; resumo: Resumo[]; funil: Funil }>(`/api/admin/matriculas?${query()}`)
       .then((data) => {
         setAno(data.ano);
         setSolicitacoes(data.solicitacoes);
         setResumo(data.resumo);
+        setFunil(data.funil);
         setErro(null);
       })
       .catch((err) => setErro(err instanceof Error ? err.message : "Erro ao carregar"));
@@ -225,6 +355,10 @@ function MatriculasContent() {
     setSolicitacoes((prev) => prev?.map((s) => (s.id === item.id ? item : s)) ?? null);
     const anterior = solicitacoes?.find((s) => s.id === item.id);
     if (anterior && anterior.status !== item.status) {
+      // O funil depende do status: recalcula no servidor (contagens, conversão e paradas).
+      apiJson<{ funil: Funil }>(`/api/admin/matriculas?${query()}`)
+        .then((data) => setFunil(data.funil))
+        .catch(() => {});
       setResumo((prev) => {
         const next = prev.map((r) =>
           r.tipo === item.tipo && r.status === anterior.status ? { ...r, total: r.total - 1 } : r,
@@ -269,12 +403,26 @@ function MatriculasContent() {
         ))}
       </div>
 
+      {funil && (
+        <PainelFunil
+          f={funil}
+          onVerParadas={() => {
+            setTipo("PRE_MATRICULA");
+            setStatus("NOVA");
+            setSoParadas(true);
+          }}
+        />
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         {(["", "PRE_MATRICULA", "REMATRICULA"] as const).map((t) => (
           <button
             key={t || "todas"}
             type="button"
-            onClick={() => setTipo(t)}
+            onClick={() => {
+              setTipo(t);
+              setSoParadas(false);
+            }}
             className={`rounded-full px-3 py-1.5 text-sm font-medium ${
               tipo === t ? "bg-indigo-600 text-white" : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
             }`}
@@ -288,7 +436,10 @@ function MatriculasContent() {
         <select
           id="filtro-status"
           value={status}
-          onChange={(e) => setStatus(e.target.value as Status | "")}
+          onChange={(e) => {
+            setStatus(e.target.value as Status | "");
+            setSoParadas(false);
+          }}
           className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
         >
           <option value="">Todas as situações</option>
@@ -300,6 +451,14 @@ function MatriculasContent() {
         </select>
       </div>
 
+      {soParadas && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-red-800">
+          Mostrando só as pré-matrículas sem retorno há mais de {HORAS_SEM_RETORNO} h.
+          <button type="button" onClick={() => setSoParadas(false)} className="font-semibold underline">
+            Mostrar todas
+          </button>
+        </p>
+      )}
       {erro && <p className="text-sm text-red-600">{erro}</p>}
       {solicitacoes === null && !erro && <p className="text-sm text-slate-500">Carregando...</p>}
       {solicitacoes?.length === 0 && (
@@ -309,7 +468,7 @@ function MatriculasContent() {
       )}
 
       <ul className="space-y-3">
-        {solicitacoes?.map((s) => (
+        {(soParadas ? solicitacoes?.filter(estaParada) : solicitacoes)?.map((s) => (
           <SolicitacaoCard key={s.id} s={s} onChange={atualizarItem} onDelete={removerItem} />
         ))}
       </ul>

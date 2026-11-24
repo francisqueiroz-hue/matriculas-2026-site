@@ -171,7 +171,7 @@
   .aviso-form{grid-column:1/-1;border-radius:10px;padding:12px 14px;font-size:.95rem}
   .aviso-form.ok{background:#e8f6ee;color:#14532d;border:1px solid #b7e2c7}
   .aviso-form.erro{background:#fdecea;color:var(--erro);border:1px solid #f5c2bd}
-  .aviso-form[hidden]{display:none}
+  .aviso-form[hidden],.campo[hidden]{display:none}
   .armadilha{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 
   /* FAQ */
@@ -487,6 +487,23 @@
           <label for="escola">Escola atual (opcional)</label>
           <input id="escola" name="escola" type="text" maxlength="80">
         </div>
+        <div class="campo">
+          <label for="como-conheceu">Como conheceu a escola? (opcional)</label>
+          <select id="como-conheceu" name="comoConheceu">
+            <option value="">Selecione…</option>
+            <option value="INDICACAO">Indicação de outra família</option>
+            <option value="INSTAGRAM">Instagram</option>
+            <option value="FACEBOOK">Facebook</option>
+            <option value="GOOGLE">Google / Maps</option>
+            <option value="FACHADA">Passei em frente à escola</option>
+            <option value="EVENTO">Evento ou panfleto</option>
+            <option value="OUTRO">Outro</option>
+          </select>
+        </div>
+        <div class="campo" id="campo-indicado" hidden>
+          <label for="indicado-por">Quem indicou? (opcional)</label>
+          <input id="indicado-por" name="indicadoPor" type="text" maxlength="80" placeholder="Nome da família que indicou">
+        </div>
         <div class="campo cheio">
           <label for="mensagem">Dúvidas ou observações (opcional)</label>
           <textarea id="mensagem" name="mensagem" maxlength="500"></textarea>
@@ -702,6 +719,9 @@
         alunoNome: valor(form, "aluno"),
         serie: valor(form, "serie"),
         periodoVisita: valor(form, "periodo") || undefined,
+        comoConheceu: valor(form, "comoConheceu") || undefined,
+        indicadoPor: (valor(form, "comoConheceu") === "INDICACAO" && valor(form, "indicadoPor")) || undefined,
+        campanha: CAMPANHA || undefined,
         escolaAtual: valor(form, "escola") || undefined,
         observacoes: valor(form, "mensagem") || undefined,
         consentimento: true,
@@ -723,6 +743,33 @@
     });
   }
 
+  // Captação: campanha do link (utm_source/utm_campaign) e indicação (?indicacao=Nome,
+  // usado pelo botão "Indique uma família" do ClassLink). Nada disso é obrigatório.
+  var params;
+  try { params = new URLSearchParams(window.location.search); } catch (e) { params = null; }
+  function param(nome) { return params ? (params.get(nome) || "").trim() : ""; }
+  var CAMPANHA = [param("utm_source"), param("utm_campaign")].filter(Boolean).join("-")
+    .toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 60);
+  var formPre = document.getElementById("form-pre");
+  if (formPre) {
+    var selCanal = formPre.elements.comoConheceu;
+    var campoIndicado = document.getElementById("campo-indicado");
+    var mostrarIndicado = function () { campoIndicado.hidden = selCanal.value !== "INDICACAO"; };
+    selCanal.addEventListener("change", mostrarIndicado);
+    var indicacao = param("indicacao").slice(0, 80);
+    if (indicacao) {
+      selCanal.value = "INDICACAO";
+      formPre.elements.indicadoPor.value = indicacao;
+    } else if (/instagram/i.test(CAMPANHA)) {
+      selCanal.value = "INSTAGRAM";
+    } else if (/facebook|fb/i.test(CAMPANHA)) {
+      selCanal.value = "FACEBOOK";
+    } else if (/google/i.test(CAMPANHA)) {
+      selCanal.value = "GOOGLE";
+    }
+    mostrarIndicado();
+  }
+
   prepararFormulario(document.getElementById("form-pre"), "PRE_MATRICULA", function (form) {
     var linhas = [
       "Olá! Quero fazer a *pré-matrícula 2027*.",
@@ -734,6 +781,9 @@
       "*Melhor período para visita:* " + valor(form, "periodo")
     ];
     if (valor(form, "escola")) linhas.push("*Escola atual:* " + valor(form, "escola"));
+    if (valor(form, "comoConheceu") === "INDICACAO") {
+      linhas.push("*Indicação de:* " + (valor(form, "indicadoPor") || "outra família"));
+    }
     if (valor(form, "mensagem")) linhas.push("*Observações:* " + valor(form, "mensagem"));
     return linhas;
   });

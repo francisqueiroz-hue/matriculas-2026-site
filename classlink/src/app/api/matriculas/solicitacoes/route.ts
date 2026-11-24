@@ -65,6 +65,12 @@ export async function POST(request: NextRequest) {
         periodoVisita: body.periodoVisita,
         escolaAtual: body.escolaAtual,
         observacoes: body.observacoes,
+        // Origem só faz sentido para família nova; rematrícula já é da escola.
+        ...(body.tipo === "PRE_MATRICULA" && {
+          comoConheceu: body.comoConheceu,
+          indicadoPor: body.indicadoPor,
+          campanha: body.campanha,
+        }),
         consentimentoEm: new Date(),
         ipOrigem,
       },

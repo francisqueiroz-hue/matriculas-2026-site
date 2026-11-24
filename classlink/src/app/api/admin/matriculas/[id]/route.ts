@@ -14,7 +14,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
     const existente = await prisma.solicitacaoMatricula.findFirst({ where: { id, schoolId: session.schoolId } });
     if (!existente) return NextResponse.json({ error: "Solicitação não encontrada" }, { status: 404 });
 
-    const solicitacao = await prisma.solicitacaoMatricula.update({ where: { id }, data: body });
+    // 1º retorno: a primeira vez que a solicitação sai de "Nova" (mede o tempo de resposta).
+    const primeiroContato =
+      body.status && body.status !== "NOVA" && !existente.primeiroContatoEm ? { primeiroContatoEm: new Date() } : {};
+    const solicitacao = await prisma.solicitacaoMatricula.update({ where: { id }, data: { ...body, ...primeiroContato } });
     return NextResponse.json({ solicitacao });
   } catch (error) {
     return handleApiError(error);

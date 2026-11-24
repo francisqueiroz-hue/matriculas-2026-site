@@ -758,6 +758,16 @@ model SolicitacaoMatricula {
   responsavelId String?
 
   observacoesInternas String? // anotações da equipe, nunca exibidas à família
+
+  // Captação: de onde veio o interesse (ver COMO_CONHECEU em solicitacoes-matricula.ts),
+  // o nome de quem indicou (link "Indique uma família" ou digitado pela família) e a
+  // campanha do link (utm_source/utm_campaign), para medir quais canais trazem matrículas.
+  comoConheceu      String?
+  indicadoPor       String?
+  campanha          String?
+  // Primeira vez que a equipe tirou a solicitação de "Nova" (mede o tempo até o 1º retorno).
+  primeiroContatoEm DateTime?
+
   consentimentoEm     DateTime
   ipOrigem            String?
   createdAt           DateTime @default(now())
