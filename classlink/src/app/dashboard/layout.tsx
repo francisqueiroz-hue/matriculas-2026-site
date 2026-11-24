@@ -8,6 +8,7 @@ import { PushRegister } from "@/components/PushRegister";
 import { IosInstallBanner } from "@/components/IosInstallBanner";
 import { AndroidInstallBanner } from "@/components/AndroidInstallBanner";
 import { RematriculaBanner } from "@/components/RematriculaBanner";
+import { SenhaProvisoriaBanner } from "@/components/SenhaProvisoriaBanner";
 import { ContratosPendentesBanner } from "@/components/ContratosPendentesBanner";
 import { AvisosMensagensProvider, ConviteAtivarAvisos } from "@/components/AvisosMensagens";
 import { GuardaVisibilidade } from "@/components/GuardaVisibilidade";
@@ -27,6 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       schoolId: true,
       isCoordenacao: true,
       funcao: true,
+      senhaProvisoria: true,
       school: { select: { name: true } },
     },
   });
@@ -46,6 +48,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         isCoordenacao: user.isCoordenacao,
         areasBloqueadas,
         funcao: user.funcao,
+        senhaProvisoria: user.senhaProvisoria,
       }}
     >
       <AvisosMensagensProvider>
@@ -58,6 +61,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="flex flex-1">
             <Sidebar />
             <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+              <SenhaProvisoriaBanner />
               <IosInstallBanner />
               <AndroidInstallBanner />
               <ConviteAtivarAvisos />

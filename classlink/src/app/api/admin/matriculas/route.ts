@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
-import { ANO_LETIVO_MATRICULAS, solicitacoesParaCsv } from "@/lib/solicitacoes-matricula";
+import { ANO_LETIVO_MATRICULAS, calcularFunil, solicitacoesParaCsv } from "@/lib/solicitacoes-matricula";
 import { cabecalhosDownloadCsv } from "@/lib/csv";
 
 const TIPOS = ["PRE_MATRICULA", "REMATRICULA"] as const;
@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
         observacoes: true,
         observacoesInternas: true,
         responsavelId: true,
+        comoConheceu: true,
+        indicadoPor: true,
+        campanha: true,
+        primeiroContatoEm: true,
         createdAt: true,
       },
     });
@@ -62,7 +66,14 @@ export async function GET(request: NextRequest) {
     });
     const resumo = grupos.map((g) => ({ tipo: g.tipo, status: g.status, total: g._count._all }));
 
-    return NextResponse.json({ ano, solicitacoes, resumo });
+    // Funil de captação do ano inteiro (independente dos filtros): leads, visitas, matrículas e canais.
+    const paraFunil = await prisma.solicitacaoMatricula.findMany({
+      where: { schoolId: session.schoolId, anoLetivo: ano, tipo: "PRE_MATRICULA" },
+      select: { tipo: true, status: true, comoConheceu: true, createdAt: true, primeiroContatoEm: true },
+    });
+    const funil = calcularFunil(paraFunil);
+
+    return NextResponse.json({ ano, solicitacoes, resumo, funil });
   } catch (error) {
     return handleApiError(error);
   }

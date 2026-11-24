@@ -82,3 +82,49 @@ describe("administração", () => {
     expect(linha).toContain("24/09/2026");
   });
 });
+
+describe("captação: origem, indicação e funil", () => {
+  it("aceita canal conhecido, ignora canal desconhecido e limpa a campanha", async () => {
+    const { solicitacaoPublicaSchema: schema } = await import("@/lib/solicitacoes-matricula");
+    const ok = schema.parse({ ...valida, comoConheceu: "INDICACAO", indicadoPor: " Ana Souza ", campanha: "Instagram-Bio <script>" });
+    expect(ok.comoConheceu).toBe("INDICACAO");
+    expect(ok.indicadoPor).toBe("Ana Souza");
+    expect(ok.campanha).toBe("instagram-bioscript");
+    const desconhecido = schema.parse({ ...valida, comoConheceu: "TIKTOK", campanha: "" });
+    expect(desconhecido.comoConheceu).toBeUndefined();
+    expect(desconhecido.campanha).toBeUndefined();
+    expect(() => schema.parse({ ...valida, indicadoPor: "x".repeat(81) })).toThrow();
+  });
+
+  it("calcula o funil das pré-matrículas, a conversão por canal e as paradas", async () => {
+    const { calcularFunil } = await import("@/lib/solicitacoes-matricula");
+    const agora = new Date("2026-11-24T12:00:00Z");
+    const h = (horas: number) => new Date(agora.getTime() - horas * 3_600_000);
+    const f = calcularFunil(
+      [
+        { tipo: "PRE_MATRICULA", status: "NOVA", comoConheceu: "INSTAGRAM", createdAt: h(30), primeiroContatoEm: null },
+        { tipo: "PRE_MATRICULA", status: "NOVA", comoConheceu: null, createdAt: h(2), primeiroContatoEm: null },
+        { tipo: "PRE_MATRICULA", status: "VISITA_AGENDADA", comoConheceu: "INDICACAO", createdAt: h(50), primeiroContatoEm: h(48) },
+        { tipo: "PRE_MATRICULA", status: "MATRICULADO", comoConheceu: "INDICACAO", createdAt: h(100), primeiroContatoEm: h(96) },
+        { tipo: "PRE_MATRICULA", status: "DESISTIU", comoConheceu: "INSTAGRAM", createdAt: h(80), primeiroContatoEm: null },
+        { tipo: "REMATRICULA", status: "NOVA", comoConheceu: null, createdAt: h(90), primeiroContatoEm: null },
+      ],
+      agora,
+    );
+    expect(f.leads).toBe(5);
+    expect(f.atendidos).toBe(2);
+    expect(f.visitas).toBe(2);
+    expect(f.matriculados).toBe(1);
+    expect(f.desistencias).toBe(1);
+    expect(f.semRetorno).toBe(1);
+    expect(f.horasAtePrimeiroContato).toBe(3);
+    expect(f.conversao).toBe(20);
+    expect(f.canais[0]).toMatchObject({ canal: "INDICACAO", leads: 2, matriculados: 1 });
+    expect(f.canais.find((c) => c.canal === "NAO_INFORMADO")?.rotulo).toBe("Não informado");
+  });
+
+  it("funil vazio não divide por zero", async () => {
+    const { calcularFunil } = await import("@/lib/solicitacoes-matricula");
+    expect(calcularFunil([])).toMatchObject({ leads: 0, conversao: null, horasAtePrimeiroContato: null, canais: [] });
+  });
+});

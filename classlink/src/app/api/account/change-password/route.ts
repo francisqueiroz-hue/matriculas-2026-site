@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     await prisma.$transaction([
-      prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(body.newPassword) } }),
+      prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(body.newPassword), senhaProvisoria: false } }),
       prisma.refreshToken.updateMany(encerrarTodasAsSessoes(user.id)),
     ]);
 

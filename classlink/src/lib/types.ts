@@ -12,4 +12,6 @@ export interface SessionUser {
   areasBloqueadas?: string[];
   /** Função na equipe (Direção, Secretaria...). Só a Direção vê financeiro e contratos. */
   funcao?: FuncaoEquipe | null;
+  /** Entrou com senha provisória: o app sugere trocar por uma senha da própria pessoa. */
+  senhaProvisoria?: boolean;
 }
