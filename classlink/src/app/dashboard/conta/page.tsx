@@ -24,6 +24,7 @@ export default function ContaPage() {
   const [pwLoading, setPwLoading] = useState(false);
 
   const [newEmail, setNewEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailLoading, setEmailLoading] = useState(false);
 
@@ -32,7 +33,8 @@ export default function ContaPage() {
     setEmailError(null);
     setEmailLoading(true);
     try {
-      await apiJson("/api/account/update-email", { method: "POST", body: JSON.stringify({ email: newEmail }) });
+      await apiJson("/api/account/update-email", { method: "POST", body: JSON.stringify({ email: newEmail, currentPassword: emailPassword }) });
+      setEmailPassword("");
       router.refresh();
     } catch (err) {
       setEmailError(err instanceof Error ? err.message : "Erro ao salvar e-mail");
@@ -107,6 +109,16 @@ export default function ContaPage() {
               placeholder="seuemail@exemplo.com"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+            />
+            <input
+              type="password"
+              aria-label="Sua senha atual"
+              autoComplete="current-password"
+              required
+              placeholder="Sua senha atual (para confirmar)"
+              value={emailPassword}
+              onChange={(e) => setEmailPassword(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
             />
             {emailError && <p className="text-sm text-red-600">{emailError}</p>}
