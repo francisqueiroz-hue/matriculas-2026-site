@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: `Já tem contrato ${body.anoLetivo} do modelo do app` });
         continue;
       }
-      // Com mais de um responsável, o contrato vai só ao financeiro: sem ele indicado, fica de fora.
+      // Com mais de um responsável, o contrato vai só ao financeiro: se nada indica quem é, fica de fora.
       const destino = destinos.get(aluno.id);
       if (destino?.situacao === "INDEFINIDO") {
         ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: MOTIVO_SEM_FINANCEIRO });
@@ -128,6 +128,8 @@ export async function POST(request: NextRequest) {
             modelo: MODELO_CONTRATO_2027,
             condicoes: JSON.parse(JSON.stringify(condicoes)),
             criadoPorId: session.sub,
+            porResponsavelFinanceiro: true,
+            destinatarioId: destino?.ids[0] ?? null,
           },
           select: { id: true },
         });

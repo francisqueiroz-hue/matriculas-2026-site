@@ -19,7 +19,8 @@ const banco = vi.hoisted(() => {
     prisma: {
       contrato: { findFirst: vi.fn() },
       student: { findFirst: vi.fn() },
-      guardianStudent: { findMany: vi.fn(async () => [{ studentId: "a1", guardianId: "resp1", responsavelFinanceiro: false, guardian: { active: true, deletedAt: null, role: "GUARDIAN" } }]) },
+      guardianStudent: { findMany: vi.fn(async () => [{ studentId: "a1", guardianId: "resp1", responsavelFinanceiro: false, guardian: { active: true, deletedAt: null, role: "GUARDIAN", cpf: null } }]) },
+      contratoArquivo: { findMany: vi.fn(async () => []) },
       $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
     },
   };

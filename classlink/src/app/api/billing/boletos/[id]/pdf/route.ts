@@ -4,6 +4,7 @@ import { exigirDirecaoSeAdmin, requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { baixarPdfCobranca } from "@/lib/banco-inter";
 import { exigirArea } from "@/lib/visibilidade-server";
+import { responsavelVeItem } from "@/lib/responsavel-financeiro";
 
 /** Baixa o PDF do boleto sob demanda direto da API do Inter — não guardamos o PDF em repouso. */
 export async function GET(_request: NextRequest, ctx: RouteContext<"/api/billing/boletos/[id]/pdf">) {
@@ -23,7 +24,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/billing
       const vinculo = await prisma.guardianStudent.findUnique({
         where: { guardianId_studentId: { guardianId: session.sub, studentId: boleto.studentId } },
       });
-      if (!vinculo) return NextResponse.json({ error: "Boleto não encontrado" }, { status: 404 });
+      if (!responsavelVeItem(boleto, !!vinculo, session.sub)) return NextResponse.json({ error: "Boleto não encontrado" }, { status: 404 });
     }
 
     const pdf = await baixarPdfCobranca(boleto.codigoSolicitacao);

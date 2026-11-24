@@ -3,7 +3,14 @@ import { prisma } from "@/lib/prisma";
 import type { AccessTokenPayload } from "@/lib/auth";
 import { juntarPartes, lerDoBlob } from "@/lib/blob-storage";
 import { ContratoErro, mensagemArquivoGrande } from "@/lib/contratos";
-import { destinoContrato, responsavelVeContrato, type DestinoContrato, type VinculoResponsavel } from "@/lib/responsavel-financeiro";
+import {
+  avisadosDoItem,
+  destinoContrato,
+  responsavelVeItem,
+  type DestinoContrato,
+  type ItemComDestinatario,
+  type VinculoResponsavel,
+} from "@/lib/responsavel-financeiro";
 
 /** Impressão digital SHA-256 (hex) do arquivo — comprova que o PDF guardado é o mesmo que foi enviado. */
 export function sha256Hex(bytes: Uint8Array): string {
@@ -12,8 +19,9 @@ export function sha256Hex(bytes: Uint8Array): string {
 
 /**
  * Carrega o contrato garantindo o acesso: direção (ADMIN) vê os da própria escola;
- * responsável só vê contratos de alunos vinculados a ele. Retorna null quando não há
- * acesso — a rota responde 404 para não revelar que o contrato existe.
+ * responsável só vê contratos de alunos vinculados a ele e, nos contratos da regra do
+ * responsável financeiro, só se for o destinatário. Retorna null quando não há acesso — a rota
+ * responde 404 para não revelar que o contrato existe.
  */
 export async function carregarContratoComAcesso(contratoId: string, session: AccessTokenPayload) {
   const contrato = await prisma.contrato.findFirst({
@@ -22,9 +30,10 @@ export async function carregarContratoComAcesso(contratoId: string, session: Acc
   if (!contrato) return null;
   if (session.role === "ADMIN") return contrato;
   if (session.role === "GUARDIAN") {
-    // Com mais de um responsável, só o financeiro (quem assina) vê o contrato.
-    const vinculos = await vinculosDoAluno(contrato.studentId);
-    return responsavelVeContrato(vinculos, session.sub) ? contrato : null;
+    const vinculo = await prisma.guardianStudent.findUnique({
+      where: { guardianId_studentId: { guardianId: session.sub, studentId: contrato.studentId } },
+    });
+    return responsavelVeItem(contrato, !!vinculo, session.sub) ? contrato : null;
   }
   return null;
 }
@@ -33,35 +42,63 @@ const vinculoSelect = {
   studentId: true,
   guardianId: true,
   responsavelFinanceiro: true,
-  guardian: { select: { active: true, deletedAt: true, role: true } },
+  guardian: { select: { active: true, deletedAt: true, role: true, cpf: true } },
 } as const;
 
-function paraVinculo(v: {
-  guardianId: string;
-  responsavelFinanceiro: boolean;
-  guardian: { active: boolean; deletedAt: Date | null; role: string };
-}): VinculoResponsavel {
-  return {
-    guardianId: v.guardianId,
-    responsavelFinanceiro: v.responsavelFinanceiro,
-    ativo: v.guardian.active && !v.guardian.deletedAt && v.guardian.role === "GUARDIAN",
-  };
-}
-
-/** Vínculos responsável–aluno no formato da regra do responsável financeiro. */
-export async function vinculosDoAluno(studentId: string): Promise<VinculoResponsavel[]> {
-  const vinculos = await prisma.guardianStudent.findMany({ where: { studentId }, select: vinculoSelect });
-  return vinculos.map(paraVinculo);
-}
-
-/** Quem recebe o contrato de cada aluno (ver lib/responsavel-financeiro.ts). */
-export async function destinosDosAlunos(studentIds: string[]): Promise<Map<string, DestinoContrato>> {
-  const vinculos = studentIds.length
-    ? await prisma.guardianStudent.findMany({ where: { studentId: { in: studentIds } }, select: vinculoSelect })
-    : [];
+/**
+ * Vínculos responsável–aluno no formato da regra do responsável financeiro (na ordem em que
+ * foram cadastrados), com o que o cadastro já diz de cada um: quem enviou o último contrato
+ * assinado do aluno e quem preencheu o CPF de cobrança.
+ */
+export async function vinculosDosAlunos(studentIds: string[]): Promise<Map<string, VinculoResponsavel[]>> {
   const porAluno = new Map<string, VinculoResponsavel[]>(studentIds.map((id) => [id, []]));
-  for (const v of vinculos) porAluno.get(v.studentId)?.push(paraVinculo(v));
-  return new Map([...porAluno].map(([id, lista]) => [id, destinoContrato(lista)]));
+  if (studentIds.length === 0) return porAluno;
+  const [vinculos, assinados] = await Promise.all([
+    prisma.guardianStudent.findMany({
+      where: { studentId: { in: studentIds } },
+      orderBy: { createdAt: "asc" },
+      select: vinculoSelect,
+    }),
+    prisma.contratoArquivo.findMany({
+      where: { tipo: "ASSINADO", enviadoPorId: { not: null }, contrato: { studentId: { in: studentIds } } },
+      orderBy: { createdAt: "desc" },
+      select: { enviadoPorId: true, contrato: { select: { studentId: true } } },
+    }),
+  ]);
+  // Último contrato assinado de cada aluno enviado por um responsável dele (a direção também
+  // anexa contratos; esses não contam).
+  const doAluno = new Map<string, Set<string>>();
+  for (const v of vinculos) {
+    if (!doAluno.has(v.studentId)) doAluno.set(v.studentId, new Set());
+    doAluno.get(v.studentId)!.add(v.guardianId);
+  }
+  const contratante = new Map<string, string>();
+  for (const a of assinados) {
+    const aluno = a.contrato.studentId;
+    if (!contratante.has(aluno) && a.enviadoPorId && doAluno.get(aluno)?.has(a.enviadoPorId)) {
+      contratante.set(aluno, a.enviadoPorId);
+    }
+  }
+  for (const v of vinculos) {
+    porAluno.get(v.studentId)?.push({
+      guardianId: v.guardianId,
+      responsavelFinanceiro: v.responsavelFinanceiro,
+      ativo: v.guardian.active && !v.guardian.deletedAt && v.guardian.role === "GUARDIAN",
+      assinouUltimoContrato: contratante.get(v.studentId) === v.guardianId,
+      temCpf: Boolean(v.guardian.cpf),
+    });
+  }
+  return porAluno;
+}
+
+export async function vinculosDoAluno(studentId: string): Promise<VinculoResponsavel[]> {
+  return (await vinculosDosAlunos([studentId])).get(studentId) ?? [];
+}
+
+/** Quem é o responsável financeiro de cada aluno (ver lib/responsavel-financeiro.ts). */
+export async function destinosDosAlunos(studentIds: string[]): Promise<Map<string, DestinoContrato>> {
+  const vinculos = await vinculosDosAlunos(studentIds);
+  return new Map([...vinculos].map(([id, lista]) => [id, destinoContrato(lista)]));
 }
 
 export async function destinoDoAluno(studentId: string): Promise<DestinoContrato> {
@@ -69,12 +106,12 @@ export async function destinoDoAluno(studentId: string): Promise<DestinoContrato
 }
 
 /**
- * Ids de quem recebe os avisos do contrato do aluno: o responsável financeiro (ou o único
- * responsável). Sem financeiro indicado num aluno com dois ou mais responsáveis, ninguém: a
- * tela Contratos mostra o aviso para a direção indicar.
+ * Ids de quem recebe os avisos deste contrato: pela regra nova, só o destinatário; contrato
+ * anterior à regra, todos os responsáveis ativos do aluno, como era.
  */
-export async function responsaveisDoAluno(studentId: string): Promise<string[]> {
-  return (await destinoDoAluno(studentId)).ids;
+export async function avisadosDoContrato(contrato: ItemComDestinatario & { studentId: string }): Promise<string[]> {
+  const vinculos = await vinculosDoAluno(contrato.studentId);
+  return avisadosDoItem(contrato, vinculos, vinculos.filter((v) => v.ativo).map((v) => v.guardianId));
 }
 
 /**

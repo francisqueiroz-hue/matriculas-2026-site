@@ -6,7 +6,6 @@ import { handleApiError } from "@/lib/http";
 import { notifyUsers } from "@/lib/push";
 import { exigirPodeConversar } from "@/lib/permissoes-mensagens";
 import { aguardaFamilia, jaLembradoHoje, textoLembreteContrato } from "@/lib/lembrete-contrato";
-import { destinoDoAluno } from "@/lib/contratos-server";
 import { MOTIVO_SEM_FINANCEIRO } from "@/lib/responsavel-financeiro";
 
 const corpoSchema = z.object({ responsavelId: z.string().min(1) });
@@ -30,7 +29,8 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/c
         status: true,
         anoLetivo: true,
         updatedAt: true,
-        studentId: true,
+        porResponsavelFinanceiro: true,
+        destinatarioId: true,
         student: {
           select: {
             name: true,
@@ -48,10 +48,11 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/c
     }
     const responsavel = contrato.student.guardians[0]?.guardian;
     if (!responsavel) return NextResponse.json({ error: "Responsável não encontrado neste aluno" }, { status: 404 });
-    // Com mais de um responsável, só o financeiro (quem assina) é lembrado.
-    const destino = await destinoDoAluno(contrato.studentId);
-    if (destino.situacao === "INDEFINIDO") return NextResponse.json({ error: MOTIVO_SEM_FINANCEIRO }, { status: 409 });
-    if (!destino.ids.includes(responsavel.id)) {
+    // Contrato da regra do responsável financeiro: só o destinatário (quem assina) é lembrado.
+    if (contrato.porResponsavelFinanceiro && !contrato.destinatarioId) {
+      return NextResponse.json({ error: MOTIVO_SEM_FINANCEIRO }, { status: 409 });
+    }
+    if (contrato.porResponsavelFinanceiro && contrato.destinatarioId !== responsavel.id) {
       return NextResponse.json(
         { error: `${responsavel.name.split(" ")[0]} não é o responsável financeiro deste aluno: o contrato vai só para quem assina.` },
         { status: 409 },

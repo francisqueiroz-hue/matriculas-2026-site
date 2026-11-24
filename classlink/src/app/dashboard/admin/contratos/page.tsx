@@ -12,7 +12,7 @@ import { ContratoModeloPainel } from "./ContratoModeloPainel";
 import { ConferenciaAssinatura } from "./ConferenciaAssinatura";
 import { ConfirmarRenovacao } from "./ConfirmarRenovacao";
 import { EscolherFinanceiro, PainelResponsavelFinanceiro } from "./ResponsavelFinanceiro";
-import type { DestinoContrato } from "@/lib/responsavel-financeiro";
+import { ROTULO_PRESUMIDO, type DestinoContrato } from "@/lib/responsavel-financeiro";
 import { gerarPlanilhaContratos, nomeArquivoPlanilha } from "@/lib/contratos-planilha";
 import { MIME_XLSX } from "@/lib/xlsx";
 import {
@@ -83,9 +83,14 @@ interface Contrato {
       responsavelFinanceiro: boolean;
       guardian: { id: string; name: string; phone: string | null };
     }[];
-    /** Quem recebe e assina o contrato (responsável financeiro ou o único responsável). */
+    /** Responsável financeiro do aluno hoje (indicado, único ou presumido pelo cadastro). */
     destino: DestinoContrato;
   };
+  /** Contrato criado pela regra do responsável financeiro (só o destinatário recebe e assina). */
+  porResponsavelFinanceiro: boolean;
+  destinatarioId: string | null;
+  /** Quem recebe os avisos e lembretes deste contrato. */
+  avisados: string[];
   arquivos: Arquivo[];
   eventos: Evento[];
 }
@@ -508,17 +513,23 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
   }
 
   const aguardandoFamilia = c.status === "AGUARDANDO_ASSINATURA" || c.status === "DEVOLVIDO";
-  // Com mais de um responsável, o contrato e os lembretes vão só ao financeiro (quem assina).
+  // Regra do responsável financeiro (contratos a partir de 24/11/2026): avisos e lembretes só
+  // para o destinatário. Contratos anteriores seguem para todos os responsáveis, como eram.
   const destino = c.student.destino;
-  const destinatarios = c.student.guardians.filter((g) => destino.ids.includes(g.guardian.id));
+  const destinatarios = c.student.guardians.filter((g) => c.avisados.includes(g.guardian.id));
   const opcoesResponsavel = c.student.guardians.map((g) => ({ id: g.guardian.id, name: g.guardian.name, relation: g.relation }));
-  const financeiro = destino.situacao === "FINANCEIRO" ? destinatarios[0] : undefined;
-  // O PDF assinado veio de outro responsável do aluno (não do financeiro): pede conferência.
+  const varios = c.student.guardians.length > 1;
+  const financeiro = c.student.guardians.find((g) => destino.ids.includes(g.guardian.id));
+  const presumido = ROTULO_PRESUMIDO[destino.situacao];
+  const semDestinatario = c.porResponsavelFinanceiro && !c.destinatarioId;
+  const assina = c.porResponsavelFinanceiro ? c.student.guardians.find((g) => g.guardian.id === c.destinatarioId) : undefined;
+  // O PDF assinado veio de outro responsável do aluno (não do destinatário): pede conferência.
   const remetente = ultimo?.enviadoPor?.id;
   const enviadoPorOutro =
     !!remetente &&
-    destino.ids.length > 0 &&
-    !destino.ids.includes(remetente) &&
+    c.porResponsavelFinanceiro &&
+    !!c.destinatarioId &&
+    remetente !== c.destinatarioId &&
     c.student.guardians.some((g) => g.guardian.id === remetente);
 
   return (
@@ -534,33 +545,40 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_COR[c.status]}`}>{STATUS_CONTRATO_LABEL[c.status]}</span>
       </div>
 
-      {destino.situacao === "INDEFINIDO" && (
+      {(semDestinatario || (varios && destino.situacao === "INDEFINIDO")) && (
         <div role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
           <p className="font-semibold">Falta indicar o responsável financeiro.</p>
           <p className="mt-1">
-            Este aluno tem mais de um responsável. O contrato vai só para quem assina (o financeiro), nunca para o pedagógico. Até
-            indicar, nenhum aviso ou lembrete deste contrato é enviado.
+            Este aluno tem mais de um responsável. Contrato e boleto vão só para o financeiro, nunca para o pedagógico.
+            {semDestinatario && " Até indicar, nenhum aviso ou lembrete deste contrato é enviado."}
           </p>
           <div className="mt-2">
             <EscolherFinanceiro studentId={c.student.id} responsaveis={opcoesResponsavel} onSalvo={onMudou} />
           </div>
         </div>
       )}
-      {financeiro && c.student.guardians.length > 1 && (
+      {varios && financeiro && (
         <details className="mt-2 text-slate-700">
           <summary className="cursor-pointer">
-            Responsável financeiro (recebe e assina): <strong>{financeiro.guardian.name}</strong>{" "}
-            <span className="text-xs text-indigo-700 underline">trocar</span>
+            Responsável financeiro: <strong>{financeiro.guardian.name}</strong>
+            {presumido && ` (presumido: ${presumido})`}{" "}
+            <span className="text-xs text-indigo-700 underline">{presumido ? "confirmar ou trocar" : "trocar"}</span>
           </summary>
           <div className="mt-2">
             <EscolherFinanceiro
               studentId={c.student.id}
               responsaveis={opcoesResponsavel}
-              atualId={financeiro.guardian.id}
+              atualId={destino.situacao === "FINANCEIRO" ? financeiro.guardian.id : undefined}
               onSalvo={onMudou}
             />
           </div>
         </details>
+      )}
+      {varios && assina && assina.guardian.id !== financeiro?.guardian.id && (
+        <p className="mt-1 text-slate-600">Este contrato foi enviado para {assina.guardian.name}.</p>
+      )}
+      {varios && !c.porResponsavelFinanceiro && (
+        <p className="mt-1 text-xs text-slate-500">Contrato anterior à regra do responsável financeiro: segue para todos os responsáveis.</p>
       )}
       {enviadoPorOutro && (
         <p role="status" className="mt-2 rounded-md bg-amber-50 p-2 text-amber-900">

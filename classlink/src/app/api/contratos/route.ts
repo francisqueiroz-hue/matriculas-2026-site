@@ -6,7 +6,8 @@ import type { ContratoStatus } from "@/lib/contratos";
 import { MODELO_CONTRATO_2027, valoresDoContrato } from "@/lib/contrato-modelo/tipos";
 import { ROTULO_SITUACAO, conferirValor, precisaAtualizar } from "@/lib/contrato-modelo/conferencia";
 import { exigirArea } from "@/lib/visibilidade-server";
-import { destinoContrato, responsavelVeContrato } from "@/lib/responsavel-financeiro";
+import { avisadosDoItem, destinoContrato, responsavelVeItem, semDadosDaRegra, type VinculoResponsavel } from "@/lib/responsavel-financeiro";
+import { vinculosDosAlunos } from "@/lib/contratos-server";
 
 const STATUS_VALIDOS: ContratoStatus[] = ["AGUARDANDO_ASSINATURA", "EM_CONFERENCIA", "AGUARDANDO_ORIGINAL", "COMPLETO", "DEVOLVIDO"];
 
@@ -77,38 +78,18 @@ export async function GET(request: NextRequest) {
           dadosFamilia: true,
           condicoes: true,
           createdAt: true,
-          student: {
-            select: {
-              id: true,
-              name: true,
-              class: { select: { name: true } },
-              guardians: {
-                select: {
-                  guardianId: true,
-                  responsavelFinanceiro: true,
-                  guardian: { select: { active: true, deletedAt: true, role: true } },
-                },
-              },
-            },
-          },
+          porResponsavelFinanceiro: true,
+          destinatarioId: true,
+          student: { select: { id: true, name: true, class: { select: { name: true } } } },
           arquivos: { select: { id: true, tipo: true, nomeArquivo: true, createdAt: true }, orderBy: { createdAt: "desc" } },
         },
         orderBy: [{ anoLetivo: "desc" }, { createdAt: "desc" }],
       });
-      // Com mais de um responsável, só o financeiro (quem assina) vê o contrato.
+      // Contrato da regra do responsável financeiro: só o destinatário (quem assina) vê.
+      // A consulta já só traz alunos vinculados a quem está logado.
       const visiveis = contratos
-        .filter((c) =>
-          responsavelVeContrato(
-            c.student.guardians.map((g) => ({
-              guardianId: g.guardianId,
-              responsavelFinanceiro: g.responsavelFinanceiro,
-              ativo: g.guardian.active && !g.guardian.deletedAt && g.guardian.role === "GUARDIAN",
-            })),
-            session.sub,
-          ),
-        )
-        // Os vínculos dos outros responsáveis não vão para a família.
-        .map((c) => ({ ...c, student: { id: c.student.id, name: c.student.name, class: c.student.class } }));
+        .filter((c) => responsavelVeItem(c, true, session.sub))
+        .map(semDadosDaRegra);
       // A família vê só o total e as parcelas do novo contrato; o percentual de correção fica com a escola.
       return NextResponse.json({
         contratos: visiveis.map(semDadosFamilia).map((c) => ({ ...c, valores: c.valores && { ...c.valores, reajuste: null } })),
@@ -138,6 +119,8 @@ export async function GET(request: NextRequest) {
           dadosFamilia: true,
           condicoes: true,
           createdAt: true,
+          porResponsavelFinanceiro: true,
+          destinatarioId: true,
           student: {
             select: {
               id: true,
@@ -150,7 +133,7 @@ export async function GET(request: NextRequest) {
                 select: {
                   relation: true,
                   responsavelFinanceiro: true,
-                  guardian: { select: { id: true, name: true, phone: true, active: true, deletedAt: true, role: true } },
+                  guardian: { select: { id: true, name: true, phone: true } },
                 },
               },
             },
@@ -180,20 +163,22 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    // Quem é o responsável financeiro de cada aluno (indicado, único ou presumido pelo cadastro).
+    const vinculosPorAluno = await vinculosDosAlunos([...new Set(contratos.map((c) => c.student.id))]);
     return NextResponse.json({
       contratos: contratos.map((c) => {
         const { mensalidadeValor, bolsista, guardians, ...resto } = c.student;
-        const vinculos = guardians.map((g) => ({
-          guardianId: g.guardian.id,
-          responsavelFinanceiro: g.responsavelFinanceiro,
-          ativo: g.guardian.active && !g.guardian.deletedAt && g.guardian.role === "GUARDIAN",
-        }));
+        const vinculos: VinculoResponsavel[] = vinculosPorAluno.get(c.student.id) ?? [];
+        const ativo = (id: string) => vinculos.some((v) => v.guardianId === id && v.ativo);
         const destino = destinoContrato(vinculos);
+        // Quem recebe os avisos e lembretes deste contrato: pela regra nova, o destinatário;
+        // contrato anterior à regra, todos os responsáveis, como era.
+        const avisados = avisadosDoItem(c, vinculos, vinculos.filter((v) => v.ativo).map((v) => v.guardianId));
         // Na tela só entram os responsáveis ativos (com o dado de quem é o financeiro).
         const student = {
           ...resto,
           guardians: guardians
-            .filter((_, i) => vinculos[i].ativo)
+            .filter((g) => ativo(g.guardian.id))
             .map((g) => ({
               relation: g.relation,
               responsavelFinanceiro: g.responsavelFinanceiro,
@@ -201,7 +186,7 @@ export async function GET(request: NextRequest) {
             })),
           destino,
         };
-        return { ...semDadosFamilia({ ...c, student }), conferencia: conferenciaDoContrato(c, { mensalidadeValor, bolsista }) };
+        return { ...semDadosFamilia({ ...c, student }), avisados, conferencia: conferenciaDoContrato(c, { mensalidadeValor, bolsista }) };
       }),
       resumo: resumo.map((r) => ({ status: r.status, total: r._count._all })),
       anos: anos.map((a) => a.anoLetivo),

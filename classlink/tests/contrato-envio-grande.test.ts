@@ -21,7 +21,7 @@ const banco = vi.hoisted(() => {
     tx,
     prisma: {
       contrato: { findFirst: vi.fn() },
-      guardianStudent: { findMany: vi.fn() },
+      guardianStudent: { findUnique: vi.fn() },
       contratoArquivo: { findFirst: vi.fn() },
       student: { findUnique: vi.fn(async () => ({ name: "Ana Souza" })) },
       user: { findMany: vi.fn(async () => []) },
@@ -92,7 +92,7 @@ beforeEach(() => {
   sessao.role = "GUARDIAN";
   process.env.BLOB_STORE_ID = "store_teste";
   banco.prisma.contrato.findFirst.mockResolvedValue({ id: "c1", schoolId: "escola1", studentId: "a1", status: "AGUARDANDO_ASSINATURA" });
-  banco.prisma.guardianStudent.findMany.mockResolvedValue([{ studentId: "a1", guardianId: "resp1", responsavelFinanceiro: false, guardian: { active: true, deletedAt: null, role: "GUARDIAN" } }]);
+  banco.prisma.guardianStudent.findUnique.mockResolvedValue({ guardianId: "resp1", studentId: "a1" });
   banco.tx.contrato.updateMany.mockResolvedValue({ count: 1 });
   blob.issueSignedToken.mockResolvedValue({ delegationToken: "d", clientSigningToken: "c", validUntil: Date.now() + 1000 });
   blob.del.mockResolvedValue(undefined);
@@ -128,7 +128,7 @@ describe("autorização do envio direto do contrato", () => {
   });
 
   it("recusa responsável sem vínculo, outro caminho, contrato já enviado e equipe", async () => {
-    banco.prisma.guardianStudent.findMany.mockResolvedValueOnce([]);
+    banco.prisma.guardianStudent.findUnique.mockResolvedValueOnce(null);
     expect((await autorizar(json("/x", corpo(CAMINHO)), ctx())).status).toBe(404);
 
     expect((await autorizar(json("/x", corpo(`classlink/escola1/contratos/c9/${UUID}.pdf`)), ctx())).status).toBe(400);

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       select: { id: true, name: true },
     });
     if (!aluno) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
-    // Com mais de um responsável, o contrato vai só ao financeiro: sem ele indicado, não envia.
+    // Com mais de um responsável, o contrato vai só ao financeiro: se nada indica quem é, não envia.
     const destino = await destinoDoAluno(aluno.id);
     if (destino.situacao === "INDEFINIDO") {
       return NextResponse.json({ error: MOTIVO_SEM_FINANCEIRO, codigo: "SEM_RESPONSAVEL_FINANCEIRO" }, { status: 409 });
@@ -55,6 +55,8 @@ export async function POST(request: NextRequest) {
           anoLetivo: dados.anoLetivo,
           titulo: dados.titulo,
           criadoPorId: session.sub,
+          porResponsavelFinanceiro: true,
+          destinatarioId: destino.ids[0] ?? null,
         },
         select: { id: true, titulo: true, anoLetivo: true, status: true },
       });

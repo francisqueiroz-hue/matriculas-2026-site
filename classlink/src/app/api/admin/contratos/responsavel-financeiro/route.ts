@@ -3,13 +3,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
-import { destinoContrato } from "@/lib/responsavel-financeiro";
+import { destinosDosAlunos } from "@/lib/contratos-server";
 
 const ativo = { active: true, deletedAt: null, role: "GUARDIAN" as const };
 
 /**
- * Alunos com dois ou mais responsáveis ativos e nenhum indicado como financeiro: enquanto
- * estiverem aqui, o contrato deles não é enviado nem lembrado (ver lib/responsavel-financeiro.ts).
+ * Alunos com dois ou mais responsáveis ativos em que nada indica o responsável financeiro (nem
+ * indicação da direção, nem contrato assinado, nem CPF de cobrança de um só): enquanto
+ * estiverem aqui, contrato novo não é enviado e boleto novo sai sem aviso
+ * (ver lib/responsavel-financeiro.ts).
  */
 export async function GET() {
   try {
@@ -24,17 +26,14 @@ export async function GET() {
         guardians: {
           where: { guardian: ativo },
           orderBy: { createdAt: "asc" },
-          select: { relation: true, responsavelFinanceiro: true, guardian: { select: { id: true, name: true } } },
+          select: { relation: true, guardian: { select: { id: true, name: true } } },
         },
       },
     });
-    const pendentes = alunos
-      .filter(
-        (a) =>
-          destinoContrato(
-            a.guardians.map((g) => ({ guardianId: g.guardian.id, responsavelFinanceiro: g.responsavelFinanceiro, ativo: true })),
-          ).situacao === "INDEFINIDO",
-      )
+    const candidatos = alunos.filter((a) => a.guardians.length > 1);
+    const destinos = await destinosDosAlunos(candidatos.map((a) => a.id));
+    const pendentes = candidatos
+      .filter((a) => destinos.get(a.id)?.situacao === "INDEFINIDO")
       .map((a) => ({
         id: a.id,
         name: a.name,
@@ -51,7 +50,9 @@ const corpoSchema = z.object({ studentId: z.string().min(1), guardianId: z.strin
 
 /**
  * A direção indica o responsável financeiro do aluno (quem recebe, preenche e assina o
- * contrato). Só um por aluno: marcar um desmarca o outro. Fica no histórico do cadastro.
+ * contrato e recebe o boleto). Só um por aluno: marcar um desmarca o outro. Fica no histórico
+ * do cadastro. Contratos e boletos em aberto criados pela regra nova passam para ele; os
+ * anteriores à regra continuam como estavam.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -71,25 +72,36 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Responsável não encontrado neste aluno" }, { status: 404 });
     }
     const anterior = aluno.guardians.find((g) => g.responsavelFinanceiro);
-    if (anterior?.guardianId === guardianId) return NextResponse.json({ ok: true, guardianId });
 
     await prisma.$transaction(async (tx) => {
-      await tx.guardianStudent.updateMany({ where: { studentId, responsavelFinanceiro: true }, data: { responsavelFinanceiro: false } });
-      await tx.guardianStudent.update({
-        where: { guardianId_studentId: { guardianId, studentId } },
-        data: { responsavelFinanceiro: true },
+      if (anterior?.guardianId !== guardianId) {
+        await tx.guardianStudent.updateMany({ where: { studentId, responsavelFinanceiro: true }, data: { responsavelFinanceiro: false } });
+        await tx.guardianStudent.update({
+          where: { guardianId_studentId: { guardianId, studentId } },
+          data: { responsavelFinanceiro: true },
+        });
+        await tx.alteracaoCadastro.create({
+          data: {
+            schoolId: session.schoolId,
+            entidade: "ALUNO",
+            entidadeId: studentId,
+            campo: "responsavelFinanceiro",
+            valorAnterior: anterior?.guardian.name ?? null,
+            valorNovo: escolhido.guardian.name,
+            porUserId: session.sub,
+            porNome: session.name,
+          },
+        });
+      }
+      // O que ainda espera a família passa para o financeiro (só os itens da regra nova).
+      await tx.contrato.updateMany({
+        where: { studentId, porResponsavelFinanceiro: true, status: { in: ["AGUARDANDO_ASSINATURA", "DEVOLVIDO"] } },
+        data: { destinatarioId: guardianId },
       });
-      await tx.alteracaoCadastro.create({
-        data: {
-          schoolId: session.schoolId,
-          entidade: "ALUNO",
-          entidadeId: studentId,
-          campo: "responsavelFinanceiro",
-          valorAnterior: anterior?.guardian.name ?? null,
-          valorNovo: escolhido.guardian.name,
-          porUserId: session.sub,
-          porNome: session.name,
-        },
+      // Boleto já emitido no banco tem o pagador fixado lá: fica como está.
+      await tx.boleto.updateMany({
+        where: { studentId, porResponsavelFinanceiro: true, status: { in: ["PENDENTE", "VENCIDO"] }, codigoSolicitacao: null },
+        data: { destinatarioId: guardianId },
       });
     });
     return NextResponse.json({ ok: true, guardianId });

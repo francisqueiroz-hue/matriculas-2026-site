@@ -14,7 +14,11 @@ const prismaMock = vi.hoisted(() => ({
 const notifyUsers = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/push", () => ({ notifyUsers }));
-vi.mock("@/lib/contratos-server", () => ({ responsaveisDoAluno: vi.fn(async () => ["g1"]), sha256Hex: () => "hash" }));
+vi.mock("@/lib/contratos-server", () => ({
+  avisadosDoContrato: vi.fn(async () => ["g1"]),
+  destinosDosAlunos: vi.fn(async () => new Map()),
+  sha256Hex: () => "hash",
+}));
 vi.mock("@/lib/session", () => ({
   // Rotas só da direção: aqui a sessão simulada já é da direção (ver tests/direcao-acesso.test.ts).
   requireDirecao: async () => (await import("@/lib/session")).requireRole("ADMIN"),
@@ -122,7 +126,9 @@ describe("boletos do mês", () => {
     vi.doMock("@/lib/prisma", () => ({
       prisma: {
         student: { findMany: vi.fn(async () => [{ id: "a1", name: "Ana", diaVencimento: 10, mensalidadeValor: 1000, guardians: [] }]) },
-        boleto: { findUnique: vi.fn(async () => null), create: criar },
+        boleto: { findUnique: vi.fn(async () => null), findMany: vi.fn(async () => []), create: criar },
+        guardianStudent: { findMany: vi.fn(async () => []) },
+        contratoArquivo: { findMany: vi.fn(async () => []) },
       },
     }));
     vi.doMock("@/lib/banco-inter", () => ({ isBancoInterConfigured: () => false, emitirCobranca: vi.fn(), consultarCobranca: vi.fn() }));

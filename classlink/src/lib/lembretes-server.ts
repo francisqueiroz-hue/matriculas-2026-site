@@ -13,7 +13,7 @@ import { modeloDisponivel } from "@/lib/whatsapp-modelos";
 import { executarComLimite } from "@/lib/concorrencia";
 import { dataBR } from "@/lib/boleto-aviso";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
-import { destinoContrato } from "@/lib/responsavel-financeiro";
+import { avisadosDoItem, type VinculoResponsavel } from "@/lib/responsavel-financeiro";
 import {
   CONFIG_PADRAO,
   diasCorridos,
@@ -38,6 +38,24 @@ const MAX_FAMILIAS_POR_EXECUCAO = 300;
 const DIA_MS = 86_400_000;
 
 const responsavelAtivo = { active: true, deletedAt: null, role: "GUARDIAN" as const };
+
+const vinculoLembreteSelect = {
+  guardianId: true,
+  responsavelFinanceiro: true,
+  guardian: { select: { active: true, deletedAt: true, role: true } },
+} as const;
+
+function paraVinculoLembrete(g: {
+  guardianId: string;
+  responsavelFinanceiro: boolean;
+  guardian: { active: boolean; deletedAt: Date | null; role: string };
+}): VinculoResponsavel {
+  return {
+    guardianId: g.guardianId,
+    responsavelFinanceiro: g.responsavelFinanceiro,
+    ativo: g.guardian.active && !g.guardian.deletedAt && g.guardian.role === "GUARDIAN",
+  };
+}
 
 function tituloCurto(titulo: string): string {
   const limpo = titulo.replace(/\s+/g, " ").trim();
@@ -73,26 +91,16 @@ async function pendenciasDeContrato(schoolId: string): Promise<Pendencia[]> {
       anoLetivo: true,
       status: true,
       updatedAt: true,
-      student: {
-        select: {
-          name: true,
-          guardians: {
-            select: { guardianId: true, responsavelFinanceiro: true, guardian: { select: { active: true, deletedAt: true, role: true } } },
-          },
-        },
-      },
+      porResponsavelFinanceiro: true,
+      destinatarioId: true,
+      student: { select: { name: true, guardians: { select: vinculoLembreteSelect } } },
     },
   });
-  // Só o responsável financeiro (ou o único responsável) é lembrado; sem financeiro indicado num
-  // aluno com dois ou mais responsáveis, ninguém (a tela Contratos pede a indicação).
-  return contratos.flatMap((c) =>
-    destinoContrato(
-      c.student.guardians.map((g) => ({
-        guardianId: g.guardianId,
-        responsavelFinanceiro: g.responsavelFinanceiro,
-        ativo: g.guardian.active && !g.guardian.deletedAt && g.guardian.role === "GUARDIAN",
-      })),
-    ).ids.map((responsavelId) => ({
+  // Contrato da regra do responsável financeiro: só o destinatário é lembrado (sem destinatário,
+  // ninguém; a tela Contratos avisa). Contrato anterior à regra: todos os responsáveis, como era.
+  return contratos.flatMap((c) => {
+    const vinculos = c.student.guardians.map(paraVinculoLembrete);
+    return avisadosDoItem(c, vinculos, vinculos.filter((v) => v.ativo).map((v) => v.guardianId)).map((responsavelId) => ({
       tipo: "CONTRATO" as const,
       referenciaId: c.id,
       responsavelId,
@@ -104,8 +112,8 @@ async function pendenciasDeContrato(schoolId: string): Promise<Pendencia[]> {
           ? `reenviar o contrato de matrícula ${c.anoLetivo} de ${primeiroNome(c.student.name)}, que voltou para correção`
           : `assinar o contrato de matrícula ${c.anoLetivo} de ${primeiroNome(c.student.name)}`,
       url: "/dashboard/contratos",
-    })),
-  );
+    }));
+  });
 }
 
 async function pendenciasDeComunicado(schoolId: string, agora: Date): Promise<Pendencia[]> {
@@ -170,19 +178,25 @@ async function pendenciasDeBoleto(schoolId: string, agora: Date): Promise<Penden
       id: true,
       vencimento: true,
       createdAt: true,
+      porResponsavelFinanceiro: true,
+      destinatarioId: true,
       student: {
         select: {
           name: true,
-          // Mesmo responsável que recebe o aviso do boleto (o 1º vinculado): dado financeiro
-          // não vai para os demais responsáveis.
-          guardians: { orderBy: { createdAt: "asc" }, take: 1, select: { guardianId: true, guardian: { select: { active: true, deletedAt: true } } } },
+          // Mesmo responsável que recebe o aviso do boleto: dado financeiro não vai para os
+          // demais responsáveis.
+          guardians: { orderBy: { createdAt: "asc" }, select: vinculoLembreteSelect },
         },
       },
     },
   });
   return boletos.flatMap((b) => {
-    const g = b.student.guardians[0];
-    if (!g || !g.guardian.active || g.guardian.deletedAt) return [];
+    // Boleto da regra do responsável financeiro: o destinatário. Anterior à regra: o 1º
+    // responsável vinculado, como era.
+    const vinculos = b.student.guardians.map(paraVinculoLembrete);
+    const primeiro = vinculos[0];
+    const [responsavelId] = avisadosDoItem(b, vinculos, primeiro?.ativo ? [primeiro.guardianId] : []);
+    if (!responsavelId) return [];
     const nome = primeiroNome(b.student.name);
     const data = dataBR(b.vencimento);
     const diasAte = diasCorridos(agora, b.vencimento);
@@ -190,7 +204,7 @@ async function pendenciasDeBoleto(schoolId: string, agora: Date): Promise<Penden
       {
         tipo: "BOLETO" as const,
         referenciaId: b.id,
-        responsavelId: g.guardianId,
+        responsavelId,
         desde: b.createdAt,
         vencimento: b.vencimento,
         aluno: b.student.name,

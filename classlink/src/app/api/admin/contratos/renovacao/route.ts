@@ -16,7 +16,7 @@ import {
   statusAposConfirmacaoEscola,
   validarPdf,
 } from "@/lib/contratos";
-import { lerPdfDoBlob, responsaveisDoAluno, sha256Hex } from "@/lib/contratos-server";
+import { avisadosDoContrato, destinoDoAluno, lerPdfDoBlob, sha256Hex } from "@/lib/contratos-server";
 import { apagarDoBlob } from "@/lib/blob-storage";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
@@ -83,7 +83,14 @@ export async function POST(request: NextRequest) {
     const existente = dados.contratoId
       ? await prisma.contrato.findFirst({
           where: { id: dados.contratoId, schoolId: session.schoolId, studentId: aluno.id },
-          select: { id: true, status: true, anoLetivo: true, titulo: true, _count: { select: { arquivos: { where: { tipo: "ASSINADO" } } } } },
+          select: {
+            id: true,
+            status: true,
+            anoLetivo: true,
+            titulo: true,
+            porResponsavelFinanceiro: true,
+            destinatarioId: true,
+            _count: { select: { arquivos: { where: { tipo: "ASSINADO" } } } } },
         })
       : null;
     if (dados.contratoId) {
@@ -128,6 +135,10 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join(" · ");
 
+    // Contrato novo registrado pela escola já segue a regra do responsável financeiro.
+    const regra = existente
+      ? { porResponsavelFinanceiro: existente.porResponsavelFinanceiro, destinatarioId: existente.destinatarioId }
+      : { porResponsavelFinanceiro: true, destinatarioId: (await destinoDoAluno(aluno.id)).ids[0] ?? null };
     const contrato = await prisma.$transaction(async (tx) => {
       const camposStatus = {
         status: novoStatus,
@@ -150,6 +161,7 @@ export async function POST(request: NextRequest) {
             anoLetivo: dados.anoLetivo,
             titulo: dados.titulo!,
             criadoPorId: session.sub,
+            ...regra,
             ...camposStatus,
           },
           select: { id: true },
@@ -178,7 +190,7 @@ export async function POST(request: NextRequest) {
     blobPath = null; // registrado: o arquivo fica
 
     const primeiroNome = aluno.name.split(" ")[0];
-    await notifyUsers(await responsaveisDoAluno(aluno.id), {
+    await notifyUsers(await avisadosDoContrato({ ...regra, studentId: aluno.id }), {
       title: "Contrato registrado pela escola",
       body:
         novoStatus === "COMPLETO"

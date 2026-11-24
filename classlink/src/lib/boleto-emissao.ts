@@ -3,6 +3,7 @@ import { isBancoInterConfigured, emitirCobranca, consultarCobranca } from "@/lib
 import { origemPublica } from "@/lib/push";
 import { avisarNovoBoleto } from "@/lib/boleto-aviso";
 import { executarComLimite } from "@/lib/concorrencia";
+import { destinosDosAlunos } from "@/lib/contratos-server";
 
 /** Avisos (push + WhatsApp) simultâneos: acelera o lote sem estourar limites dos provedores. */
 const AVISOS_SIMULTANEOS = 5;
@@ -44,11 +45,21 @@ export async function gerarBoletosDoMes(
     include: {
       guardians: {
         orderBy: { createdAt: "asc" },
-        take: 1,
         include: { guardian: { select: { id: true, name: true, cpf: true, enderecoCobranca: true, active: true, phone: true, whatsappUltimaMensagemEm: true } } },
       },
     },
   });
+
+  // Regra do responsável financeiro: o boleto (e o aviso) vai só para ele. Calculado só para
+  // quem ainda não tem o boleto do mês.
+  const jaGerados = (
+    await prisma.boleto.findMany({
+      where: { studentId: { in: alunos.map((a) => a.id) }, mesReferencia },
+      select: { studentId: true },
+    })
+  ).map((b) => b.studentId);
+  const comBoleto = new Set(jaGerados);
+  const destinos = await destinosDosAlunos(alunos.filter((a) => !comBoleto.has(a.id)).map((a) => a.id));
 
   for (const aluno of alunos) {
     const jaExiste = await prisma.boleto.findUnique({
@@ -62,6 +73,10 @@ export async function gerarBoletosDoMes(
     // Vencimento sempre no dia 05, para todos os alunos (decisão da direção, out/2026).
     const vencimento = calcularVencimento(DIA_VENCIMENTO_PADRAO, hoje);
 
+    // Sem ninguém que conste como responsável financeiro (dois ou mais responsáveis, nenhum
+    // indicado): o boleto é criado, mas sem destinatário e sem aviso; a tela Contratos pede a
+    // indicação e, ao indicar, o boleto em aberto passa para ele.
+    const destinatarioId = destinos.get(aluno.id)?.ids[0] ?? null;
     const boleto = await prisma.boleto.create({
       data: {
         studentId: aluno.id,
@@ -70,11 +85,13 @@ export async function gerarBoletosDoMes(
         valor: aluno.mensalidadeValor!,
         vencimento,
         status: "PENDENTE",
+        porResponsavelFinanceiro: true,
+        destinatarioId,
       },
     });
     resultado.criados++;
 
-    const responsavel = aluno.guardians[0]?.guardian;
+    const responsavel = aluno.guardians.find((g) => g.guardianId === destinatarioId)?.guardian;
 
     // O responsável é avisado quando o boleto é gerado pelo ClassLink (a cobrança hoje é manual,
     // sem automação do banco); o aviso não depende da emissão real no Inter.
@@ -98,7 +115,12 @@ export async function gerarBoletosDoMes(
     if (!responsavel || !responsavel.active) {
       await prisma.boleto.update({
         where: { id: boleto.id },
-        data: { status: "ERRO", erroDetalhe: "Aluno sem responsável financeiro ativo vinculado" },
+        data: {
+          status: "ERRO",
+          erroDetalhe: destinatarioId
+            ? "Aluno sem responsável financeiro ativo vinculado"
+            : "Aluno com mais de um responsável: indique o responsável financeiro na tela Contratos",
+        },
       });
       resultado.erros++;
       continue;

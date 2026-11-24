@@ -96,8 +96,8 @@ interface Pendente {
 }
 
 /**
- * Alunos com dois ou mais responsáveis e nenhum indicado como financeiro. Enquanto estiverem
- * aqui, o contrato deles não é enviado nem lembrado (para não ir ao responsável pedagógico).
+ * Alunos com dois ou mais responsáveis em que nada indica o financeiro. Enquanto estiverem
+ * aqui, contrato novo não é enviado e boleto novo sai sem aviso (para não ir ao pedagógico).
  * `versao` muda quando a lista de contratos recarrega, para esta lista acompanhar.
  */
 export function PainelResponsavelFinanceiro({ versao, onMudou }: { versao: unknown; onMudou: () => void }) {
@@ -130,8 +130,9 @@ export function PainelResponsavelFinanceiro({ versao, onMudou }: { versao: unkno
       </summary>
       <div className="space-y-3 border-t border-amber-200 px-4 py-3 text-sm text-amber-900">
         <p>
-          O contrato vai só para o responsável financeiro (quem assina), nunca para o pedagógico. Enquanto não indicar, o app não
-          envia o contrato desses alunos nem manda lembretes dele.
+          Contrato e boleto vão só para o responsável financeiro, nunca para o pedagógico. Nesses alunos nada no cadastro indica
+          quem é (nem contrato assinado, nem CPF de cobrança). Enquanto não indicar, o app não envia contrato novo a eles e o boleto
+          novo sai sem aviso.
         </p>
         <ul className="space-y-3">
           {pendentes.map((p) => (

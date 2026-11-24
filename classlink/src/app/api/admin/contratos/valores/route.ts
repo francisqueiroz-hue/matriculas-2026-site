@@ -4,7 +4,7 @@ import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
-import { responsaveisDoAluno, sha256Hex } from "@/lib/contratos-server";
+import { avisadosDoContrato, sha256Hex } from "@/lib/contratos-server";
 import { gerarContrato2027 } from "@/lib/contrato-modelo/gerar";
 import { CRITERIO_RENOVACAO_2027, ROTULO_SITUACAO, conferirValor, precisaAtualizar } from "@/lib/contrato-modelo/conferencia";
 import {
@@ -31,6 +31,8 @@ async function contratosDoAno(schoolId: string) {
       condicoes: true,
       dadosFamilia: true,
       studentId: true,
+      porResponsavelFinanceiro: true,
+      destinatarioId: true,
       student: { select: { name: true, mensalidadeValor: true, bolsista: true, class: { select: { name: true } } } },
       arquivos: { where: { tipo: "ASSINADO" }, select: { id: true }, take: 1 },
     },
@@ -156,7 +158,7 @@ export async function POST(request: NextRequest) {
       });
       if (!ok) continue;
       atualizados.push({ id: c.id, nome: c.student.name });
-      await notifyUsers(await responsaveisDoAluno(c.studentId), {
+      await notifyUsers(await avisadosDoContrato(c), {
         title: "Contrato 2027 atualizado",
         body: `O contrato de ${c.student.name.split(" ")[0]} foi atualizado com os valores de 2027. Confira e assine a versão nova no app.`,
         url: "/dashboard/contratos",
