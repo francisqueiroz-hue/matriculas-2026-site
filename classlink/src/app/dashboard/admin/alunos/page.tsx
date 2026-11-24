@@ -28,7 +28,10 @@ interface StudentItem {
   id: string;
   name: string;
   class: { id: string; name: string };
-  guardians: { guardian: { id: string; name: string; email: string | null; phone: string | null } }[];
+  guardians: {
+    responsavelFinanceiro?: boolean;
+    guardian: { id: string; name: string; email: string | null; phone: string | null };
+  }[];
   mensalidadeValor: string | null;
   diaVencimento: number | null;
   /** Isento de mensalidade (bolsa integral). */
@@ -547,6 +550,14 @@ function AlunosContent() {
                       <span>
                         {g.guardian.name} ({g.guardian.email ?? g.guardian.phone ?? "sem contato"}
                         {g.guardian.email && g.guardian.phone ? ` · ${g.guardian.phone}` : ""})
+                        {g.responsavelFinanceiro && s.guardians.length > 1 && (
+                          <span
+                            className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
+                            title="Recebe e assina o contrato. A direção troca na tela Contratos."
+                          >
+                            financeiro
+                          </span>
+                        )}
                       </span>
                       <span className="flex items-center gap-3">
                         <button type="button" onClick={() => startEditGuardian(g.guardian)} className="text-xs text-indigo-600 hover:underline">

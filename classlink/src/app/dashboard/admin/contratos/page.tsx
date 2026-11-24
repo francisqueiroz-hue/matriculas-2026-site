@@ -11,6 +11,8 @@ import { AcoesPdf } from "@/components/AcoesPdf";
 import { ContratoModeloPainel } from "./ContratoModeloPainel";
 import { ConferenciaAssinatura } from "./ConferenciaAssinatura";
 import { ConfirmarRenovacao } from "./ConfirmarRenovacao";
+import { EscolherFinanceiro, PainelResponsavelFinanceiro } from "./ResponsavelFinanceiro";
+import type { DestinoContrato } from "@/lib/responsavel-financeiro";
 import { gerarPlanilhaContratos, nomeArquivoPlanilha } from "@/lib/contratos-planilha";
 import { MIME_XLSX } from "@/lib/xlsx";
 import {
@@ -76,7 +78,13 @@ interface Contrato {
     id: string;
     name: string;
     class: { name: string };
-    guardians: { relation: string | null; guardian: { id: string; name: string; phone: string | null } }[];
+    guardians: {
+      relation: string | null;
+      responsavelFinanceiro: boolean;
+      guardian: { id: string; name: string; phone: string | null };
+    }[];
+    /** Quem recebe e assina o contrato (responsável financeiro ou o único responsável). */
+    destino: DestinoContrato;
   };
   arquivos: Arquivo[];
   eventos: Evento[];
@@ -500,6 +508,18 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
   }
 
   const aguardandoFamilia = c.status === "AGUARDANDO_ASSINATURA" || c.status === "DEVOLVIDO";
+  // Com mais de um responsável, o contrato e os lembretes vão só ao financeiro (quem assina).
+  const destino = c.student.destino;
+  const destinatarios = c.student.guardians.filter((g) => destino.ids.includes(g.guardian.id));
+  const opcoesResponsavel = c.student.guardians.map((g) => ({ id: g.guardian.id, name: g.guardian.name, relation: g.relation }));
+  const financeiro = destino.situacao === "FINANCEIRO" ? destinatarios[0] : undefined;
+  // O PDF assinado veio de outro responsável do aluno (não do financeiro): pede conferência.
+  const remetente = ultimo?.enviadoPor?.id;
+  const enviadoPorOutro =
+    !!remetente &&
+    destino.ids.length > 0 &&
+    !destino.ids.includes(remetente) &&
+    c.student.guardians.some((g) => g.guardian.id === remetente);
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
@@ -513,6 +533,41 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_COR[c.status]}`}>{STATUS_CONTRATO_LABEL[c.status]}</span>
       </div>
+
+      {destino.situacao === "INDEFINIDO" && (
+        <div role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900">
+          <p className="font-semibold">Falta indicar o responsável financeiro.</p>
+          <p className="mt-1">
+            Este aluno tem mais de um responsável. O contrato vai só para quem assina (o financeiro), nunca para o pedagógico. Até
+            indicar, nenhum aviso ou lembrete deste contrato é enviado.
+          </p>
+          <div className="mt-2">
+            <EscolherFinanceiro studentId={c.student.id} responsaveis={opcoesResponsavel} onSalvo={onMudou} />
+          </div>
+        </div>
+      )}
+      {financeiro && c.student.guardians.length > 1 && (
+        <details className="mt-2 text-slate-700">
+          <summary className="cursor-pointer">
+            Responsável financeiro (recebe e assina): <strong>{financeiro.guardian.name}</strong>{" "}
+            <span className="text-xs text-indigo-700 underline">trocar</span>
+          </summary>
+          <div className="mt-2">
+            <EscolherFinanceiro
+              studentId={c.student.id}
+              responsaveis={opcoesResponsavel}
+              atualId={financeiro.guardian.id}
+              onSalvo={onMudou}
+            />
+          </div>
+        </details>
+      )}
+      {enviadoPorOutro && (
+        <p role="status" className="mt-2 rounded-md bg-amber-50 p-2 text-amber-900">
+          Atenção: o contrato assinado foi enviado por {ultimo.enviadoPor?.name}, que não é o responsável financeiro. Confira quem
+          assinou antes de aprovar.
+        </p>
+      )}
 
       {ultimo && (
         <div className="mt-3 rounded-lg bg-slate-50 p-3">
@@ -634,7 +689,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
           </button>
         )}
         {aguardandoFamilia &&
-          c.student.guardians.map((g) => (
+          destinatarios.map((g) => (
             <button
               key={`app-${g.guardian.id}`}
               type="button"
@@ -650,7 +705,7 @@ function ContratoAdminCard({ c, onMudou }: { c: Contrato; onMudou: () => void })
             </button>
           ))}
         {aguardandoFamilia &&
-          c.student.guardians
+          destinatarios
             .filter((g) => g.guardian.phone)
             .map((g) => (
               <a
@@ -873,6 +928,8 @@ function ContratosContent() {
           </button>
         ))}
       </div>
+
+      <PainelResponsavelFinanceiro versao={dados} onMudou={carregar} />
 
       <ContratoModeloPainel ano={ano} jaTemModelo={jaTemModelo} onEnviado={carregar} />
 

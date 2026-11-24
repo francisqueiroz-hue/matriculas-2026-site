@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const banco = vi.hoisted(() => ({
   prisma: {
     contrato: { findFirst: vi.fn() },
+    guardianStudent: { findMany: vi.fn() },
     lembretePendencia: { findUnique: vi.fn(), upsert: vi.fn() },
     conversation: { upsert: vi.fn<(args: { create: unknown }) => Promise<{ id: string }>>(async () => ({ id: "conv1" })) },
     message: { create: vi.fn() },
@@ -27,9 +28,16 @@ import { jaLembradoHoje, textoLembreteContrato } from "@/lib/lembrete-contrato";
 
 const ctx = { params: Promise.resolve({ id: "c1" }) } as never;
 const req = (corpo: unknown) => new NextRequest("http://t/api/admin/contratos/c1/lembrete", { method: "POST", body: JSON.stringify(corpo) });
+const vinculo = (guardianId: string, responsavelFinanceiro = false) => ({
+  studentId: "a1",
+  guardianId,
+  responsavelFinanceiro,
+  guardian: { active: true, deletedAt: null, role: "GUARDIAN" },
+});
 const contrato = (status: string, guardians = [{ guardian: { id: "resp1", name: "Maria Souza" } }]) => ({
   id: "c1",
   status,
+  studentId: "a1",
   anoLetivo: 2027,
   updatedAt: new Date("2026-11-10T12:00:00Z"),
   student: { name: "Ravi Souza", guardians },
@@ -39,6 +47,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
   banco.prisma.lembretePendencia.findUnique.mockResolvedValue(null);
+  banco.prisma.guardianStudent.findMany.mockResolvedValue([vinculo("resp1")]);
 });
 
 describe("lembrar no ClassLink", () => {
@@ -96,5 +105,36 @@ describe("regras do lembrete", () => {
     // 17/11 13h UTC e 18/11 13h UTC: dias diferentes.
     expect(jaLembradoHoje(new Date("2026-11-17T13:00:00Z"), new Date("2026-11-18T13:00:00Z"))).toBe(false);
     expect(jaLembradoHoje(null, new Date())).toBe(false);
+  });
+});
+
+describe("lembrar no ClassLink com mais de um responsável", () => {
+  const doisResponsaveis = [{ guardian: { id: "pai", name: "João Souza" } }];
+
+  it("lembra o responsável financeiro", async () => {
+    banco.prisma.guardianStudent.findMany.mockResolvedValue([vinculo("mae", true), vinculo("pai")]);
+    banco.prisma.contrato.findFirst.mockResolvedValue(contrato("AGUARDANDO_ASSINATURA", [{ guardian: { id: "mae", name: "Maria Souza" } }]));
+    const res = await POST(req({ responsavelId: "mae" }), ctx);
+    expect(res.status).toBe(201);
+    expect(push.notifyUsers).toHaveBeenCalledWith(["mae"], expect.anything());
+  });
+
+  it("recusa lembrar o responsável que não é o financeiro (pedagógico)", async () => {
+    banco.prisma.guardianStudent.findMany.mockResolvedValue([vinculo("mae", true), vinculo("pai")]);
+    banco.prisma.contrato.findFirst.mockResolvedValue(contrato("AGUARDANDO_ASSINATURA", doisResponsaveis));
+    const res = await POST(req({ responsavelId: "pai" }), ctx);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/não é o responsável financeiro/);
+    expect(push.notifyUsers).not.toHaveBeenCalled();
+    expect(banco.prisma.message.create).not.toHaveBeenCalled();
+  });
+
+  it("sem financeiro indicado: não lembra ninguém e pede a indicação", async () => {
+    banco.prisma.guardianStudent.findMany.mockResolvedValue([vinculo("mae"), vinculo("pai")]);
+    banco.prisma.contrato.findFirst.mockResolvedValue(contrato("AGUARDANDO_ASSINATURA", doisResponsaveis));
+    const res = await POST(req({ responsavelId: "pai" }), ctx);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/indique o responsável financeiro/);
+    expect(push.notifyUsers).not.toHaveBeenCalled();
   });
 });

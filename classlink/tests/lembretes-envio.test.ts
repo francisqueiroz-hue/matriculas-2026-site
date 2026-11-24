@@ -46,7 +46,9 @@ const config = (ativos: boolean) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.school.findUnique.mockResolvedValue(config(true));
-  // Um contrato aguardando assinatura há 5 dias, de uma aluna com mãe e pai vinculados.
+  // Dois contratos aguardando assinatura há 5 dias: Ana tem mãe (financeira) e pai vinculados;
+  // Bia só tem o pai. O contrato vai só ao responsável financeiro (ou ao único responsável).
+  const ativo = { active: true, deletedAt: null, role: "GUARDIAN" };
   prismaMock.contrato.findMany.mockImplementation(async (args: { where: { status?: { in: string[] }; anoLetivo?: number } }) =>
     args.where.status?.in.includes("AGUARDANDO_ASSINATURA")
       ? [
@@ -55,7 +57,20 @@ beforeEach(() => {
             anoLetivo: 2027,
             status: "AGUARDANDO_ASSINATURA",
             updatedAt: new Date("2026-10-30T12:00:00Z"),
-            student: { name: "Ana Souza", guardians: [{ guardianId: "mae" }, { guardianId: "pai" }] },
+            student: {
+              name: "Ana Souza",
+              guardians: [
+                { guardianId: "mae", responsavelFinanceiro: true, guardian: ativo },
+                { guardianId: "pai", responsavelFinanceiro: false, guardian: ativo },
+              ],
+            },
+          },
+          {
+            id: "c2",
+            anoLetivo: 2027,
+            status: "AGUARDANDO_ASSINATURA",
+            updatedAt: new Date("2026-10-30T12:00:00Z"),
+            student: { name: "Bia Lima", guardians: [{ guardianId: "pai", responsavelFinanceiro: false, guardian: ativo }] },
           },
         ]
       : [],
@@ -83,6 +98,32 @@ describe("executarLembretesDaEscola", () => {
     expect(prismaMock.lembretePendencia.createMany).toHaveBeenCalledTimes(1);
     expect(notifyUsers).not.toHaveBeenCalled();
     expect(sendTemplate).not.toHaveBeenCalled();
+  });
+
+  it("contrato só para o responsável financeiro: sem financeiro indicado, o aluno com dois responsáveis não é lembrado", async () => {
+    const ativo = { active: true, deletedAt: null, role: "GUARDIAN" };
+    prismaMock.contrato.findMany.mockImplementation(async (args: { where: { status?: { in: string[] } } }) =>
+      args.where.status?.in.includes("AGUARDANDO_ASSINATURA")
+        ? [
+            {
+              id: "c1",
+              anoLetivo: 2027,
+              status: "AGUARDANDO_ASSINATURA",
+              updatedAt: new Date("2026-10-30T12:00:00Z"),
+              student: {
+                name: "Ana Souza",
+                guardians: [
+                  { guardianId: "mae", responsavelFinanceiro: false, guardian: ativo },
+                  { guardianId: "pai", responsavelFinanceiro: false, guardian: ativo },
+                ],
+              },
+            },
+          ]
+        : [],
+    );
+    const r = await executarLembretesDaEscola("s1", QUARTA);
+    expect(r).toMatchObject({ pendencias: 0, enviadas: 0 });
+    expect(notifyUsers).not.toHaveBeenCalled();
   });
 
   it("domingo: não envia", async () => {

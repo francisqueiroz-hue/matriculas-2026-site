@@ -13,6 +13,7 @@ import { modeloDisponivel } from "@/lib/whatsapp-modelos";
 import { executarComLimite } from "@/lib/concorrencia";
 import { dataBR } from "@/lib/boleto-aviso";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
+import { destinoContrato } from "@/lib/responsavel-financeiro";
 import {
   CONFIG_PADRAO,
   diasCorridos,
@@ -72,14 +73,29 @@ async function pendenciasDeContrato(schoolId: string): Promise<Pendencia[]> {
       anoLetivo: true,
       status: true,
       updatedAt: true,
-      student: { select: { name: true, guardians: { where: { guardian: responsavelAtivo }, select: { guardianId: true } } } },
+      student: {
+        select: {
+          name: true,
+          guardians: {
+            select: { guardianId: true, responsavelFinanceiro: true, guardian: { select: { active: true, deletedAt: true, role: true } } },
+          },
+        },
+      },
     },
   });
+  // Só o responsável financeiro (ou o único responsável) é lembrado; sem financeiro indicado num
+  // aluno com dois ou mais responsáveis, ninguém (a tela Contratos pede a indicação).
   return contratos.flatMap((c) =>
-    c.student.guardians.map((g) => ({
+    destinoContrato(
+      c.student.guardians.map((g) => ({
+        guardianId: g.guardianId,
+        responsavelFinanceiro: g.responsavelFinanceiro,
+        ativo: g.guardian.active && !g.guardian.deletedAt && g.guardian.role === "GUARDIAN",
+      })),
+    ).ids.map((responsavelId) => ({
       tipo: "CONTRATO" as const,
       referenciaId: c.id,
-      responsavelId: g.guardianId,
+      responsavelId,
       // Última mudança do contrato: devolução ou PDF refeito recomeçam a contagem.
       desde: c.updatedAt,
       aluno: c.student.name,

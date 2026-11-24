@@ -5,7 +5,8 @@ import { handleApiError } from "@/lib/http";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
 import { executarComLimite } from "@/lib/concorrencia";
-import { responsaveisDoAluno, sha256Hex } from "@/lib/contratos-server";
+import { destinosDosAlunos, sha256Hex } from "@/lib/contratos-server";
+import { MOTIVO_SEM_FINANCEIRO } from "@/lib/responsavel-financeiro";
 import { carregarConfig } from "@/lib/contrato-modelo/servidor";
 import { gerarContrato2027 } from "@/lib/contrato-modelo/gerar";
 import { envioLoteSchema } from "@/lib/contrato-modelo/validacao";
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
         select: { studentId: true },
       }),
     ]);
+    const destinos = await destinosDosAlunos(alunos.map((a) => a.id));
     const porId = new Map(alunos.map((a) => [a.id, a]));
     const jaTem = new Set(existentes.map((e) => e.studentId));
     const ipOrigem = getClientIp(request);
@@ -70,6 +72,12 @@ export async function POST(request: NextRequest) {
       }
       if (jaTem.has(aluno.id)) {
         ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: `Já tem contrato ${body.anoLetivo} do modelo do app` });
+        continue;
+      }
+      // Com mais de um responsável, o contrato vai só ao financeiro: sem ele indicado, fica de fora.
+      const destino = destinos.get(aluno.id);
+      if (destino?.situacao === "INDEFINIDO") {
+        ignorados.push({ studentId: aluno.id, nome: aluno.name, motivo: MOTIVO_SEM_FINANCEIRO });
         continue;
       }
       // Renovação com correção exige a mensalidade no cadastro (ou a isenção de bolsista):
@@ -158,10 +166,10 @@ export async function POST(request: NextRequest) {
       });
       jaTem.add(aluno.id);
       criados.push({ id: contrato.id, studentId: aluno.id, nome: aluno.name });
-      const alunoId = aluno.id;
+      const destinatarios = destino?.ids ?? [];
       const primeiroNome = aluno.name.split(" ")[0];
       avisos.push(async () => {
-        await notifyUsers(await responsaveisDoAluno(alunoId), {
+        await notifyUsers(destinatarios, {
           title: "Contrato de matrícula 2027",
           body: `O contrato de ${primeiroNome} está no app para assinar — grátis pelo gov.br ou à mão.`,
           url: "/dashboard/contratos",

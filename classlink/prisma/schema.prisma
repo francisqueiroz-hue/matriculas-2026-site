@@ -367,6 +367,10 @@ model GuardianStudent {
   student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   studentId  String
   relation   String? // ex: "mãe", "pai", "tutor legal"
+  // Responsável financeiro (contratante): quando o aluno tem mais de um responsável, só ele
+  // recebe, preenche e assina o contrato. No máximo um por aluno (garantido na rota que marca).
+  // Ver lib/responsavel-financeiro.ts.
+  responsavelFinanceiro Boolean @default(false)
   createdAt  DateTime @default(now())
 
   @@unique([guardianId, studentId])
