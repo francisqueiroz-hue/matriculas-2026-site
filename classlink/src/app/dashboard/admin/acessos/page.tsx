@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { apiJson } from "@/lib/api-client";
+import { mensagemAtivarAvisos } from "@/lib/adocao";
+import { linkWhatsApp } from "@/lib/busca-aluno";
+import { PainelAdocao } from "./PainelAdocao";
 
 interface Responsavel {
   id: string;
@@ -14,6 +17,7 @@ interface Responsavel {
   ultimoUso?: string | null;
   notificacoesAtivas?: boolean;
   alunos: string[];
+  turmasAlunos?: string[];
   funcao: string | null;
   turmas: string[];
   nomeRepetido?: boolean;
@@ -44,8 +48,10 @@ function dataHora(iso: string) {
 }
 
 function AcessosContent() {
-  // Filtro da lista: nunca entraram (padrão), todos, ou sem notificações no celular.
-  const [filtro, setFiltro] = useState<"pendentes" | "todos" | "semNotificacao">("pendentes");
+  // Filtro da lista: nunca entraram (padrão), sem uso há 7 dias, sem notificações no celular, ou todos.
+  const [filtro, setFiltro] = useState<"pendentes" | "semUso" | "todos" | "semNotificacao">("pendentes");
+  // Turma escolhida no painel de uso (só famílias): filtra a lista sem nova consulta.
+  const [turma, setTurma] = useState<string | null>(null);
   const [publico, setPublico] = useState<"familias" | "equipe">("familias");
   const [dados, setDados] = useState<Dados | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -59,6 +65,7 @@ function AcessosContent() {
     const params = new URLSearchParams({
       ...(filtro === "todos" && { todos: "1" }),
       ...(filtro === "semNotificacao" && { filtro: "sem-notificacao" }),
+      ...(filtro === "semUso" && { filtro: "sem-uso" }),
       ...(publico === "equipe" && { publico: "equipe" }),
     });
     apiJson<Dados>(`/api/admin/acessos?${params}`)
@@ -121,9 +128,10 @@ function AcessosContent() {
 
   async function enviarTodos() {
     if (!dados) return;
-    const pendentes = dados.responsaveis.filter((r) => !r.jaEntrou && r.phone);
+    const pendentes = lista.filter((r) => !r.jaEntrou && r.phone);
     if (pendentes.length === 0) return;
-    if (!confirm(`Enviar o acesso pelo WhatsApp da escola para ${pendentes.length} pessoa(s) que nunca entraram?`)) return;
+    const daTurma = turma ? ` da turma ${turma}` : "";
+    if (!confirm(`Enviar o acesso pelo WhatsApp da escola para ${pendentes.length} pessoa(s)${daTurma} que nunca entraram?`)) return;
     setEnviandoTodos(true);
     setResultadoLote(null);
     try {
@@ -162,8 +170,16 @@ function AcessosContent() {
     }
   }
 
+  const lista = (dados?.responsaveis ?? []).filter((r) => publico === "equipe" || !turma || r.turmasAlunos?.includes(turma));
   // Só conta quem pode receber (tem celular); os sem telefone aparecem destacados na lista.
-  const pendentes = dados?.responsaveis.filter((r) => !r.jaEntrou && r.phone).length ?? 0;
+  const pendentes = lista.filter((r) => !r.jaEntrou && r.phone).length;
+
+  /** Link do WhatsApp (do aparelho da escola) com o passo a passo para ativar as notificações. */
+  function linkAtivarAvisos(r: Responsavel) {
+    const base = linkWhatsApp(r.phone);
+    if (!base || typeof window === "undefined") return null;
+    return `${base}?text=${encodeURIComponent(mensagemAtivarAvisos(r.name, `${window.location.origin}/guia#instalar`))}`;
+  }
 
   return (
     <div className="space-y-4">
@@ -204,6 +220,8 @@ function AcessosContent() {
         </div>
       )}
 
+      {publico === "familias" && <PainelAdocao turmaSelecionada={turma} onTurma={setTurma} />}
+
       <div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 text-sm" role="tablist" aria-label="Público">
         {(["familias", "equipe"] as const).map((p) => (
           <button
@@ -223,6 +241,7 @@ function AcessosContent() {
         {(
           [
             ["pendentes", "Nunca entraram"],
+            ["semUso", "Sem uso há 7 dias"],
             ["semNotificacao", "Sem notificações no celular"],
             ["todos", publico === "equipe" ? "Toda a equipe" : "Todos os responsáveis"],
           ] as const
@@ -249,10 +268,23 @@ function AcessosContent() {
           </button>
         )}
       </div>
+      {publico === "familias" && turma && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+          Mostrando só a turma <strong>{turma}</strong>.
+          <button type="button" onClick={() => setTurma(null)} className="text-xs font-semibold text-indigo-700 underline">
+            Ver todas as turmas
+          </button>
+        </p>
+      )}
       {resultadoLote && <p className="rounded-md bg-slate-100 p-3 text-sm text-slate-700">{resultadoLote}</p>}
 
       {erro && <p className="text-sm text-red-600">{erro}</p>}
       {!dados && !erro && <p className="text-sm text-slate-500">Carregando...</p>}
+      {dados && dados.responsaveis.length > 0 && lista.length === 0 && (
+        <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+          Ninguém da turma {turma} neste filtro.
+        </p>
+      )}
       {dados?.responsaveis.length === 0 && (
         <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
           {publico === "equipe"
@@ -260,17 +292,21 @@ function AcessosContent() {
               ? "Ninguém da equipe cadastrado."
               : filtro === "semNotificacao"
                 ? "🎉 Toda a equipe está com as notificações ativas."
+                : filtro === "semUso"
+                  ? "🎉 Todo mundo da equipe que já entrou usou o ClassLink nos últimos 7 dias."
                 : "🎉 Toda a equipe já entrou no ClassLink."
             : filtro === "todos"
               ? "Nenhum responsável cadastrado."
               : filtro === "semNotificacao"
                 ? "🎉 Todos os responsáveis estão com as notificações ativas."
+                : filtro === "semUso"
+                  ? "🎉 Todos os responsáveis que já entraram usaram o ClassLink nos últimos 7 dias."
                 : "🎉 Todos os responsáveis já entraram no ClassLink."}
         </p>
       )}
 
       <ul className="space-y-2">
-        {dados?.responsaveis.map((r) => (
+        {lista.map((r) => (
           <li key={r.id} className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
@@ -330,6 +366,17 @@ function AcessosContent() {
                   >
                     {enviando === r.id ? "Enviando..." : avisos[r.id]?.ok ? "✓ Enviado — enviar de novo" : "Enviar acesso pelo WhatsApp da escola"}
                   </button>
+                )}
+                {r.jaEntrou && !r.notificacoesAtivas && linkAtivarAvisos(r) && (
+                  <a
+                    href={linkAtivarAvisos(r)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Abre o WhatsApp deste aparelho com o passo a passo para ativar as notificações"
+                    className="rounded-md border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 hover:bg-sky-100"
+                  >
+                    🔔 Pedir para ativar notificações
+                  </a>
                 )}
                 <button
                   type="button"
