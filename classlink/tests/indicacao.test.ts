@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkIndicacao, linkWhatsAppIndicacao, mensagemIndicacao, nomeParaIndicacao } from "@/lib/indicacao";
+import { BENEFICIO_INDICACAO, linkIndicacao, linkWhatsAppIndicacao, mensagemIndicacao, nomeParaIndicacao } from "@/lib/indicacao";
 
 describe("indique uma família", () => {
   it("usa só o primeiro e o último nome de quem indica", () => {
@@ -22,5 +22,12 @@ describe("indique uma família", () => {
     const texto = decodeURIComponent(wa.split("text=")[1]);
     expect(texto).toContain("indicacao=Ana+Lima");
     expect(mensagemIndicacao("L", 2027)).toContain("matrículas 2027");
+  });
+});
+
+describe("benefício da indicação", () => {
+  it("cita material pedagógico ou escolar sem prometer valor", () => {
+    expect(BENEFICIO_INDICACAO).toContain("material pedagógico ou escolar");
+    expect(BENEFICIO_INDICACAO).not.toMatch(/R\$|%|\d/);
   });
 });

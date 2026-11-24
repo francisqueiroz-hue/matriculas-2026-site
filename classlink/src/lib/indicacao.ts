@@ -9,6 +9,13 @@ const ANO_LETIVO_MATRICULAS = CAMPANHA_REMATRICULA.ano;
  * recebe o link é coletado aqui: o contato só existe se a família convidada enviar o formulário.
  */
 
+/**
+ * Benefício de quem indica, decidido pela direção em 24/11/2026: material pedagógico ou escolar,
+ * sem valor fixo. O texto não promete quantia; os detalhes ficam com a secretaria.
+ */
+export const BENEFICIO_INDICACAO =
+  "Quando a família indicada faz a matrícula, quem indicou ganha um benefício em material pedagógico ou escolar. Os detalhes são combinados com a secretaria.";
+
 /** Nome que vai no link: só o primeiro e o último nome, para não expor o nome completo. */
 export function nomeParaIndicacao(nomeCompleto: string): string {
   const partes = nomeCompleto.trim().split(/\s+/).filter(Boolean);
