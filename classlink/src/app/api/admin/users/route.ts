@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
         funcao: body.funcao,
         schoolId: session.schoolId,
         passwordHash: await hashPassword(senha),
+        senhaProvisoria: true,
         ...(role === "STAFF" && body.classIds?.length
           ? { classesTeaching: { create: body.classIds.map((classId) => ({ classId })) } }
           : {}),

@@ -40,7 +40,7 @@ export async function responderPedidoDeAcesso(
   );
 
   await prisma.$transaction([
-    prisma.user.update({ where: { id: responsavel.id }, data: { passwordHash: await hashPassword(senha) } }),
+    prisma.user.update({ where: { id: responsavel.id }, data: { passwordHash: await hashPassword(senha), senhaProvisoria: true } }),
     prisma.refreshToken.updateMany(encerrarTodasAsSessoes(responsavel.id)),
   ]);
 }

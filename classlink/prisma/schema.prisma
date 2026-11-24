@@ -162,6 +162,10 @@ model User {
   // chega mensagem nova no ClassLink. Opt-in pela própria pessoa, em Conta.
   avisosWhatsApp Boolean @default(false)
 
+  // Entrou com senha provisória (gerada pela escola ou pelo "esqueci a senha"): o app sugere
+  // trocar por uma senha da própria pessoa. Volta a false quando ela troca em Conta.
+  senhaProvisoria Boolean @default(false)
+
   funcao FuncaoEquipe?
 
   // Equipe: como a pessoa aparece para as famílias (ex.: "Secretaria"). Vazio = o cargo

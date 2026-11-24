@@ -101,10 +101,21 @@ export async function sendPlainEmail(input: { to: string; subject: string; text:
   }
 }
 
-/** Valida a assinatura do webhook (timestamp + token assinados com a chave de assinatura do Mailgun). */
-export function verifyMailgunSignature(timestamp: string, token: string, signature: string): boolean {
+/** Janela aceita para o timestamp do webhook do Mailgun (mesma recomendação da documentação deles). */
+export const JANELA_WEBHOOK_MAILGUN_MS = 15 * 60 * 1000;
+
+/**
+ * Valida a assinatura do webhook (timestamp + token assinados com a chave de assinatura do Mailgun).
+ * A assinatura do Mailgun não cobre o corpo da mensagem, então um conjunto
+ * timestamp/token/assinatura capturado poderia ser reaproveitado com outro conteúdo: por isso só
+ * vale dentro de 15 minutos do envio (a repetição dentro da janela é barrada pelo Message-Id).
+ */
+export function verifyMailgunSignature(timestamp: string, token: string, signature: string, agora = Date.now()): boolean {
   const signingKey = process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
   if (!signingKey) return false;
+
+  const segundos = Number(timestamp);
+  if (!/^\d{1,12}$/.test(timestamp) || Math.abs(agora - segundos * 1000) > JANELA_WEBHOOK_MAILGUN_MS) return false;
 
   const expected = createHmac("sha256", signingKey).update(timestamp + token).digest("hex");
   const expectedBuf = Buffer.from(expected);
