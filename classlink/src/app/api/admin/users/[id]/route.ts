@@ -69,7 +69,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
             : body.isCoordenacao !== undefined && existing.role === "STAFF"
               ? { isCoordenacao: body.isCoordenacao }
               : {}),
-          ...(temporaryPassword ? { passwordHash: await hashPassword(temporaryPassword) } : {}),
+          ...(temporaryPassword ? { passwordHash: await hashPassword(temporaryPassword), senhaProvisoria: true } : {}),
         },
       });
       if (temporaryPassword) {

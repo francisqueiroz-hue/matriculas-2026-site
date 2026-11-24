@@ -66,6 +66,8 @@ describe("POST /api/auth/forgot-password", () => {
     await rodarTarefas();
     expect(sendPlainEmail).toHaveBeenCalledTimes(1);
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    // Senha provisória: o app vai sugerir trocar por uma da própria pessoa.
+    expect(prismaMock.user.update.mock.calls[0][0].data).toMatchObject({ senhaProvisoria: true });
   });
 
   it("conta inexistente: mesma resposta, nada é enviado nem trocado", async () => {

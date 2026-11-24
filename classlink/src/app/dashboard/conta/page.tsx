@@ -56,6 +56,7 @@ export default function ContaPage() {
       setCurrentPassword("");
       setNewPassword("");
       setPwSuccess(true);
+      router.refresh(); // tira o aviso de senha provisória
     } catch (err) {
       setPwError(err instanceof Error ? err.message : "Erro ao trocar senha");
     } finally {
@@ -138,7 +139,7 @@ export default function ContaPage() {
       {(user.role === "ADMIN" || user.role === "STAFF") && <AvisosWhatsAppEquipe />}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="font-semibold">Trocar senha</h2>
+        <h2 id="trocar-senha" className="scroll-mt-20 font-semibold">Trocar senha</h2>
         <form onSubmit={handleChangePassword} className="mt-3 space-y-2">
           <input
             type="password"
