@@ -18,6 +18,7 @@ export const ROTULO_CAMPO: Record<string, string> = {
   nascimento: "Data de nascimento",
   mensalidade: "Mensalidade (R$)",
   bolsista: "Isento de mensalidade (bolsista)",
+  responsavelFinanceiro: "Responsável financeiro (assina o contrato)",
 };
 
 /**

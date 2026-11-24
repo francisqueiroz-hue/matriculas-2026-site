@@ -4,7 +4,7 @@ import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
-import { responsaveisDoAluno, sha256Hex } from "@/lib/contratos-server";
+import { avisadosDoContrato, sha256Hex } from "@/lib/contratos-server";
 import { gerarContrato2027 } from "@/lib/contrato-modelo/gerar";
 import {
   DIA_VENCIMENTO_MENSALIDADE,
@@ -36,7 +36,15 @@ export async function POST(request: NextRequest) {
         arquivos: { none: { tipo: "ASSINADO" } },
         student: { deletedAt: null },
       },
-      select: { id: true, studentId: true, condicoes: true, dadosFamilia: true, student: { select: { name: true } } },
+      select: {
+        id: true,
+        studentId: true,
+        porResponsavelFinanceiro: true,
+        destinatarioId: true,
+        condicoes: true,
+        dadosFamilia: true,
+        student: { select: { name: true } },
+      },
     });
     const ipOrigem = getClientIp(request);
     const dia = diaDoMes(DIA_VENCIMENTO_MENSALIDADE);
@@ -88,7 +96,7 @@ export async function POST(request: NextRequest) {
       });
       if (!atualizado) continue;
       corrigidos.push({ id: c.id, nome: c.student.name });
-      await notifyUsers(await responsaveisDoAluno(c.studentId), {
+      await notifyUsers(await avisadosDoContrato(c), {
         title: "Contrato atualizado",
         body: `O contrato de ${c.student.name.split(" ")[0]} foi atualizado: as mensalidades vencem no dia ${dia} de cada mês. Assine a versão nova no app.`,
         url: "/dashboard/contratos",

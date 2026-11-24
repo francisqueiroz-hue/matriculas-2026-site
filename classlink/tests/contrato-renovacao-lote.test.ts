@@ -19,7 +19,11 @@ vi.mock("next/server", async (importOriginal) => {
   return { ...real, after: (fn: () => unknown) => void afterTarefas.push(fn) };
 });
 vi.mock("@/lib/push", () => ({ notifyUsers: vi.fn(async () => undefined) }));
-vi.mock("@/lib/contratos-server", () => ({ responsaveisDoAluno: vi.fn(async () => []), sha256Hex: () => "hash" }));
+const destinos = vi.hoisted(() => ({ porAluno: new Map<string, { situacao: string; ids: string[] }>() }));
+vi.mock("@/lib/contratos-server", () => ({
+  sha256Hex: () => "hash",
+  destinosDosAlunos: vi.fn(async (ids: string[]) => new Map(ids.map((id) => [id, destinos.porAluno.get(id) ?? { situacao: "UNICO", ids: [`resp-${id}`] }]))),
+}));
 vi.mock("@/lib/session", () => ({
   // Rotas só da direção: aqui a sessão simulada já é da direção (ver tests/direcao-acesso.test.ts).
   requireDirecao: async () => (await import("@/lib/session")).requireRole("ADMIN"),
@@ -109,5 +113,26 @@ describe("aviso às famílias no envio em lote", () => {
     for (const t of afterTarefas.splice(0)) await t();
     expect(notifyUsers).toHaveBeenCalledTimes(2);
     erro.mockRestore();
+  });
+});
+
+describe("envio em lote com mais de um responsável", () => {
+  beforeEach(() => destinos.porAluno.clear());
+
+  it("sem responsável financeiro indicado: o aluno fica de fora, com o motivo, e ninguém é avisado", async () => {
+    destinos.porAluno.set("a1", { situacao: "INDEFINIDO", ids: [] });
+    const res = await POST(req({ ...corpo, itens: [{ studentId: "a1", etapa: "EI" }] }));
+    const json = await res.json();
+    expect(json.criados).toEqual([]);
+    expect(json.ignorados[0]).toMatchObject({ studentId: "a1", motivo: expect.stringMatching(/responsável financeiro/) });
+    expect(tx.contrato.create).not.toHaveBeenCalled();
+    expect(afterTarefas).toHaveLength(0);
+  });
+
+  it("com responsável financeiro: só ele recebe o aviso do contrato", async () => {
+    destinos.porAluno.set("a1", { situacao: "FINANCEIRO", ids: ["mae"] });
+    await POST(req({ ...corpo, itens: [{ studentId: "a1", etapa: "EI" }] }));
+    for (const t of afterTarefas.splice(0)) await t();
+    expect(vi.mocked(notifyUsers).mock.calls[0][0]).toEqual(["mae"]);
   });
 });

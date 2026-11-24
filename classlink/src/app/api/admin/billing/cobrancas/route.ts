@@ -19,6 +19,7 @@ export async function GET() {
       where: { schoolId: session.schoolId, status: { in: ["PENDENTE", "VENCIDO"] }, student: { deletedAt: null } },
       orderBy: [{ vencimento: "asc" }],
       include: {
+        destinatario: { select: { name: true, phone: true, active: true, deletedAt: true } },
         student: {
           select: {
             id: true,
@@ -34,7 +35,12 @@ export async function GET() {
     });
 
     const itens = boletos.map((b) => {
-      const responsavel = b.student.guardians[0]?.guardian ?? null;
+      // Boleto da regra do responsável financeiro: o destinatário; anterior à regra: o 1º vinculado.
+      const responsavel = b.porResponsavelFinanceiro
+        ? b.destinatario && b.destinatario.active && !b.destinatario.deletedAt
+          ? b.destinatario
+          : null
+        : (b.student.guardians[0]?.guardian ?? null);
       const vencido = b.status === "VENCIDO" || b.vencimento.getTime() < hoje.getTime();
       const valor = Number(b.valor);
       const mensagem = responsavel
@@ -57,6 +63,7 @@ export async function GET() {
       orderBy: [{ pagoEm: "desc" }],
       take: 30,
       include: {
+        destinatario: { select: { name: true } },
         student: {
           select: { name: true, guardians: { orderBy: { createdAt: "asc" }, take: 1, select: { guardian: { select: { name: true } } } } },
         },
@@ -66,7 +73,7 @@ export async function GET() {
     const pagos = pagosBd.map((b) => ({
       id: b.id,
       aluno: b.student.name,
-      responsavel: b.student.guardians[0]?.guardian.name ?? null,
+      responsavel: (b.porResponsavelFinanceiro ? b.destinatario?.name : b.student.guardians[0]?.guardian.name) ?? null,
       mesReferencia: b.mesReferencia,
       valor: Number(b.valor),
       pagoEm: b.pagoEm ? b.pagoEm.toISOString() : null,

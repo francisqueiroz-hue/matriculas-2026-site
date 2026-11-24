@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { alunosDaFamilia } from "@/lib/escopo-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
+import { responsavelVeItem, semDadosDaRegra } from "@/lib/responsavel-financeiro";
 
 /** "Meus boletos" — todos os boletos dos alunos vinculados ao responsável logado. */
 export async function GET() {
@@ -20,7 +21,12 @@ export async function GET() {
       orderBy: [{ mesReferencia: "desc" }],
     });
 
-    return NextResponse.json({ boletos });
+    // Boleto da regra do responsável financeiro: só o destinatário vê. Anteriores: todos, como era.
+    return NextResponse.json({
+      boletos: boletos
+        .filter((b) => responsavelVeItem(b, true, session.sub))
+        .map(semDadosDaRegra),
+    });
   } catch (error) {
     return handleApiError(error);
   }

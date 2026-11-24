@@ -43,6 +43,8 @@ const config = (ativos: boolean) => ({
   lembretesMaxEnvios: 4,
 });
 
+const ATIVO = { active: true, deletedAt: null, role: "GUARDIAN" };
+
 beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.school.findUnique.mockResolvedValue(config(true));
@@ -55,7 +57,7 @@ beforeEach(() => {
             anoLetivo: 2027,
             status: "AGUARDANDO_ASSINATURA",
             updatedAt: new Date("2026-10-30T12:00:00Z"),
-            student: { name: "Ana Souza", guardians: [{ guardianId: "mae" }, { guardianId: "pai" }] },
+            student: { name: "Ana Souza", guardians: [{ guardianId: "mae", guardian: ATIVO }, { guardianId: "pai", guardian: ATIVO }] },
           },
         ]
       : [],
@@ -151,13 +153,13 @@ describe("executarLembretesDaEscola", () => {
         id: "b1",
         vencimento: new Date("2026-11-05T15:00:00Z"),
         createdAt: new Date("2026-11-01T07:00:00Z"),
-        student: { name: "Ana Souza", guardians: [{ guardianId: "mae", guardian: { active: true, deletedAt: null } }] },
+        student: { name: "Ana Souza", guardians: [{ guardianId: "mae", guardian: ATIVO }] },
       },
       {
         id: "b2",
         vencimento: new Date("2026-11-05T15:00:00Z"),
         createdAt: new Date("2026-11-01T07:00:00Z"),
-        student: { name: "Bia", guardians: [{ guardianId: "x", guardian: { active: false, deletedAt: null } }] },
+        student: { name: "Bia", guardians: [{ guardianId: "x", guardian: { ...ATIVO, active: false } }] },
       },
     ]);
     const r = await executarLembretesDaEscola("s1", QUARTA);
@@ -165,6 +167,38 @@ describe("executarLembretesDaEscola", () => {
     const aviso = notifyUsers.mock.calls[0][1] as { body: string };
     expect(aviso.body).toContain("pagar a mensalidade de Ana, que vence amanhã (05/11/2026)");
     expect(aviso.body).not.toMatch(/R\$/);
+  });
+
+  it("regra do responsável financeiro: contrato e boleto novos lembram só o destinatário; sem destinatário, ninguém", async () => {
+    const doisResponsaveis = [
+      { guardianId: "mae", responsavelFinanceiro: true, guardian: ATIVO },
+      { guardianId: "pai", responsavelFinanceiro: false, guardian: ATIVO },
+    ];
+    const base = { anoLetivo: 2027, status: "AGUARDANDO_ASSINATURA", updatedAt: new Date("2026-10-30T12:00:00Z"), porResponsavelFinanceiro: true };
+    prismaMock.contrato.findMany.mockImplementation(async (args: { where: { status?: { in: string[] } } }) =>
+      args.where.status?.in.includes("AGUARDANDO_ASSINATURA")
+        ? [
+            { ...base, id: "c1", destinatarioId: "mae", student: { name: "Ana Souza", guardians: doisResponsaveis } },
+            { ...base, id: "c2", destinatarioId: null, student: { name: "Bia Lima", guardians: doisResponsaveis } },
+          ]
+        : [],
+    );
+    prismaMock.boleto.findMany.mockResolvedValue([
+      {
+        id: "b1",
+        vencimento: new Date("2026-11-05T15:00:00Z"),
+        createdAt: new Date("2026-11-01T07:00:00Z"),
+        porResponsavelFinanceiro: true,
+        destinatarioId: "pai",
+        student: { name: "Caio", guardians: doisResponsaveis },
+      },
+    ]);
+    await executarLembretesDaEscola("s1", QUARTA);
+    const destinatarios = notifyUsers.mock.calls.map((c) => (c[0] as string[])[0]).sort();
+    expect(destinatarios).toEqual(["mae", "pai"]);
+    const paraMae = notifyUsers.mock.calls.find((c) => (c[0] as string[])[0] === "mae")?.[1] as { body: string };
+    expect(paraMae.body).toContain("Ana");
+    expect(paraMae.body).not.toContain("Bia");
   });
 
   it("WhatsApp: guarda o id da mensagem no envio, para a falha de entrega poder devolvê-lo", async () => {

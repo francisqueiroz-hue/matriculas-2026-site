@@ -242,6 +242,10 @@ model User {
   // Lembretes automáticos de pendências recebidos por este responsável
   lembretesPendencia LembretePendencia[]
 
+  // Responsável financeiro: contratos que assina e boletos que paga (regra de 24/11/2026)
+  contratosComoDestinatario Contrato[] @relation("ContratoDestinatario")
+  boletosComoDestinatario   Boleto[]   @relation("BoletoDestinatario")
+
   @@index([schoolId])
 }
 
@@ -367,6 +371,10 @@ model GuardianStudent {
   student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   studentId  String
   relation   String? // ex: "mãe", "pai", "tutor legal"
+  // Responsável financeiro (contratante): quando o aluno tem mais de um responsável, só ele
+  // recebe, preenche e assina o contrato. No máximo um por aluno (garantido na rota que marca).
+  // Ver lib/responsavel-financeiro.ts.
+  responsavelFinanceiro Boolean @default(false)
   createdAt  DateTime @default(now())
 
   @@unique([guardianId, studentId])
@@ -580,6 +588,13 @@ model Boleto {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   pagoEm    DateTime?
+
+  // Regra do responsável financeiro (a partir de 24/11/2026): o boleto e os avisos dele vão só
+  // para `destinatario`. Boletos anteriores ficam com `porResponsavelFinanceiro` false e seguem
+  // como antes (1º responsável vinculado). Ver lib/responsavel-financeiro.ts.
+  porResponsavelFinanceiro Boolean @default(false)
+  destinatario             User?   @relation("BoletoDestinatario", fields: [destinatarioId], references: [id], onDelete: SetNull)
+  destinatarioId           String?
   // Valor efetivamente recebido, informado na baixa manual. Nulo nas baixas antigas (antes
   // deste campo) e nas confirmadas pelo banco: nesses casos vale o próprio valor do boleto.
   valorPago Decimal?  @db.Decimal(10, 2)
@@ -848,6 +863,13 @@ model Contrato {
 
   criadoPor   User?   @relation("ContratoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
   criadoPorId String?
+
+  // Regra do responsável financeiro (a partir de 24/11/2026): só `destinatario` recebe, vê,
+  // preenche e assina o contrato. Contratos anteriores ficam com `porResponsavelFinanceiro`
+  // false e seguem como antes (todos os responsáveis vinculados). Ver lib/responsavel-financeiro.ts.
+  porResponsavelFinanceiro Boolean @default(false)
+  destinatario             User?   @relation("ContratoDestinatario", fields: [destinatarioId], references: [id], onDelete: SetNull)
+  destinatarioId           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

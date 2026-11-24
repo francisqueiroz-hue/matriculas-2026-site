@@ -4,7 +4,7 @@ import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { acaoContratoSchema } from "@/lib/validators";
 import { CONTRATO_MAX_BYTES, ContratoErro, ERRO_SEM_ASSINATURA_DIGITAL, podeExcluirContrato, proximoStatus } from "@/lib/contratos";
-import { lerPdfDoBlob, responsaveisDoAluno } from "@/lib/contratos-server";
+import { avisadosDoContrato, lerPdfDoBlob } from "@/lib/contratos-server";
 import { conferirAssinaturasPdf } from "@/lib/assinatura-pdf";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
@@ -113,7 +113,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
         : novoStatus === "COMPLETO"
           ? { title: "Contrato concluído", body: `O contrato de ${primeiroNome} foi conferido e está completo. Obrigado!` }
           : { title: "Falta a via original", body: `Recebemos o contrato de ${primeiroNome}. Entregue a via original assinada na secretaria.` };
-    await notifyUsers(await responsaveisDoAluno(contrato.studentId), { ...aviso, url: "/dashboard/contratos" }).catch((err) =>
+    await notifyUsers(await avisadosDoContrato(contrato), { ...aviso, url: "/dashboard/contratos" }).catch((err) =>
       console.error("push notify failed", err),
     );
 

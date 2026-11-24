@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
       orderBy: [{ mesReferencia: "desc" }, { student: { name: "asc" } }],
       take: MAX_LINHAS + 1,
       include: {
+        destinatario: { select: { name: true } },
         student: {
           select: {
             name: true,
@@ -141,7 +142,7 @@ export async function GET(request: NextRequest) {
         id: b.id,
         aluno: b.student.name,
         turma: b.student.class.name,
-        responsavel: b.student.guardians[0]?.guardian.name ?? null,
+        responsavel: (b.porResponsavelFinanceiro ? b.destinatario?.name : b.student.guardians[0]?.guardian.name) ?? null,
         mesReferencia: b.mesReferencia,
         vencimento: b.vencimento.toISOString(),
         valor,

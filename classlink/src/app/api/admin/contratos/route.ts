@@ -4,13 +4,14 @@ import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { novoContratoSchema } from "@/lib/validators";
 import { CONTRATO_LIMITE_ENVIO_SERVIDOR, ContratoErro, nomeArquivoPdfSeguro, validarPdf } from "@/lib/contratos";
-import { responsaveisDoAluno, sha256Hex } from "@/lib/contratos-server";
+import { destinoDoAluno, sha256Hex } from "@/lib/contratos-server";
+import { MOTIVO_SEM_FINANCEIRO } from "@/lib/responsavel-financeiro";
 import { getClientIp } from "@/lib/solicitacoes-matricula";
 import { notifyUsers } from "@/lib/push";
 
 /**
  * Direção envia o contrato (PDF já preenchido com os dados do aluno) para a família
- * assinar. Os responsáveis vinculados recebem notificação no app.
+ * assinar. O responsável financeiro (ou o único responsável) recebe notificação no app.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -37,6 +38,11 @@ export async function POST(request: NextRequest) {
       select: { id: true, name: true },
     });
     if (!aluno) return NextResponse.json({ error: "Aluno não encontrado" }, { status: 404 });
+    // Com mais de um responsável, o contrato vai só ao financeiro: se nada indica quem é, não envia.
+    const destino = await destinoDoAluno(aluno.id);
+    if (destino.situacao === "INDEFINIDO") {
+      return NextResponse.json({ error: MOTIVO_SEM_FINANCEIRO, codigo: "SEM_RESPONSAVEL_FINANCEIRO" }, { status: 409 });
+    }
 
     const sha256 = sha256Hex(bytes);
     const ipOrigem = getClientIp(request);
@@ -49,6 +55,8 @@ export async function POST(request: NextRequest) {
           anoLetivo: dados.anoLetivo,
           titulo: dados.titulo,
           criadoPorId: session.sub,
+          porResponsavelFinanceiro: true,
+          destinatarioId: destino.ids[0] ?? null,
         },
         select: { id: true, titulo: true, anoLetivo: true, status: true },
       });
@@ -71,8 +79,7 @@ export async function POST(request: NextRequest) {
       return criado;
     });
 
-    const responsaveis = await responsaveisDoAluno(aluno.id);
-    await notifyUsers(responsaveis, {
+    await notifyUsers(destino.ids, {
       title: "Contrato de matrícula disponível",
       body: `O contrato de ${aluno.name.split(" ")[0]} está pronto para assinatura. Assine grátis pelo gov.br e envie pelo app.`,
       url: "/dashboard/contratos",
