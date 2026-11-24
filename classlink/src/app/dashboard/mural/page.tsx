@@ -7,6 +7,7 @@ import { apiJson } from "@/lib/api-client";
 import { juntarPaginas } from "@/lib/paginacao";
 import { PostCard, type PostItem } from "@/components/PostCard";
 import { PostComposer } from "@/components/PostComposer";
+import { IndiqueFamiliaCard } from "@/components/IndiqueFamiliaCard";
 
 type PaginaPosts = { posts: PostItem[]; nextCursor: string | null };
 
@@ -44,6 +45,8 @@ export default function MuralPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold">Mural de avisos</h1>
+
+      <IndiqueFamiliaCard />
 
       {podePublicar(perfilAcessoDe(user)) && (
         <PostComposer onCreated={(post) => setPosts((prev) => [post, ...(prev ?? [])])} />

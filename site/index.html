@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Matrículas Abertas 2027 — Espaço Kids &amp; Instituto Fokus</title>
-<meta name="description" content="Matrículas abertas 2027 no Instituto Fokus (6º ao 9º ano) e Espaço Kids (Educação Infantil). Agende sua visita ou faça a pré-matrícula pelo WhatsApp: (21) 96469-9441.">
+<meta name="description" content="Matrículas abertas 2027 na Educação Infantil do Espaço Kids (Instituto Fokus). Agende sua visita ou faça a pré-matrícula pelo WhatsApp: (21) 96469-9441.">
 <meta name="theme-color" content="#6b2a86">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="pt_BR">
@@ -17,7 +17,7 @@
   "@context": "https://schema.org",
   "@type": "School",
   "name": "Instituto Fokus & Espaço Kids",
-  "description": "Educação Infantil (Espaço Kids) e Ensino Fundamental — 6º ao 9º ano (Instituto Fokus).",
+  "description": "Educação Infantil (Espaço Kids).",
   "telephone": "+55-21-96469-9441"
 }
 </script>
@@ -170,7 +170,7 @@
   .aviso-form{grid-column:1/-1;border-radius:10px;padding:12px 14px;font-size:.95rem}
   .aviso-form.ok{background:#e8f6ee;color:#14532d;border:1px solid #b7e2c7}
   .aviso-form.erro{background:#fdecea;color:var(--erro);border:1px solid #f5c2bd}
-  .aviso-form[hidden]{display:none}
+  .aviso-form[hidden],.campo[hidden]{display:none}
   .armadilha{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 
   /* FAQ */
@@ -242,7 +242,7 @@
       <div>
         <span class="selo">Vagas limitadas</span>
         <h1 id="titulo-hero">Matrículas Abertas <em>2027</em></h1>
-        <p class="lead">Do 6º ao 9º ano — Aqui, educar é transformar com afeto 💛</p>
+        <p class="lead">Educação Infantil — Aqui, educar é transformar com afeto 💛</p>
         <p class="lead">Venha conhecer a escola, tirar suas dúvidas e garantir a vaga do seu filho.</p>
         <div class="acoes">
           <a class="btn btn-wa" data-wa="Olá! Gostaria de agendar uma visita para conhecer a escola (Matrículas 2027)." href="https://wa.me/5521964699441" target="_blank" rel="noopener">
@@ -300,16 +300,11 @@
           <label for="r-serie">Série em 2027 <span class="obr" aria-hidden="true">*</span></label>
           <select id="r-serie" name="serie" required aria-describedby="erro-r-serie">
             <option value="">Selecione…</option>
-            <optgroup label="Instituto Fokus — Fundamental II">
-              <option>6º ano</option>
-              <option>7º ano</option>
-              <option>8º ano</option>
-              <option>9º ano</option>
-            </optgroup>
             <optgroup label="Espaço Kids">
               <option>Educação Infantil</option>
             </optgroup>
             <optgroup label="Outros">
+              <option>Outra série (informo nas observações)</option>
               <option>Mais de um filho (informo nas observações)</option>
             </optgroup>
           </select>
@@ -338,18 +333,10 @@
   <section id="segmentos" aria-labelledby="titulo-segmentos">
     <div class="container">
       <div class="titulo-secao">
-        <h2 id="titulo-segmentos">Uma escola para cada fase</h2>
+        <h2 id="titulo-segmentos">Educação Infantil</h2>
         <p>Acolhimento, acompanhamento de perto e parceria com a família em todas as etapas.</p>
       </div>
-      <div class="grade grade-2">
-        <article class="cartao segmento">
-          <div class="logo-box escuro"><img src="assets/logo-instituto-fokus.png" alt="" width="76" height="76"></div>
-          <div>
-            <span class="etiqueta">Ensino Fundamental II</span>
-            <h3>Instituto Fokus — 6º ao 9º ano</h3>
-            <p>Uma fase de grandes mudanças, vivida com foco nos estudos, autonomia e cuidado com o desenvolvimento de cada aluno.</p>
-          </div>
-        </article>
+      <div class="grade" style="max-width:640px;margin:0 auto">
         <article class="cartao segmento">
           <div class="logo-box claro"><img src="assets/logo-espaco-kids.png" alt="" width="76" height="34"></div>
           <div>
@@ -366,7 +353,7 @@
     <div class="container">
       <div class="titulo-secao">
         <h2 id="titulo-familia">A família sempre por perto</h2>
-        <p>Pelo aplicativo <strong>ClassLink</strong>, os responsáveis acompanham a vida escolar pelo celular — sem bilhete perdido na mochila.</p>
+        <p>Pelo aplicativo <strong>ClassLink</strong>, exclusivo para as famílias matriculadas, os responsáveis acompanham a vida escolar pelo celular — sem bilhete perdido na mochila. O acesso é liberado pela escola após a matrícula.</p>
       </div>
       <div class="grade grade-3">
         <div class="cartao">
@@ -462,12 +449,6 @@
           <label for="serie">Série pretendida em 2027 <span class="obr" aria-hidden="true">*</span></label>
           <select id="serie" name="serie" required aria-describedby="erro-serie">
             <option value="">Selecione…</option>
-            <optgroup label="Instituto Fokus — Fundamental II">
-              <option>6º ano</option>
-              <option>7º ano</option>
-              <option>8º ano</option>
-              <option>9º ano</option>
-            </optgroup>
             <optgroup label="Espaço Kids">
               <option>Educação Infantil</option>
             </optgroup>
@@ -485,6 +466,23 @@
         <div class="campo cheio">
           <label for="escola">Escola atual (opcional)</label>
           <input id="escola" name="escola" type="text" maxlength="80">
+        </div>
+        <div class="campo">
+          <label for="como-conheceu">Como conheceu a escola? (opcional)</label>
+          <select id="como-conheceu" name="comoConheceu">
+            <option value="">Selecione…</option>
+            <option value="INDICACAO">Indicação de outra família</option>
+            <option value="INSTAGRAM">Instagram</option>
+            <option value="FACEBOOK">Facebook</option>
+            <option value="GOOGLE">Google / Maps</option>
+            <option value="FACHADA">Passei em frente à escola</option>
+            <option value="EVENTO">Evento ou panfleto</option>
+            <option value="OUTRO">Outro</option>
+          </select>
+        </div>
+        <div class="campo" id="campo-indicado" hidden>
+          <label for="indicado-por">Quem indicou? (opcional)</label>
+          <input id="indicado-por" name="indicadoPor" type="text" maxlength="80" placeholder="Nome da família que indicou">
         </div>
         <div class="campo cheio">
           <label for="mensagem">Dúvidas ou observações (opcional)</label>
@@ -537,7 +535,7 @@
         </details>
         <details>
           <summary>Como a família acompanha o dia a dia do aluno?</summary>
-          <p>Pelo ClassLink, o aplicativo da escola: comunicados, autorizações, notas, frequência, agenda, mensagens com a equipe e boletos — tudo pelo celular, sem precisar instalar nada da loja de aplicativos.</p>
+          <p>Pelo ClassLink, o aplicativo exclusivo das famílias matriculadas (o acesso é liberado pela escola após a matrícula): comunicados, autorizações, notas, frequência, agenda, mensagens com a equipe e boletos — tudo pelo celular, sem precisar instalar nada da loja de aplicativos.</p>
         </details>
       </div>
     </div>
@@ -701,6 +699,9 @@
         alunoNome: valor(form, "aluno"),
         serie: valor(form, "serie"),
         periodoVisita: valor(form, "periodo") || undefined,
+        comoConheceu: valor(form, "comoConheceu") || undefined,
+        indicadoPor: (valor(form, "comoConheceu") === "INDICACAO" && valor(form, "indicadoPor")) || undefined,
+        campanha: CAMPANHA || undefined,
         escolaAtual: valor(form, "escola") || undefined,
         observacoes: valor(form, "mensagem") || undefined,
         consentimento: true,
@@ -722,6 +723,33 @@
     });
   }
 
+  // Captação: campanha do link (utm_source/utm_campaign) e indicação (?indicacao=Nome,
+  // usado pelo botão "Indique uma família" do ClassLink). Nada disso é obrigatório.
+  var params;
+  try { params = new URLSearchParams(window.location.search); } catch (e) { params = null; }
+  function param(nome) { return params ? (params.get(nome) || "").trim() : ""; }
+  var CAMPANHA = [param("utm_source"), param("utm_campaign")].filter(Boolean).join("-")
+    .toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 60);
+  var formPre = document.getElementById("form-pre");
+  if (formPre) {
+    var selCanal = formPre.elements.comoConheceu;
+    var campoIndicado = document.getElementById("campo-indicado");
+    var mostrarIndicado = function () { campoIndicado.hidden = selCanal.value !== "INDICACAO"; };
+    selCanal.addEventListener("change", mostrarIndicado);
+    var indicacao = param("indicacao").slice(0, 80);
+    if (indicacao) {
+      selCanal.value = "INDICACAO";
+      formPre.elements.indicadoPor.value = indicacao;
+    } else if (/instagram/i.test(CAMPANHA)) {
+      selCanal.value = "INSTAGRAM";
+    } else if (/facebook|fb/i.test(CAMPANHA)) {
+      selCanal.value = "FACEBOOK";
+    } else if (/google/i.test(CAMPANHA)) {
+      selCanal.value = "GOOGLE";
+    }
+    mostrarIndicado();
+  }
+
   prepararFormulario(document.getElementById("form-pre"), "PRE_MATRICULA", function (form) {
     var linhas = [
       "Olá! Quero fazer a *pré-matrícula 2027*.",
@@ -733,6 +761,9 @@
       "*Melhor período para visita:* " + valor(form, "periodo")
     ];
     if (valor(form, "escola")) linhas.push("*Escola atual:* " + valor(form, "escola"));
+    if (valor(form, "comoConheceu") === "INDICACAO") {
+      linhas.push("*Indicação de:* " + (valor(form, "indicadoPor") || "outra família"));
+    }
     if (valor(form, "mensagem")) linhas.push("*Observações:* " + valor(form, "mensagem"));
     return linhas;
   });
