@@ -5,7 +5,7 @@ import { LOGO_ESPACO_KIDS_PNG, LOGO_INSTITUTO_FOKUS_PNG } from "@/lib/boletim-lo
 
 /**
  * Boletim em PDF no modelo da escola (A4 em pé): moldura laranja, logos do Espaço Kids e do
- * Instituto Fokus, cabeçalho com a portaria, tabela por trimestre (nota, faltas, % de frequência),
+ * Instituto Fokus no topo, cabeçalho com a portaria logo abaixo das logos, tabela por trimestre (nota, faltas, % de frequência),
  * média final e situação, gráfico das médias, local e data, assinaturas e rodapé com endereço.
  * Cada aluno começa numa página nova; disciplinas, gráfico ou assinaturas que não cabem continuam
  * na página seguinte. Gerado no servidor só para a direção e a coordenação.
@@ -41,7 +41,7 @@ type Fontes = { normal: PDFFont; negrito: PDFFont };
 export type Espacamento = { hLinha: number; hCabecalho: number; alturaBarras: number; vao: number; assinaturasNoPe: boolean };
 export const ESPACAMENTO_COMPACTO: Espacamento = { hLinha: 13, hCabecalho: 12, alturaBarras: 120, vao: 0, assinaturasNoPe: false };
 /** Quando por pouco não cabe numa folha: linhas e gráfico um pouco menores. */
-const ESPACAMENTO_APERTADO: Espacamento = { hLinha: 11.5, hCabecalho: 11, alturaBarras: 70, vao: 0, assinaturasNoPe: true };
+const ESPACAMENTO_APERTADO: Espacamento = { hLinha: 10.5, hCabecalho: 10.5, alturaBarras: 55, vao: 0, assinaturasNoPe: true };
 const H_LINHA_MAX = 21;
 const CRESCIMENTO_GRAFICO_MAX = 110;
 const VAO_MAX = 36;
@@ -144,19 +144,18 @@ class Desenho {
 
     // Logos e cabeçalho
     const topo = H - MARGEM;
-    const kids = this.logos.kids.scaleToFit(112, 50);
+    // Logos numa faixa própria; a portaria e o título vêm logo abaixo, centralizados na largura toda.
+    const kids = this.logos.kids.scaleToFit(124, 56);
     this.page.drawImage(this.logos.kids, { x: MARGEM, y: topo - kids.height, width: kids.width, height: kids.height });
-    const fokus = this.logos.fokus.scaleToFit(54, 54);
+    const fokus = this.logos.fokus.scaleToFit(60, 60);
     this.page.drawImage(this.logos.fokus, { x: W - MARGEM - fokus.width, y: topo - fokus.height, width: fokus.width, height: fokus.height });
-    const x0 = MARGEM + 120;
-    const largura = LARGURA - 120 - 64;
-    let y = topo - 10;
+    let y = topo - Math.max(kids.height, fokus.height) - 18;
     for (const linha of this.modelo.cabecalho.filter(Boolean)) {
-      const { x, w } = this.centro(linha, y, 9, this.fontes.negrito, PRETO, x0, largura);
+      const { x, w } = this.centro(linha, y, 9.5, this.fontes.negrito, PRETO);
       this.page.drawLine({ start: { x, y: y - 1.5 }, end: { x: x + w, y: y - 1.5 }, thickness: 0.6, color: PRETO });
-      y -= 12.5;
+      y -= 13.5;
     }
-    this.y = Math.min(y, topo - 58) - 8;
+    this.y = y - 6;
 
     // Rodapé
     const rodape = this.modelo.rodape.filter(Boolean);
