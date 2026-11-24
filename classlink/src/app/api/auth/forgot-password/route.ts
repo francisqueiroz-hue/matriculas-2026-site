@@ -97,7 +97,7 @@ async function redefinirEEnviar(identifier: LoginIdentifier, origem: string) {
 
   if (entregue) {
     await prisma.$transaction([
-      prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(temporaryPassword) } }),
+      prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(temporaryPassword), senhaProvisoria: true } }),
       prisma.refreshToken.updateMany(encerrarTodasAsSessoes(user.id)),
     ]);
   }

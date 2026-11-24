@@ -24,6 +24,7 @@ export default function ContaPage() {
   const [pwLoading, setPwLoading] = useState(false);
 
   const [newEmail, setNewEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailLoading, setEmailLoading] = useState(false);
 
@@ -32,7 +33,8 @@ export default function ContaPage() {
     setEmailError(null);
     setEmailLoading(true);
     try {
-      await apiJson("/api/account/update-email", { method: "POST", body: JSON.stringify({ email: newEmail }) });
+      await apiJson("/api/account/update-email", { method: "POST", body: JSON.stringify({ email: newEmail, currentPassword: emailPassword }) });
+      setEmailPassword("");
       router.refresh();
     } catch (err) {
       setEmailError(err instanceof Error ? err.message : "Erro ao salvar e-mail");
@@ -54,6 +56,7 @@ export default function ContaPage() {
       setCurrentPassword("");
       setNewPassword("");
       setPwSuccess(true);
+      router.refresh(); // tira o aviso de senha provisória
     } catch (err) {
       setPwError(err instanceof Error ? err.message : "Erro ao trocar senha");
     } finally {
@@ -109,6 +112,16 @@ export default function ContaPage() {
               onChange={(e) => setNewEmail(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
             />
+            <input
+              type="password"
+              aria-label="Sua senha atual"
+              autoComplete="current-password"
+              required
+              placeholder="Sua senha atual (para confirmar)"
+              value={emailPassword}
+              onChange={(e) => setEmailPassword(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800"
+            />
             {emailError && <p className="text-sm text-red-600">{emailError}</p>}
             <button
               type="submit"
@@ -126,7 +139,7 @@ export default function ContaPage() {
       {(user.role === "ADMIN" || user.role === "STAFF") && <AvisosWhatsAppEquipe />}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="font-semibold">Trocar senha</h2>
+        <h2 id="trocar-senha" className="scroll-mt-20 font-semibold">Trocar senha</h2>
         <form onSubmit={handleChangePassword} className="mt-3 space-y-2">
           <input
             type="password"

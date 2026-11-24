@@ -52,11 +52,26 @@ describe("verifyMailgunSignature", () => {
     process.env.MAILGUN_WEBHOOK_SIGNING_KEY = originalKey;
   });
 
-  it("aceita uma assinatura válida", () => {
-    const timestamp = "1234567890";
-    const token = "token-abc";
-    const signature = createHmac("sha256", "chave-teste").update(timestamp + token).digest("hex");
-    expect(verifyMailgunSignature(timestamp, token, signature)).toBe(true);
+  const assinar = (timestamp: string, token: string) => createHmac("sha256", "chave-teste").update(timestamp + token).digest("hex");
+  const agora = 1_800_000_000_000;
+  const tsAgora = String(agora / 1000);
+
+  it("aceita uma assinatura válida e recente", () => {
+    expect(verifyMailgunSignature(tsAgora, "token-abc", assinar(tsAgora, "token-abc"), agora)).toBe(true);
+  });
+
+  it("aceita até 15 minutos de diferença no relógio", () => {
+    const ts = String(agora / 1000 - 14 * 60);
+    expect(verifyMailgunSignature(ts, "token-abc", assinar(ts, "token-abc"), agora)).toBe(true);
+  });
+
+  it("rejeita assinatura válida mas antiga (reaproveitada com outro conteúdo)", () => {
+    const ts = String(agora / 1000 - 16 * 60);
+    expect(verifyMailgunSignature(ts, "token-abc", assinar(ts, "token-abc"), agora)).toBe(false);
+  });
+
+  it("rejeita timestamp que não é número", () => {
+    expect(verifyMailgunSignature("abc", "token-abc", assinar("abc", "token-abc"), agora)).toBe(false);
   });
 
   it("rejeita assinatura incorreta", () => {

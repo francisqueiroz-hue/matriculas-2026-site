@@ -54,7 +54,7 @@ export async function enviarAcessoPeloApp(userId: string, origem: string, senhaD
   async function gravarSenha() {
     if (senhaDefinida) return; // o chamador já gravou
     await prisma.$transaction([
-      prisma.user.update({ where: { id: user!.id }, data: { passwordHash: await hashPassword(dados.senha) } }),
+      prisma.user.update({ where: { id: user!.id }, data: { passwordHash: await hashPassword(dados.senha), senhaProvisoria: true } }),
       prisma.refreshToken.updateMany(encerrarTodasAsSessoes(user!.id)),
     ]);
   }

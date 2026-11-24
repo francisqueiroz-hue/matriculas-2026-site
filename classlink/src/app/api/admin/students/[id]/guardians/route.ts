@@ -84,6 +84,7 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/admin/s
           role: "GUARDIAN",
           schoolId: session.schoolId,
           passwordHash: await hashPassword(temporaryPassword),
+          senhaProvisoria: true,
         },
       });
     } else if (guardian.schoolId !== session.schoolId || guardian.role !== "GUARDIAN") {

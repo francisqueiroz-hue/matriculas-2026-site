@@ -82,6 +82,9 @@ export const forgotPasswordSchema = z.object({
 
 export const updateEmailSchema = z.object({
   email: z.string().email(),
+  // Senha atual: com a sessão de outra pessoa aberta (aparelho emprestado ou perdido), trocar o
+  // e-mail e pedir "esqueci a senha" bastaria para tomar a conta.
+  currentPassword: z.string().min(1, "Informe sua senha atual"),
 });
 
 export const createPostSchema = z.object({
