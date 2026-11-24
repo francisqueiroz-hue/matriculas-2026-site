@@ -23,6 +23,10 @@ import { POST as trocarSenha } from "@/app/api/account/change-password/route";
 import { SenhaProvisoriaBanner } from "@/components/SenhaProvisoriaBanner";
 import { UserProvider } from "@/components/UserContext";
 
+// children vai como terceiro argumento (regra react/no-children-prop); o cast cobre o tipo do provider.
+const comUsuario = (user: SessionUser) =>
+  createElement(UserProvider, { user } as Parameters<typeof UserProvider>[0], createElement(SenhaProvisoriaBanner));
+
 const usuario = (senhaProvisoria: boolean): SessionUser => ({
   id: "u1",
   name: "Maria",
@@ -37,14 +41,14 @@ const usuario = (senhaProvisoria: boolean): SessionUser => ({
 describe("aviso de senha provisória", () => {
   it("aparece para quem entrou com senha provisória e leva a Minha conta", () => {
     caminho.atual = "/dashboard";
-    render(createElement(UserProvider, { user: usuario(true), children: createElement(SenhaProvisoriaBanner) }));
+    render(comUsuario(usuario(true)));
     expect(screen.getByText(/senha provisória/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Trocar senha agora" }).getAttribute("href")).toBe("/dashboard/conta#trocar-senha");
   });
 
   it("não aparece para quem já tem senha própria", () => {
     cleanup();
-    const { container } = render(createElement(UserProvider, { user: usuario(false), children: createElement(SenhaProvisoriaBanner) }));
+    const { container } = render(comUsuario(usuario(false)));
     expect(container.textContent).toBe("");
   });
 });
