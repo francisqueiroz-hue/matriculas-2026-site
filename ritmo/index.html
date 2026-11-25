@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ritmo</title>
+<meta name="theme-color" content="#8b6cf0">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="top-row">
+      <button class="icon-btn" id="prevDay" aria-label="Dia anterior">‹</button>
+      <div class="date-box">
+        <h1 id="dateTitle">Hoje</h1>
+        <p id="dateSub"></p>
+      </div>
+      <button class="icon-btn" id="nextDay" aria-label="Próximo dia">›</button>
+    </div>
+    <div class="progress" aria-hidden="true"><i id="progBar"></i></div>
+    <p class="progress-txt" id="progTxt"></p>
+  </header>
+
+  <main>
+    <section id="view-hoje" class="view active">
+      <div id="timeline" class="timeline"></div>
+      <p id="emptyDay" class="empty" hidden>Dia livre. Toque em <b>＋</b> para planejar com leveza. 🌿</p>
+    </section>
+
+    <section id="view-tarefas" class="view">
+      <h2 class="h-serif">Lista de tarefas</h2>
+      <form id="taskForm" class="row-form">
+        <input id="taskInput" placeholder="O que está na sua cabeça?" autocomplete="off" required>
+        <button class="btn">Adicionar</button>
+      </form>
+      <ul id="taskList" class="cards"></ul>
+    </section>
+
+    <section id="view-foco" class="view">
+      <h2 class="h-serif">Timer de foco</h2>
+      <div class="focus-card">
+        <div class="seg" id="focusSeg"></div>
+        <div class="dial big" id="focusDial"><span id="focusTime">25:00</span></div>
+        <div class="focus-actions">
+          <button class="btn" id="focusStart">Começar foco</button>
+        </div>
+        <div class="settings-row">
+          <label>Foco (min) <input type="number" id="setFocus" min="1" max="180"></label>
+          <label>Pausa (min) <input type="number" id="setBreak" min="1" max="60"></label>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-rotinas" class="view">
+      <h2 class="h-serif">Rotinas</h2>
+      <p class="muted">Modelos reutilizáveis. Aplique em qualquer dia com um toque.</p>
+      <ul id="routineList" class="cards"></ul>
+      <button class="btn ghost" id="newRoutine">＋ Nova rotina</button>
+      <h2 class="h-serif" style="margin-top:28px">Dados</h2>
+      <p class="muted">Tudo fica salvo só neste aparelho. Faça backup de vez em quando.</p>
+      <div class="row-form">
+        <button class="btn ghost" id="exportBtn">Exportar backup</button>
+        <label class="btn ghost" for="importFile">Importar</label>
+        <input type="file" id="importFile" accept="application/json" hidden>
+      </div>
+    </section>
+  </main>
+
+  <button class="fab" id="fab" aria-label="Adicionar">＋</button>
+
+  <nav class="tabs">
+    <button data-v="hoje" class="active"><b>🗓️</b>Hoje</button>
+    <button data-v="tarefas"><b>✅</b>Tarefas</button>
+    <button data-v="foco"><b>🎯</b>Foco</button>
+    <button data-v="rotinas"><b>🔁</b>Rotinas</button>
+  </nav>
+</div>
+
+<!-- Editor de evento -->
+<dialog id="evDlg">
+  <form method="dialog" id="evForm">
+    <h3 id="evDlgTitle">Novo bloco</h3>
+    <label>Título <input id="evTitle" required autocomplete="off"></label>
+    <div class="grid2">
+      <label>Início <input type="time" id="evStart" required></label>
+      <label>Duração (min) <input type="number" id="evDur" min="5" max="720" step="5" required></label>
+    </div>
+    <div class="chips" id="evEmoji"></div>
+    <div class="chips colors" id="evColor"></div>
+    <label>Passos (um por linha)
+      <textarea id="evSteps" rows="3" placeholder="Ex.:&#10;Separar materiais&#10;Começar pelo mais fácil"></textarea>
+    </label>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="evDelete" hidden>Excluir</button>
+      <button type="button" class="btn ghost" id="evCancel">Cancelar</button>
+      <button class="btn" id="evSave" value="ok">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Detalhe de evento -->
+<dialog id="detDlg"><div id="detBody"></div></dialog>
+
+<!-- Rotina -->
+<dialog id="rtDlg">
+  <form method="dialog" id="rtForm">
+    <h3>Nova rotina</h3>
+    <label>Nome <input id="rtName" required autocomplete="off" placeholder="Ex.: Manhã tranquila"></label>
+    <label>Blocos (um por linha: <code>HH:MM duração emoji título</code>)
+      <textarea id="rtItems" rows="6" placeholder="07:00 30 ☀️ Acordar e se arrumar&#10;07:30 20 🍳 Café da manhã&#10;08:00 15 🎒 Sair de casa"></textarea>
+    </label>
+    <div class="dlg-actions">
+      <button type="button" class="btn ghost" id="rtCancel">Cancelar</button>
+      <button class="btn" value="ok">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Timer visual -->
+<div id="timerOv" class="timer-ov" hidden>
+  <div class="timer-card">
+    <p class="t-label" id="tLabel"></p>
+    <div class="dial huge" id="tDial"><span id="tTime">00:00</span></div>
+    <div class="t-actions">
+      <button class="btn ghost" id="tMinus">−5</button>
+      <button class="btn" id="tPause">Pausar</button>
+      <button class="btn ghost" id="tPlus">+5</button>
+    </div>
+    <div class="t-actions">
+      <button class="btn ghost" id="tDone">Concluir</button>
+      <button class="btn danger" id="tStop">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
