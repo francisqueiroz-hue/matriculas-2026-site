@@ -260,6 +260,15 @@ describe("PDF do histórico", () => {
     expect(doc.getPage(0).getSize().width).toBeCloseTo(595.28, 1);
   });
 
+  it("nome e filiação longos não são cortados: quebram em mais linhas", async () => {
+    const h = exemplo();
+    h.aluno.nome = "Maria Eduarda ".repeat(10).trim();
+    h.aluno.filiacao = "Fulana de Tal da Silva Santos ".repeat(10).trim();
+    const pdfMod = await import("@/lib/historico-pdf");
+    const doc = await PDFDocument.load(await pdfMod.gerarHistoricoPdf(MODELO_HISTORICO_PADRAO, h));
+    expect(doc.getPageCount()).toBe(1);
+  });
+
   it("muitos componentes e anos continuam na folha seguinte, sem erro", async () => {
     const series = Array.from({ length: 9 }, (_, i) => `${i + 1}º ano`);
     const base = ajustarColunas(exemplo(), series);

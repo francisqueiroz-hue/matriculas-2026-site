@@ -204,10 +204,10 @@ function EditorHistorico({ studentId, podeEditar }: { studentId: string; podeEdi
         return;
       }
       const mapa = new Map(d.medias.map((m) => [normalizarNome(m.nome), m]));
-      const r = aplicarMedias(h!, coluna, mapa);
-      setH(r.historico);
+      // Sobre o estado mais recente: o que foi digitado enquanto as médias chegavam não se perde.
+      setH((atual) => (atual ? aplicarMedias(atual, colunaDaTurma(turma, atual.series), mapa).historico : atual));
       setAlterado(true);
-      setAviso(r.preenchidas ? `${r.preenchidas} média(s) de ${ano} colocadas na coluna ${h!.series[coluna]}.` : `Ainda não há média final fechada (3 trimestres) em ${ano}.`);
+      setAviso(d.medias.length ? `${d.medias.length} média(s) de ${ano} colocadas na coluna ${h!.series[coluna]}.` : `Ainda não há média final fechada (3 trimestres) em ${ano}.`);
     } catch (err) {
       setAviso(err instanceof Error ? err.message : "Não foi possível trazer as médias.");
     } finally {

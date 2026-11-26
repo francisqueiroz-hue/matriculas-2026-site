@@ -140,26 +140,43 @@ class Desenho {
   }
 
   /** Quadro de identificação: rótulo em negrito seguido do valor, em até três linhas. */
+  /**
+   * Quadro de identificação: rótulo em negrito seguido do valor. Valores longos (nome completo,
+   * filiação) quebram em mais linhas em vez de serem cortados.
+   */
   identificacao() {
     const a = this.h.aluno;
-    const linhas: [string, string][][] = [
-      [["Aluno(a): ", a.nome], ["Código Censo INEP: ", a.codigoInep]],
-      [["Natural de: ", a.naturalidade], ["Nacionalidade: ", a.nacionalidade], ["Data de nascimento: ", a.nascimento]],
-      [["Filiação: ", a.filiacao]],
+    // [rótulo, valor, fração da largura]
+    const linhas: [string, string, number][][] = [
+      [["Aluno(a): ", a.nome, 0.64], ["Código Censo INEP: ", a.codigoInep, 0.36]],
+      [["Natural de: ", a.naturalidade, 1 / 3], ["Nacionalidade: ", a.nacionalidade, 1 / 3], ["Data de nascimento: ", a.nascimento, 1 / 3]],
+      [["Filiação: ", a.filiacao, 1]],
     ];
-    const hLinha = 14;
-    const altura = linhas.length * hLinha + 8;
+    const tam = 8.5;
+    const passo = 11;
+    const montadas = linhas.map((pares) => {
+      let x = MARGEM + 5;
+      const itens = pares.map(([rotulo, valor, fracao]) => {
+        const largura = LARGURA * fracao;
+        const wr = this.f.negrito.widthOfTextAtSize(limpar(rotulo, this.f.negrito), tam);
+        const partes = quebrar(limpar(valor || "", this.f.normal), this.f.normal, tam, Math.max(40, largura - wr - 10));
+        const item = { x, rotulo, wr, partes };
+        x += largura;
+        return item;
+      });
+      return { itens, n: Math.max(...itens.map((i) => i.partes.length)) };
+    });
+    const altura = montadas.reduce((s, l) => s + l.n * passo + 3, 0) + 6;
     this.y -= altura;
     this.page.drawRectangle({ x: MARGEM, y: this.y, width: LARGURA, height: altura, borderColor: BORDA, borderWidth: 0.7 });
-    linhas.forEach((pares, i) => {
-      const yl = this.y + altura - 13 - i * hLinha;
-      const larguraPar = LARGURA / pares.length;
-      pares.forEach(([rotulo, valor], j) => {
-        const x = MARGEM + 5 + j * larguraPar;
-        const wr = this.texto(rotulo, x, yl, 8.5, this.f.negrito);
-        this.texto(valor || "", x + wr, yl, 8.5, this.f.normal, PRETO, larguraPar - wr - 8);
-      });
-    });
+    let yl = this.y + altura - 12;
+    for (const l of montadas) {
+      for (const it of l.itens) {
+        this.texto(it.rotulo, it.x, yl, tam, this.f.negrito);
+        it.partes.forEach((parte, k) => this.texto(parte, it.x + it.wr, yl - k * passo, tam));
+      }
+      yl -= l.n * passo + 3;
+    }
     this.y -= 6;
   }
 
