@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Leitor de PDF copiado de node_modules no postinstall (scripts/copiar-pdfjs.mjs).
+    "public/pdfjs/**",
   ]),
 ]);
 
