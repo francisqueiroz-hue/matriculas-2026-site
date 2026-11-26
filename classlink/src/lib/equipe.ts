@@ -120,3 +120,13 @@ export const podeExportarBoletim = ehDirecaoOuCoordenacao;
 export const MENSAGEM_SO_DIRECAO_COORDENACAO_ENQUETE_INTERNA = "Somente a direção e a coordenação criam enquetes para a equipe.";
 export const MENSAGEM_SO_DIRECAO_COORDENACAO_EQUIPE = "Somente a direção e a coordenação escrevem para toda a equipe.";
 export const MENSAGEM_SO_DIRECAO_COORDENACAO_BOLETIM = "Somente a direção e a coordenação exportam o boletim para impressão.";
+
+/**
+ * Histórico escolar (regra do Francis, 26/11/2026): direção e coordenação emitem (preenchem,
+ * salvam e geram o PDF); a secretaria só visualiza. Professores, auxiliares e famílias não
+ * acessam (o histórico traz notas de todos os anos e dados pessoais).
+ */
+export const podeVerHistorico = ehGestao;
+export const podeEmitirHistorico = ehDirecaoOuCoordenacao;
+export const MENSAGEM_SO_GESTAO_HISTORICO = "Somente a direção, a secretaria e a coordenação acessam o histórico escolar.";
+export const MENSAGEM_SO_DIRECAO_COORDENACAO_HISTORICO = "Somente a direção e a coordenação emitem o histórico escolar. A secretaria só visualiza.";

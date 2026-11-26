@@ -119,7 +119,7 @@ export const DEFINICOES_AREAS: DefinicaoArea[] = [
     nome: "Notas e boletim",
     descricao:
       "Direção e coordenação lançam as notas; professores veem (sem editar) as notas das próprias turmas; a família vê o boletim do filho.",
-    telas: ["/dashboard/notas", "/dashboard/boletim"],
+    telas: ["/dashboard/notas", "/dashboard/boletim", "/dashboard/historico"],
     celulas: {
       COORDENACAO: sensivel(),
       PROFESSORES: sensivel(),

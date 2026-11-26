@@ -127,6 +127,8 @@ model School {
 
   users                 User[]
   boletimModelo         BoletimModelo?
+  historicoModelo       HistoricoModelo?
+  historicosEscolares   HistoricoEscolar[]
   classes               Class[]
   students              Student[]
   posts                 Post[]
@@ -338,6 +340,9 @@ model Student {
   id        String    @id @default(cuid())
   name      String
   birthDate DateTime?
+  // Código do aluno no Censo Escolar (INEP, 12 dígitos). Preenchido no cadastro pela direção ou
+  // secretaria; sai no histórico escolar.
+  codigoInep String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -366,6 +371,7 @@ model Student {
   documentosMatricula    MatriculaDocumento[]
   consentimentosLgpd     ConsentimentoLgpd[]
   fichaSaude             FichaSaude?
+  historicoEscolar       HistoricoEscolar?
   rotinasDiarias         RotinaDiaria[]
   pessoasAutorizadas     PessoaAutorizada[]
 
@@ -1482,4 +1488,32 @@ model BoletimModelo {
   editadoPorId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// Histórico escolar (Ensino Fundamental) emitido pela secretaria. Modelo da escola (cabeçalho,
+// quem assina, componentes e anos padrão) e dados por aluno (identificação, código INEP, notas
+// por ano, estudos realizados/transferências). Só gestão (direção, secretaria, coordenação).
+// Ver src/lib/historico-escolar.ts.
+model HistoricoModelo {
+  id           String   @id @default(cuid())
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId     String   @unique
+  dados        Json
+  editadoPorId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model HistoricoEscolar {
+  id           String   @id @default(cuid())
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId     String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId    String   @unique
+  dados        Json
+  editadoPorId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([schoolId])
 }

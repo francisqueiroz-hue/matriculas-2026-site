@@ -189,6 +189,14 @@ function NotasContent({ podeEditar, podeExportar }: { podeEditar: boolean; podeE
               Revisar e imprimir boletim do aluno
             </Link>
           )}
+          {studentId && (
+            <Link
+              href={`/dashboard/historico?aluno=${studentId}`}
+              className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300"
+            >
+              Histórico escolar do aluno
+            </Link>
+          )}
           <Link
             href={`/dashboard/notas/boletim?turma=${classId}`}
             className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
