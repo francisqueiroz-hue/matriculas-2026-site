@@ -5,11 +5,8 @@
  */
 import type { LembreteTipo } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { notifyUsers, origemPublica } from "@/lib/push";
-import { janelaWhatsApp } from "@/lib/canal-envio";
-import { deveAvisarPorWhatsApp, parametrosModeloAviso } from "@/lib/avisos-equipe";
-import { isWhatsAppConfigured, normalizePhoneBR, sendWhatsAppTemplateMessage, sendWhatsAppTextMessage } from "@/lib/whatsapp";
-import { modeloDisponivel } from "@/lib/whatsapp-modelos";
+import { enviarMensagemFamilia, type ResultadoEnvioFamilia } from "@/lib/envio-familia";
+import { executarAvisoTurmasDaEscola, type ResultadoAvisoTurmas } from "@/lib/aviso-turmas-server";
 import { executarComLimite } from "@/lib/concorrencia";
 import { dataBR } from "@/lib/boleto-aviso";
 import { CAMPANHA_REMATRICULA } from "@/lib/rematricula";
@@ -277,53 +274,9 @@ export async function planejarDaEscola(schoolId: string, agora = new Date()) {
   return { config, registros, plano: planejarLembretes(pendencias, registros, config, agora) };
 }
 
-export type CanalLembrete = "push" | "whatsapp" | "nenhum";
-
-export interface ResultadoEnvioLembrete {
-  canal: CanalLembrete;
-  /** Id da mensagem no WhatsApp (só no canal "whatsapp"), para desfazer a contagem se a entrega falhar. */
-  mensagemId?: string;
-}
-
 /** Envia a mensagem única da família. Nunca lança: falha vira "nenhum" e tenta de novo amanhã. */
-export async function enviarLembreteFamilia(
-  responsavelId: string,
-  pendencias: Pendencia[],
-): Promise<ResultadoEnvioLembrete> {
-  const { titulo, texto, url } = mensagemLembrete(pendencias);
-  let push = 0;
-  try {
-    push = (await notifyUsers([responsavelId], { title: titulo, body: texto, url })).enviados;
-  } catch (err) {
-    console.error("lembretes: falha no push", err);
-  }
-  if (push > 0) return { canal: "push" };
-
-  // Sem notificação no celular: WhatsApp da escola, como já é feito com as mensagens.
-  try {
-    if (!isWhatsAppConfigured()) return { canal: "nenhum" };
-    const pessoa = await prisma.user.findUnique({
-      where: { id: responsavelId },
-      select: { phone: true, avisosWhatsApp: true, whatsappUltimaMensagemEm: true, _count: { select: { pushTokens: true } } },
-    });
-    if (!pessoa) return { canal: "nenhum" };
-    // Quem tem aparelho com push ativo e o envio falhou agora não recebe WhatsApp: tenta amanhã.
-    if (!deveAvisarPorWhatsApp({ avisosWhatsApp: pessoa.avisosWhatsApp, aparelhosComPush: pessoa._count.pushTokens })) return { canal: "nenhum" };
-    const telefone = pessoa.phone ? normalizePhoneBR(pessoa.phone) : null;
-    if (!telefone) return { canal: "nenhum" };
-    const link = `${origemPublica() ?? ""}${url}`;
-    if (janelaWhatsApp(pessoa.whatsappUltimaMensagemEm).aberta) {
-      const { externalId } = await sendWhatsAppTextMessage(telefone, `${titulo}\n\n${texto}\n${link}`);
-      return { canal: "whatsapp", mensagemId: externalId };
-    }
-    const modelo = await modeloDisponivel("aviso");
-    if (!modelo) return { canal: "nenhum" };
-    const { externalId } = await sendWhatsAppTemplateMessage(telefone, modelo, parametrosModeloAviso("Secretaria", texto, link));
-    return { canal: "whatsapp", mensagemId: externalId };
-  } catch (err) {
-    console.error("lembretes: falha no WhatsApp", err);
-    return { canal: "nenhum" };
-  }
+export async function enviarLembreteFamilia(responsavelId: string, pendencias: Pendencia[]): Promise<ResultadoEnvioFamilia> {
+  return enviarMensagemFamilia(responsavelId, mensagemLembrete(pendencias));
 }
 
 export interface ResultadoExecucao {
@@ -338,6 +291,8 @@ export interface ResultadoExecucao {
   resolvidas: number;
   /** Famílias que ficaram para a próxima execução porque o tempo da rotina acabou. */
   adiadas: number;
+  /** Aviso único de definição das turmas (depois do limite de lembretes de matrícula). */
+  avisoTurmas?: ResultadoAvisoTurmas;
 }
 
 /**
@@ -366,7 +321,8 @@ export async function executarLembretesDaEscola(
 
   await registrarSituacao(schoolId, plano, registros, agora);
 
-  if (!config.ativos || domingo) return resultado;
+  const podeEnviar = config.ativos && !domingo;
+  if (!podeEnviar) return resultado;
 
   const lote = plano.envios.slice(0, MAX_FAMILIAS_POR_EXECUCAO);
   await executarComLimite(
@@ -404,6 +360,17 @@ export async function executarLembretesDaEscola(
     }),
     4,
   );
+
+  // Depois dos lembretes do dia: aviso único às famílias com a matrícula no limite de lembretes.
+  // Quem recebeu lembrete agora (ou ficou para amanhã) não recebe o aviso hoje.
+  resultado.avisoTurmas = await executarAvisoTurmasDaEscola(schoolId, {
+    avaliadas: plano.avaliadas,
+    registros,
+    lembradosAgora: new Set(plano.envios.map((e) => e.responsavelId)),
+    config,
+    agora,
+    encerrarEm: opcoes.encerrarEm,
+  });
   return resultado;
 }
 

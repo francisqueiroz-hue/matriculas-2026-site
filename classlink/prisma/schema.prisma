@@ -118,6 +118,13 @@ model School {
   lembretesIntervaloDias Int            @default(3) // mínimo de dias entre dois lembretes à mesma família
   lembretesMaxEnvios     Int            @default(4) // lembretes por pendência, no máximo
 
+  // Aviso único "estamos definindo as turmas": sai uma vez por família quando os lembretes de
+  // contrato/rematrícula chegam ao máximo e a pendência continua. Desligado até a direção ligar.
+  // Título/texto null = texto padrão (src/lib/aviso-turmas.ts). Ver AvisoTurmasEnvio.
+  avisoTurmasAtivo  Boolean @default(false)
+  avisoTurmasTitulo String?
+  avisoTurmasTexto  String?
+
   users                 User[]
   boletimModelo         BoletimModelo?
   classes               Class[]
@@ -136,6 +143,7 @@ model School {
   matriculaDocumentos   MatriculaDocumento[]
   consentimentosLgpd    ConsentimentoLgpd[]
   lembretesPendencia    LembretePendencia[]
+  avisosTurmas          AvisoTurmasEnvio[]
   fichasSaude           FichaSaude[]
   rotinasDiarias        RotinaDiaria[]
   pessoasAutorizadas    PessoaAutorizada[]
@@ -241,6 +249,8 @@ model User {
 
   // Lembretes automáticos de pendências recebidos por este responsável
   lembretesPendencia LembretePendencia[]
+  avisosTurmasRecebidos AvisoTurmasEnvio[] @relation("AvisoTurmasResponsavel")
+  avisosTurmasEnviados  AvisoTurmasEnvio[] @relation("AvisoTurmasEnviadoPor")
 
   // Responsável financeiro: contratos que assina e boletos que paga (regra de 24/11/2026)
   contratosComoDestinatario Contrato[] @relation("ContratoDestinatario")
@@ -1264,6 +1274,39 @@ enum LembreteTipo {
   COMUNICADO // autorização de passeio/evento ou confirmação de presença sem resposta
   BOLETO // mensalidade em aberto
   REMATRICULA // família ainda não confirmou a rematrícula da campanha ativa
+}
+
+// Cada aviso "estamos definindo as turmas" enviado a um responsável (automático ou manual).
+// O automático sai uma única vez por família: chaveAutomatico ("escola:responsável") é única e
+// é gravada ANTES do envio, então duas execuções nunca mandam duas vezes. Se a entrega falhar
+// (sem canal ou recusa da Meta), a chave é liberada (null) e o aviso tenta de novo no dia seguinte.
+// O manual (direção, caso excepcional) não tem chave e pode ser repetido com confirmação.
+model AvisoTurmasEnvio {
+  id       String @id @default(cuid())
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String
+
+  responsavel   User   @relation("AvisoTurmasResponsavel", fields: [responsavelId], references: [id], onDelete: Cascade)
+  responsavelId String
+
+  automatico      Boolean
+  chaveAutomatico String? @unique
+  enviadoPor      User?   @relation("AvisoTurmasEnviadoPor", fields: [enviadoPorId], references: [id], onDelete: SetNull)
+  enviadoPorId    String?
+
+  titulo String
+  texto  String
+  // "push" ou "whatsapp"; null enquanto o envio está em andamento.
+  canal      String?
+  mensagemId String?
+  // Como no lembrete: "ENVIADO", "ENTREGUE", "LIDO" ou "FALHOU" (só WhatsApp; push fica null).
+  status     String?
+  statusEm   DateTime?
+  falha      String?
+  enviadoEm  DateTime @default(now())
+
+  @@index([schoolId, responsavelId])
+  @@index([mensagemId])
 }
 
 model LembretePendencia {

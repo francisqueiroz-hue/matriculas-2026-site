@@ -8,6 +8,15 @@ import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { ehDomingo } from "@/lib/lembretes";
 import { resumoFalhasRecentes } from "@/lib/whatsapp-falhas";
 import { situacaoEntrega } from "@/lib/lembrete-entrega";
+import { ultimoEnvioPorFamilia } from "@/lib/lembretes";
+import {
+  avaliarAvisoTurmas,
+  LIMITE_TEXTO_AVISO_TURMAS,
+  LIMITE_TITULO_AVISO_TURMAS,
+  TEXTO_PADRAO_AVISO_TURMAS,
+  TITULO_PADRAO_AVISO_TURMAS,
+} from "@/lib/aviso-turmas";
+import { ANO_AVISO_TURMAS, carregarAvisoTurmas, responsaveisJaAvisados, ultimosAvisosTurmas } from "@/lib/aviso-turmas-server";
 
 /**
  * Resumo para a direção: configuração, pendências das famílias (com quantos lembretes já
@@ -18,7 +27,7 @@ export async function GET() {
   try {
     const session = await requireDirecao();
     const agora = new Date();
-    const { config, plano } = await planejarDaEscola(session.schoolId, agora);
+    const { config, registros: registrosPlano, plano } = await planejarDaEscola(session.schoolId, agora);
 
     const ids = [...new Set(plano.avaliadas.map((a) => a.responsavelId))];
     const pessoas = await prisma.user.findMany({
@@ -57,10 +66,22 @@ export async function GET() {
       familias.set(a.responsavelId, familia);
     }
 
-    const [escola, entregas] = await Promise.all([
+    const [escola, entregas, aviso, jaAvisados, ultimosAvisos] = await Promise.all([
       pendenciasDaEscola(session.schoolId, config.diasInicio, agora),
       resumoFalhasRecentes(session.schoolId, agora),
+      carregarAvisoTurmas(session.schoolId),
+      responsaveisJaAvisados(session.schoolId),
+      ultimosAvisosTurmas(session.schoolId, ids),
     ]);
+    // Aviso único de definição das turmas: quem chegou ao limite de lembretes de matrícula.
+    const avisoFamilias = avaliarAvisoTurmas(
+      plano.avaliadas,
+      ultimoEnvioPorFamilia(registrosPlano),
+      jaAvisados,
+      new Set(plano.envios.map((e) => e.responsavelId)),
+      config,
+      agora,
+    ).map((f) => ({ ...f, nome: porId.get(f.responsavelId)?.name ?? "Responsável" }));
 
     return NextResponse.json({
       config,
@@ -70,6 +91,17 @@ export async function GET() {
       familias: [...familias.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
       escola,
       entregas,
+      avisoTurmas: {
+        ativo: aviso.ativo,
+        titulo: aviso.salvo.titulo,
+        texto: aviso.salvo.texto,
+        padrao: { titulo: TITULO_PADRAO_AVISO_TURMAS, texto: TEXTO_PADRAO_AVISO_TURMAS },
+        limites: { titulo: LIMITE_TITULO_AVISO_TURMAS, texto: LIMITE_TEXTO_AVISO_TURMAS },
+        ano: ANO_AVISO_TURMAS,
+        familias: avisoFamilias.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+        // Último aviso de cada família listada (automático ou manual), para mostrar na tela.
+        ultimos: Object.fromEntries(ultimosAvisos),
+      },
     });
   } catch (error) {
     return handleApiError(error);
