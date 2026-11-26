@@ -12,6 +12,7 @@ const prismaMock = vi.hoisted(() => ({
   solicitacaoMatricula: { findMany: vi.fn() },
   user: { findUnique: vi.fn() },
   lembretePendencia: { findMany: vi.fn(), createMany: vi.fn(), updateMany: vi.fn() },
+  avisoTurmasEnvio: { findMany: vi.fn() },
 }));
 const notifyUsers = vi.hoisted(() => vi.fn());
 const sendTemplate = vi.hoisted(() => vi.fn());
@@ -69,6 +70,7 @@ beforeEach(() => {
   prismaMock.student.findMany.mockResolvedValue([]);
   prismaMock.solicitacaoMatricula.findMany.mockResolvedValue([]);
   prismaMock.lembretePendencia.findMany.mockResolvedValue([]);
+  prismaMock.avisoTurmasEnvio.findMany.mockResolvedValue([]);
   prismaMock.lembretePendencia.createMany.mockResolvedValue({ count: 2 });
   prismaMock.lembretePendencia.updateMany.mockResolvedValue({ count: 1 });
   prismaMock.user.findUnique.mockResolvedValue({ phone: "5521999990000", avisosWhatsApp: false, whatsappUltimaMensagemEm: null, _count: { pushTokens: 0 } });
@@ -135,6 +137,14 @@ describe("executarLembretesDaEscola", () => {
     const r = await executarLembretesDaEscola("s1", QUARTA);
     expect(r).toMatchObject({ enviadas: 0, semCanal: 2 });
     expect(prismaMock.lembretePendencia.updateMany.mock.calls.some((c) => c[0].data.envios)).toBe(false);
+  });
+
+  it("aviso de definição das turmas de ontem conta para o intervalo da família", async () => {
+    prismaMock.avisoTurmasEnvio.findMany.mockResolvedValue([{ responsavelId: "mae", enviadoEm: new Date("2026-11-03T15:00:00Z") }]);
+    const r = await executarLembretesDaEscola("s1", QUARTA);
+    expect(r.enviadas).toBe(1); // só o pai; a mãe recebeu o aviso ontem
+    expect(notifyUsers).toHaveBeenCalledWith(["pai"], expect.anything());
+    expect(prismaMock.avisoTurmasEnvio.findMany.mock.calls[0][0].where.OR).toEqual([{ status: null }, { status: { not: "FALHOU" } }]);
   });
 
   it("família lembrada há 1 dia não recebe de novo", async () => {

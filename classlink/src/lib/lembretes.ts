@@ -203,11 +203,16 @@ export function planejarLembretes(
   registros: RegistroLembrete[],
   config: ConfigLembretes,
   agora: Date,
+  /** Outros contatos com a família que contam para o intervalo (ex.: aviso de definição das turmas). */
+  outrosContatos: Map<string, Date> = new Map(),
 ): PlanoLembretes {
   const porChave = new Map(registros.map((r) => [chaveLembrete(r), r]));
   const tiposAtivos = new Set(config.tipos);
 
   const ultimoDaFamilia = ultimoEnvioPorFamilia(registros);
+  for (const [responsavelId, em] of outrosContatos) {
+    ultimoDaFamilia.set(responsavelId, maisRecente(ultimoDaFamilia.get(responsavelId) ?? null, em));
+  }
 
   const vistas = new Set<string>();
   const avaliadas: PendenciaAvaliada[] = [];

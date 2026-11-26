@@ -5,7 +5,7 @@ import { DirecaoGuard } from "@/components/DirecaoGuard";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
 import { ROTULO_ENTREGA, type SituacaoEntrega } from "@/lib/lembrete-entrega";
-import { listaAlunos, preencherModelo, type SituacaoAvisoTurmas } from "@/lib/aviso-turmas";
+import { LIMITE_TEXTO_ENVIO_MANUAL, LIMITE_TITULO_ENVIO_MANUAL, listaAlunos, preencherModelo, type SituacaoAvisoTurmas } from "@/lib/aviso-turmas";
 import { LIMITES, ROTULO_TIPO_LEMBRETE, TIPOS_LEMBRETE, type ConfigLembretes, type LembreteTipo, type SituacaoPendencia } from "@/lib/lembretes";
 
 interface PendenciaFamilia {
@@ -124,7 +124,7 @@ function EnvioManualAviso({
   onFechar,
   onEnviado,
 }: {
-  familia: { id: string; nome: string; alunos: string[] };
+  familia: { id: string; nome: string; alunos: string[]; jaRecebeu: boolean };
   aviso: AvisoTurmasDados;
   onFechar: () => void;
   onEnviado: (msg: string) => void;
@@ -135,7 +135,8 @@ function EnvioManualAviso({
   const [texto, setTexto] = useState(ultimo?.texto ?? aviso.texto ?? aviso.padrao.texto);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const jaRecebeu = Boolean(ultimo && ultimo.status !== "FALHOU");
+  // Vale o histórico todo (situação da família), não só a última tentativa, que pode ter falhado.
+  const jaRecebeu = familia.jaRecebeu;
   const previa = preencherModelo(texto, { alunos: familia.alunos, ano: aviso.ano });
 
   async function enviar() {
@@ -165,14 +166,14 @@ function EnvioManualAviso({
       <input
         aria-label="Título do aviso para esta família"
         value={titulo}
-        maxLength={aviso.limites.titulo}
+        maxLength={LIMITE_TITULO_ENVIO_MANUAL}
         onChange={(e) => setTitulo(e.target.value)}
         className="w-full rounded-md border border-slate-300 px-2 py-1.5"
       />
       <textarea
         aria-label="Texto do aviso para esta família"
         value={texto}
-        maxLength={aviso.limites.texto}
+        maxLength={LIMITE_TEXTO_ENVIO_MANUAL}
         rows={4}
         onChange={(e) => setTexto(e.target.value)}
         className="w-full rounded-md border border-slate-300 px-2 py-1.5"
@@ -304,7 +305,7 @@ function SecaoAvisoTurmas({
               </div>
               {abertoPara === f.responsavelId && (
                 <EnvioManualAviso
-                  familia={{ id: f.responsavelId, nome: f.nome, alunos: f.alunos }}
+                  familia={{ id: f.responsavelId, nome: f.nome, alunos: f.alunos, jaRecebeu: f.situacao === "ENVIADO" }}
                   aviso={aviso}
                   onFechar={() => setAbertoPara(null)}
                   onEnviado={(m) => {

@@ -270,8 +270,22 @@ async function carregarRegistros(schoolId: string, agora: Date): Promise<Registr
 
 export async function planejarDaEscola(schoolId: string, agora = new Date()) {
   const config = await carregarConfigLembretes(schoolId);
-  const [pendencias, registros] = await Promise.all([coletarPendencias(schoolId, config.tipos, agora), carregarRegistros(schoolId, agora)]);
-  return { config, registros, plano: planejarLembretes(pendencias, registros, config, agora) };
+  const [pendencias, registros, avisos] = await Promise.all([
+    coletarPendencias(schoolId, config.tipos, agora),
+    carregarRegistros(schoolId, agora),
+    // Aviso de definição das turmas entregue (ou em andamento) conta como contato com a família:
+    // o próximo lembrete dela respeita o intervalo a partir dele.
+    prisma.avisoTurmasEnvio.findMany({
+      where: { schoolId, enviadoEm: { gte: new Date(agora.getTime() - 31 * DIA_MS) }, OR: [{ status: null }, { status: { not: "FALHOU" } }] },
+      select: { responsavelId: true, enviadoEm: true },
+    }),
+  ]);
+  const outrosContatos = new Map<string, Date>();
+  for (const a of avisos) {
+    const atual = outrosContatos.get(a.responsavelId);
+    if (!atual || a.enviadoEm > atual) outrosContatos.set(a.responsavelId, a.enviadoEm);
+  }
+  return { config, registros, outrosContatos, plano: planejarLembretes(pendencias, registros, config, agora, outrosContatos) };
 }
 
 /** Envia a mensagem única da família. Nunca lança: falha vira "nenhum" e tenta de novo amanhã. */

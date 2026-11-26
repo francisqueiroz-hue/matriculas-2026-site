@@ -115,5 +115,9 @@ describe("texto do aviso", () => {
     expect(() => configAvisoTurmasSchema.parse({ ativo: true, titulo: "x".repeat(LIMITE_TITULO_AVISO_TURMAS + 1), texto: null })).toThrow();
     expect(() => configAvisoTurmasSchema.parse({ ativo: true, titulo: null, texto: "x".repeat(LIMITE_TEXTO_AVISO_TURMAS + 1) })).toThrow();
     expect(envioAvisoTurmasSchema.parse({ responsavelId: "mae" })).toEqual({ responsavelId: "mae" });
+    // Reenvio da mensagem recebida: com os nomes, pode passar de 280 e precisa ser aceita.
+    const recebida = preencherModelo(TEXTO_PADRAO_AVISO_TURMAS, { alunos: ["Alexandre", "Guilherme", "Valentina", "Beatriz"], ano: 2027 });
+    expect(recebida.length).toBeGreaterThan(LIMITE_TEXTO_AVISO_TURMAS);
+    expect(envioAvisoTurmasSchema.parse({ responsavelId: "mae", texto: recebida }).texto).toBe(recebida);
   });
 });

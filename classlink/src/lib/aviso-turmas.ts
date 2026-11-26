@@ -35,6 +35,9 @@ export const TEXTO_PADRAO_AVISO_TURMAS =
 /** O modelo de WhatsApp mostra até 300 caracteres; com os nomes, o texto precisa caber nisso. */
 export const LIMITE_TITULO_AVISO_TURMAS = 80;
 export const LIMITE_TEXTO_AVISO_TURMAS = 280;
+/** Envio manual (texto já com os nomes, inclusive o reenvio da mensagem recebida). */
+export const LIMITE_TITULO_ENVIO_MANUAL = 160;
+export const LIMITE_TEXTO_ENVIO_MANUAL = 600;
 
 export interface ModeloAvisoTurmas {
   titulo: string;
