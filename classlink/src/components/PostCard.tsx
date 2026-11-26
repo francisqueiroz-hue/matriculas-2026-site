@@ -6,6 +6,7 @@ import { ehGestao, perfilAcessoDe } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { formatarDataHora } from "@/lib/datas";
 import { precisaRecolher } from "@/lib/texto-recolhivel";
+import { MidiaDoAviso } from "@/components/MidiaDoAviso";
 
 export interface PostItem {
   id: string;
@@ -13,12 +14,23 @@ export interface PostItem {
   body: string;
   mediaUrl: string | null;
   mediaType: string | null;
+  /** PDF convertido: links das imagens das páginas, em ordem. */
+  mediaPaginas?: string[];
+  mediaNome?: string | null;
   audience: "SCHOOL" | "CLASS";
   createdAt: string;
   author: { id: string; name: string; role: string };
   class: { id: string; name: string } | null;
   _count: { reads: number };
   readByMe: boolean;
+}
+
+/** Cartão visível o bastante para contar como lido: metade dele, ou metade da tela tomada por ele. */
+export function cartaoBemVisivel(
+  entrada: { intersectionRatio: number; intersectionRect: { height: number } },
+  alturaTela: number,
+): boolean {
+  return entrada.intersectionRatio >= 0.5 || (alturaTela > 0 && entrada.intersectionRect.height >= alturaTela * 0.5);
 }
 
 interface ReadEntry {
@@ -47,7 +59,8 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
   const canSeeReaders = user.role === "ADMIN" || user.role === "STAFF";
 
   // A leitura é registrada quando a família realmente vê o aviso na tela (metade do cartão
-  // visível por 1 segundo), e não quando a lista carrega: só rolar a página por cima não vale.
+  // visível por 1 segundo — ou metade da tela ocupada por ele, no cartão mais alto que a tela,
+  // como o de PDF com várias páginas), e não quando a lista carrega: só rolar por cima não vale.
   const cartaoRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (user.role !== "GUARDIAN" || readByMe) return;
@@ -68,7 +81,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
     let timer: ReturnType<typeof setTimeout> | undefined;
     const observer = new IntersectionObserver(
       ([entrada]) => {
-        if (entrada.isIntersecting && document.visibilityState === "visible") {
+        if (entrada.isIntersecting && cartaoBemVisivel(entrada, window.innerHeight) && document.visibilityState === "visible") {
           timer ??= setTimeout(() => {
             observer.disconnect();
             registrar();
@@ -78,7 +91,7 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
           timer = undefined;
         }
       },
-      { threshold: 0.5 },
+      { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5] },
     );
     observer.observe(alvo);
     return () => {
@@ -220,28 +233,13 @@ export function PostCard({ post, onDeleted }: { post: PostItem; onDeleted?: (id:
         </div>
       )}
 
-      {post.mediaUrl && post.mediaType === "image" && (
-        // Imagem inteira, sem cortes, em qualquer formato (vertical de status, horizontal, quadrada);
-        // tocar abre no tamanho original. URL assinada e temporária: o otimizador do Next não a reaproveita.
-        <a
-          href={post.mediaUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Abrir imagem em tamanho original"
-          className="mt-3 flex justify-center rounded-lg bg-slate-50 dark:bg-slate-800/50"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={post.mediaUrl}
-            alt={`Foto do aviso: ${current.title}`}
-            loading="lazy"
-            className="block h-auto max-h-[80vh] w-auto max-w-full rounded-lg object-contain"
-          />
-        </a>
-      )}
-      {post.mediaUrl && post.mediaType === "video" && (
-        <video src={post.mediaUrl} controls aria-label={`Vídeo do aviso: ${current.title}`} className="mt-3 max-h-[80vh] w-full rounded-lg bg-black object-contain" />
-      )}
+      <MidiaDoAviso
+        titulo={current.title}
+        mediaUrl={post.mediaUrl}
+        mediaType={post.mediaType}
+        mediaPaginas={post.mediaPaginas}
+        mediaNome={post.mediaNome}
+      />
 
       <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
         {user.role === "GUARDIAN" ? (

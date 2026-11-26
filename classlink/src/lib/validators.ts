@@ -93,7 +93,10 @@ export const createPostSchema = z.object({
   audience: z.enum(["SCHOOL", "CLASS"]),
   classId: z.string().optional(),
   mediaUrl: z.string().min(1).optional(), // caminho do objeto no Storage, não uma URL pública
-  mediaType: z.enum(["image", "video"]).optional(),
+  mediaType: z.enum(["image", "video", "pdf"]).optional(),
+  // PDF convertido em imagens no navegador: caminhos das páginas, em ordem (ver lib/midia-aviso).
+  mediaPaginas: z.array(z.string().min(1).max(300)).max(10).optional(),
+  mediaNome: z.string().max(300).optional(),
 });
 
 export const updatePostSchema = z.object({

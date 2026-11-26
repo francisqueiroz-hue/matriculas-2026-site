@@ -5,6 +5,8 @@ import { useCurrentUser } from "@/components/UserContext";
 import { ehGestao, perfilAcessoDe } from "@/lib/equipe";
 import { apiJson } from "@/lib/api-client";
 import { uploadMediaFile } from "@/lib/upload-client";
+import { converterPdfEmImagens, mensagemErroPdf } from "@/lib/pdf-para-imagens";
+import { MAX_BYTES_VIDEO, MAX_PAGINAS_PDF, tipoDoAnexo, type TipoAnexoAviso } from "@/lib/midia-aviso";
 import type { PostItem } from "@/components/PostCard";
 
 interface ClassOption {
@@ -25,8 +27,22 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
   const [loading, setLoading] = useState(false);
   // Progresso do envio direto de arquivos grandes (vídeos); null = sem barra.
   const [progresso, setProgresso] = useState<number | null>(null);
+  // Etapa visível durante o envio (conversão do PDF, envio das páginas).
+  const [etapa, setEtapa] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aberto, setAberto] = useState(false);
+
+  function escolherArquivo(arquivo: File | null) {
+    setError(null);
+    if (!arquivo) return setFile(null);
+    const tipo = tipoDoAnexo(arquivo);
+    if (typeof tipo === "object") {
+      setFile(null);
+      setError(tipo.erro);
+      return;
+    }
+    setFile(arquivo);
+  }
 
   useEffect(() => {
     apiJson<{ classes: ClassOption[] }>("/api/admin/classes")
@@ -44,8 +60,30 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
     setLoading(true);
     try {
       let mediaUrl: string | undefined;
-      let mediaType: "image" | "video" | undefined;
-      if (file) {
+      let mediaType: TipoAnexoAviso | undefined;
+      let mediaPaginas: string[] | undefined;
+      let mediaNome: string | undefined;
+      const tipo = file ? tipoDoAnexo(file) : null;
+      if (tipo && typeof tipo === "object") throw new Error(tipo.erro);
+      if (file && tipo === "pdf") {
+        setEtapa("Preparando o PDF…");
+        const paginas = await converterPdfEmImagens(file, (n, total) => setEtapa(`Convertendo página ${n} de ${total}…`)).catch(
+          (err: unknown) => {
+            throw new Error(mensagemErroPdf(err));
+          },
+        );
+        mediaPaginas = [];
+        for (const [i, pagina] of paginas.entries()) {
+          setEtapa(`Enviando página ${i + 1} de ${paginas.length}…`);
+          const enviada = await uploadMediaFile(pagina, { escolaId: user.schoolId }).catch((err: unknown) => {
+            throw new Error(`Não foi possível enviar a página ${i + 1} do PDF: ${err instanceof Error ? err.message : String(err)}`);
+          });
+          mediaPaginas.push(enviada.path);
+        }
+        mediaType = "pdf";
+        mediaNome = file.name;
+        setEtapa("Publicando...");
+      } else if (file) {
         const uploaded = await uploadMediaFile(file, { escolaId: user.schoolId, aoProgredir: setProgresso }).catch((err: unknown) => {
           throw new Error(`Não foi possível enviar o anexo: ${err instanceof Error ? err.message : String(err)}`);
         });
@@ -62,6 +100,8 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
           classId: audience === "CLASS" ? classId : undefined,
           mediaUrl,
           mediaType,
+          mediaPaginas,
+          mediaNome,
         }),
       });
 
@@ -75,6 +115,7 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
     } finally {
       setLoading(false);
       setProgresso(null);
+      setEtapa(null);
     }
   }
 
@@ -151,12 +192,16 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
 
         <label className="inline-flex max-w-full cursor-pointer items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 focus-within:outline focus-within:outline-2 focus-within:outline-indigo-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
           <span aria-hidden="true">📎</span>
-          <span className="truncate">{file ? file.name : "Anexar foto ou vídeo"}</span>
+          <span className="truncate">{file ? file.name : "Anexar foto, vídeo ou PDF"}</span>
           <input
             type="file"
-            aria-label="Anexar foto ou vídeo"
-            accept="image/*,video/*"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            aria-label="Anexar foto, vídeo ou PDF"
+            aria-describedby="dica-anexo-aviso"
+            accept="image/jpeg,image/png,image/webp,image/*,video/mp4,video/quicktime,video/webm,video/*,application/pdf,.pdf"
+            onChange={(e) => {
+              escolherArquivo(e.target.files?.[0] ?? null);
+              e.target.value = ""; // permite escolher o mesmo arquivo de novo depois de remover
+            }}
             className="sr-only"
           />
         </label>
@@ -166,16 +211,31 @@ export function PostComposer({ onCreated }: { onCreated: (post: PostItem) => voi
           </button>
         )}
       </div>
+      <p id="dica-anexo-aviso" className="text-xs text-slate-500">
+        Foto, vídeo (até {MAX_BYTES_VIDEO / 1024 / 1024} MB) ou PDF (até {MAX_PAGINAS_PDF} páginas). O PDF aparece no
+        mural como imagem, uma por página.
+      </p>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
 
       <button
         type="submit"
         disabled={loading}
         className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
       >
-        {loading ? (progresso !== null && progresso < 100 ? `Enviando arquivo… ${progresso}%` : "Publicando...") : "Publicar"}
+        {loading
+          ? etapa ?? (progresso !== null && progresso < 100 ? `Enviando arquivo… ${progresso}%` : "Publicando...")
+          : "Publicar"}
       </button>
+      {loading && (
+        <p aria-live="polite" className="sr-only">
+          {etapa ?? "Publicando"}
+        </p>
+      )}
     </form>
   );
 }
