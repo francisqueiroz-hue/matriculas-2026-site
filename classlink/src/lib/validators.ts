@@ -295,3 +295,29 @@ export const configLembretesSchema = z.object({
   intervaloDias: z.number().int().min(2).max(30),
   maxEnvios: z.number().int().min(1).max(10),
 });
+
+/** Aviso único de definição das turmas: texto editável pela direção (null = volta ao padrão). */
+const textoAvisoTurmas = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, `Use no máximo ${max} caracteres.`)
+    .nullable()
+    .transform((v) => (v ? v : null));
+
+export const configAvisoTurmasSchema = z.object({
+  ativo: z.boolean(),
+  titulo: textoAvisoTurmas(80),
+  texto: textoAvisoTurmas(280),
+});
+
+export const envioAvisoTurmasSchema = z.object({
+  responsavelId: z.string().min(1),
+  // Texto só para este envio (caso excepcional). Sem ele, vai o texto salvo.
+  // Limite maior que o do texto salvo: a mensagem já enviada vem com os nomes preenchidos e pode
+  // passar de 280 caracteres; precisa poder ser reenviada como está.
+  titulo: textoAvisoTurmas(160).optional(),
+  texto: textoAvisoTurmas(600).optional(),
+  // A família já recebeu o aviso: a direção confirma que quer mandar de novo.
+  repetir: z.boolean().optional(),
+});

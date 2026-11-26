@@ -9,6 +9,7 @@ import { findGuardianByPhone, findStaffByPhone, verifyWhatsAppSignature } from "
 import { ehPedidoDeAcesso } from "@/lib/acesso";
 import { mensagemIgnoravel } from "@/lib/whatsapp-ignorar";
 import { devolverEnvioFalho, registrarStatusLembrete } from "@/lib/lembretes-server";
+import { falhaAvisoTurmas, registrarStatusAvisoTurmas } from "@/lib/aviso-turmas-server";
 import { explicarCodigoFalha, horarioDoStatus, registrarEntregaConfirmada, registrarFalhaEntrega, ultimaEntregaDosStatus } from "@/lib/whatsapp-falhas";
 import { responderNumeroNaoCadastrado, responderPedidoDeAcesso } from "@/lib/pedido-acesso";
 import { corpoDaMidia, guardarMidiaRecebida, midiaDaMensagem } from "@/lib/whatsapp-midia";
@@ -117,6 +118,9 @@ export async function POST(request: NextRequest) {
       await registrarStatusLembrete(st.id, st.status, horarioDoStatus(st.timestamp)).catch((err) =>
         console.error("lembretes: falha ao registrar entrega", err),
       );
+      await registrarStatusAvisoTurmas(st.id, st.status, horarioDoStatus(st.timestamp)).catch((err) =>
+        console.error("aviso de turmas: falha ao registrar entrega", err),
+      );
     }
     const falhas = statuses.filter((st) => st.status === "failed");
     for (const falha of falhas) {
@@ -135,6 +139,7 @@ export async function POST(request: NextRequest) {
         detalhe: erro?.error_data?.details ?? erro?.message,
       }).catch((err) => console.error("whatsapp: falha ao registrar entrega recusada", err));
       await devolverEnvioFalho(falha.id, { motivo: explicarCodigoFalha(erro?.code ?? null), em: horarioDoStatus(falha.timestamp) }).catch((err) => console.error("lembretes: falha ao devolver envio", err));
+      await falhaAvisoTurmas(falha.id, { motivo: explicarCodigoFalha(erro?.code ?? null), em: horarioDoStatus(falha.timestamp) }).catch((err) => console.error("aviso de turmas: falha ao registrar entrega recusada", err));
     }
 
     for (const msg of mensagens) {

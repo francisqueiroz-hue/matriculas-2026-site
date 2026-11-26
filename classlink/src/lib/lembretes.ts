@@ -187,6 +187,13 @@ export function situacaoBoleto(
     : { situacao: "AGUARDANDO_INTERVALO", proximoEm: somarDias(agora, config.intervaloDias - desde) };
 }
 
+/** Último lembrete que cada família recebeu, de qualquer pendência (inclusive já resolvida). */
+export function ultimoEnvioPorFamilia(registros: Pick<RegistroLembrete, "responsavelId" | "ultimoEnvioEm">[]): Map<string, Date | null> {
+  const ultimo = new Map<string, Date | null>();
+  for (const r of registros) ultimo.set(r.responsavelId, maisRecente(ultimo.get(r.responsavelId) ?? null, r.ultimoEnvioEm));
+  return ultimo;
+}
+
 /**
  * Decide quem recebe lembrete agora. Pura: recebe as pendências atuais e os registros e
  * devolve o plano (quem recebe, o que vai em cada mensagem e o que foi resolvido).
@@ -196,14 +203,15 @@ export function planejarLembretes(
   registros: RegistroLembrete[],
   config: ConfigLembretes,
   agora: Date,
+  /** Outros contatos com a família que contam para o intervalo (ex.: aviso de definição das turmas). */
+  outrosContatos: Map<string, Date> = new Map(),
 ): PlanoLembretes {
   const porChave = new Map(registros.map((r) => [chaveLembrete(r), r]));
   const tiposAtivos = new Set(config.tipos);
 
-  // Último lembrete que cada família recebeu, de qualquer pendência (inclusive já resolvida).
-  const ultimoDaFamilia = new Map<string, Date | null>();
-  for (const r of registros) {
-    ultimoDaFamilia.set(r.responsavelId, maisRecente(ultimoDaFamilia.get(r.responsavelId) ?? null, r.ultimoEnvioEm));
+  const ultimoDaFamilia = ultimoEnvioPorFamilia(registros);
+  for (const [responsavelId, em] of outrosContatos) {
+    ultimoDaFamilia.set(responsavelId, maisRecente(ultimoDaFamilia.get(responsavelId) ?? null, em));
   }
 
   const vistas = new Set<string>();

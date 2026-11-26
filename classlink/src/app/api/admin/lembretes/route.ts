@@ -3,11 +3,21 @@ import { prisma } from "@/lib/prisma";
 import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { configLembretesSchema } from "@/lib/validators";
-import { planejarDaEscola, pendenciasDaEscola } from "@/lib/lembretes-server";
+import { coletarPendencias, planejarDaEscola, pendenciasDaEscola } from "@/lib/lembretes-server";
 import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { ehDomingo } from "@/lib/lembretes";
 import { resumoFalhasRecentes } from "@/lib/whatsapp-falhas";
 import { situacaoEntrega } from "@/lib/lembrete-entrega";
+import { planejarLembretes, ultimoEnvioPorFamilia } from "@/lib/lembretes";
+import {
+  TIPOS_AVISO_TURMAS,
+  avaliarAvisoTurmas,
+  LIMITE_TEXTO_AVISO_TURMAS,
+  LIMITE_TITULO_AVISO_TURMAS,
+  TEXTO_PADRAO_AVISO_TURMAS,
+  TITULO_PADRAO_AVISO_TURMAS,
+} from "@/lib/aviso-turmas";
+import { ANO_AVISO_TURMAS, carregarAvisoTurmas, responsaveisJaAvisados, ultimosAvisosTurmas } from "@/lib/aviso-turmas-server";
 
 /**
  * Resumo para a direção: configuração, pendências das famílias (com quantos lembretes já
@@ -18,7 +28,7 @@ export async function GET() {
   try {
     const session = await requireDirecao();
     const agora = new Date();
-    const { config, plano } = await planejarDaEscola(session.schoolId, agora);
+    const { config, registros: registrosPlano, plano } = await planejarDaEscola(session.schoolId, agora);
 
     const ids = [...new Set(plano.avaliadas.map((a) => a.responsavelId))];
     const pessoas = await prisma.user.findMany({
@@ -57,10 +67,34 @@ export async function GET() {
       familias.set(a.responsavelId, familia);
     }
 
-    const [escola, entregas] = await Promise.all([
+    // Aviso único de definição das turmas: lista com base nos contratos não assinados, mesmo que o
+    // lembrete de contrato esteja desmarcado (a direção pode enviar à mão).
+    const tiposAviso = [...TIPOS_AVISO_TURMAS];
+    const planoContratos = planejarLembretes(
+      await coletarPendencias(session.schoolId, tiposAviso, agora),
+      registrosPlano,
+      { ...config, tipos: tiposAviso },
+      agora,
+    );
+    const idsAviso = [...new Set(planoContratos.avaliadas.map((a) => a.responsavelId))];
+    const [escola, entregas, aviso, jaAvisados, ultimosAvisos, nomesAviso] = await Promise.all([
       pendenciasDaEscola(session.schoolId, config.diasInicio, agora),
       resumoFalhasRecentes(session.schoolId, agora),
+      carregarAvisoTurmas(session.schoolId),
+      responsaveisJaAvisados(session.schoolId),
+      ultimosAvisosTurmas(session.schoolId, idsAviso),
+      prisma.user.findMany({ where: { id: { in: idsAviso } }, select: { id: true, name: true } }),
     ]);
+    const nomePorId = new Map(nomesAviso.map((p) => [p.id, p.name]));
+    const avisoFamilias = avaliarAvisoTurmas(
+      planoContratos.avaliadas,
+      ultimoEnvioPorFamilia(registrosPlano),
+      jaAvisados,
+      // Quem recebe lembrete no próximo envio (de qualquer tipo) não recebe o aviso no mesmo dia.
+      new Set(plano.envios.map((e) => e.responsavelId)),
+      config,
+      agora,
+    ).map((f) => ({ ...f, nome: nomePorId.get(f.responsavelId) ?? "Responsável" }));
 
     return NextResponse.json({
       config,
@@ -70,6 +104,17 @@ export async function GET() {
       familias: [...familias.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
       escola,
       entregas,
+      avisoTurmas: {
+        ativo: aviso.ativo,
+        titulo: aviso.salvo.titulo,
+        texto: aviso.salvo.texto,
+        padrao: { titulo: TITULO_PADRAO_AVISO_TURMAS, texto: TEXTO_PADRAO_AVISO_TURMAS },
+        limites: { titulo: LIMITE_TITULO_AVISO_TURMAS, texto: LIMITE_TEXTO_AVISO_TURMAS },
+        ano: ANO_AVISO_TURMAS,
+        familias: avisoFamilias.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+        // Último aviso de cada família listada (automático ou manual), para mostrar na tela.
+        ultimos: Object.fromEntries(ultimosAvisos),
+      },
     });
   } catch (error) {
     return handleApiError(error);
