@@ -12,8 +12,10 @@ import {
   historicoAlunoSchema,
   aplicarMedias,
   localDataHistorico,
+  MENSAGEM_SO_FUNDAMENTAL,
   modeloHistoricoDe,
   normalizarNome,
+  turmaDoFundamental,
   vazios,
   type HistoricoAluno,
   type ModeloHistorico,
@@ -63,10 +65,11 @@ const SELECT_ALUNO = {
   },
 } as const;
 
-/** Aluno ativo desta escola, ou 404. */
+/** Aluno ativo desta escola, ou 404; aluno da educação infantil não tem histórico (400). */
 export async function alunoDaEscola(schoolId: string, studentId: string) {
   const aluno = await prisma.student.findFirst({ where: { id: studentId, schoolId, deletedAt: null }, select: SELECT_ALUNO });
   if (!aluno) throw new ErroDeUsuario("Aluno não encontrado.", 404);
+  if (!turmaDoFundamental(aluno.class.name)) throw new ErroDeUsuario(MENSAGEM_SO_FUNDAMENTAL, 400);
   return aluno;
 }
 

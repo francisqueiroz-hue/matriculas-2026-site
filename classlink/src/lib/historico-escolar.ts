@@ -1,5 +1,6 @@
 import { z } from "zod";
 import "@/lib/zod-sem-eval";
+import { etapaPelaTurma } from "@/lib/contrato-modelo/tipos";
 
 /**
  * Histórico escolar (Ensino Fundamental) no modelo da escola, emitido pela secretaria quando a
@@ -44,6 +45,13 @@ export const modeloHistoricoSchema = z.object({
   series: z.array(texto(20).min(1)).min(1).max(LIMITES_HISTORICO.series),
 });
 export type ModeloHistorico = z.infer<typeof modeloHistoricoSchema>;
+
+/** O histórico escolar é só para o ensino fundamental (turmas "Nº Ano"), como na matrícula. */
+export function turmaDoFundamental(turma: string): boolean {
+  return etapaPelaTurma(turma) === "EF1";
+}
+
+export const MENSAGEM_SO_FUNDAMENTAL = "O histórico escolar é só para alunos do ensino fundamental.";
 
 /** Ponto de partida, a partir do histórico que a escola já usa (arquivo .docx enviado pela direção). */
 export const MODELO_HISTORICO_PADRAO: ModeloHistorico = {
