@@ -50,7 +50,7 @@ export const MODELO_HISTORICO_PADRAO: ModeloHistorico = {
   cabecalho: [
     "MANTENEDORA – INSTITUTO DE EDUCAÇÃO SIL FARIA LTDA",
     "CNPJ Nº: 29.946.447/0001-30",
-    "Av. Professor Carlos Nelson Ferreira dos Santos, 658 – Camboinhas – Niterói – RJ",
+    "Rua Professor Carlos Nelson Ferreira dos Santos, 658 – Camboinhas – Niterói – RJ",
     "CEP: 24.358-705 – Tel.: 3492-2852",
     "Portaria SEEDUC/SUGEN/AUT nº 472 de 08/04/2013 – D.O. de 10/04/2013",
     "Reconhecido pela Resolução SEEDUC nº 4.654, de 23/12/2010.",
@@ -58,11 +58,11 @@ export const MODELO_HISTORICO_PADRAO: ModeloHistorico = {
   titulo: "HISTÓRICO ESCOLAR – ENSINO FUNDAMENTAL",
   cidade: "Niterói",
   estabelecimento: "Instituto Fokus",
-  // Nomes e registros ficam em branco no código: a secretaria preenche uma vez na tela e salva
-  // como padrão da escola.
+  // Assinantes indicados pela direção em 26/11/2026; o registro fica para a escola completar
+  // no "Modelo da escola".
   assinantes: [
-    { cargo: "Secretária Escolar", nome: "", registro: "" },
-    { cargo: "Diretora Pedagógica", nome: "", registro: "" },
+    { cargo: "Secretária Escolar", nome: "Kamilla de Sousa Rangel", registro: "" },
+    { cargo: "Diretor Pedagógico", nome: "Francis Wagner de Queiroz Ribeiro", registro: "" },
   ],
   disciplinas: [
     "Língua Portuguesa",
