@@ -214,6 +214,8 @@ function SecaoAvisoTurmas({
   const [abertoPara, setAbertoPara] = useState<string | null>(null);
 
   const exemplo = preencherModelo(texto, { alunos: ["Ana"], ano: aviso.ano });
+  // Vale o que está salvo (não a caixa marcada sem salvar): é o que o envio automático usa.
+  const desligado = !aviso.ativo || !lembretesAtivos;
 
   async function salvar() {
     setSalvando(true);
@@ -282,6 +284,12 @@ function SecaoAvisoTurmas({
       <div className="space-y-2">
         <h3 className="text-sm font-semibold">Contratos não assinados ({aviso.familias.length} {aviso.familias.length === 1 ? "família" : "famílias"})</h3>
         {aviso.familias.length === 0 && <p className="text-xs text-slate-500">Nenhum contrato aguardando assinatura.</p>}
+        {desligado && aviso.familias.some((f) => f.situacao === "PRONTO") && (
+          <p role="note" className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+            Envio automático desligado: nenhum aviso sai enquanto {aviso.ativo ? "os lembretes estiverem desligados" : "\"Enviar o aviso automaticamente\" não estiver marcado e salvo"}.
+            As famílias marcadas &quot;Sairá quando ligar&quot; recebem no primeiro envio depois de ligar.
+          </p>
+        )}
         <ul className="space-y-1.5">
           {aviso.familias.map((f) => (
             <li key={f.responsavelId} className="rounded-lg bg-slate-50 px-2 py-1.5 text-sm">
@@ -297,7 +305,9 @@ function SecaoAvisoTurmas({
                   )}
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${COR_SITUACAO_AVISO[f.situacao]}`}>{ROTULO_SITUACAO_AVISO[f.situacao]}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${desligado && f.situacao === "PRONTO" ? "bg-amber-100 text-amber-900" : COR_SITUACAO_AVISO[f.situacao]}`}>
+                    {desligado && f.situacao === "PRONTO" ? "Sairá quando ligar" : ROTULO_SITUACAO_AVISO[f.situacao]}
+                  </span>
                   <button type="button" onClick={() => setAbertoPara(abertoPara === f.responsavelId ? null : f.responsavelId)} className="text-xs text-indigo-700 underline">
                     {aviso.ultimos[f.responsavelId] ? "Ver, editar e reenviar" : "Enviar à mão"}
                   </button>
