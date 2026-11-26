@@ -245,7 +245,21 @@ describe("regras do histórico", () => {
     h.aluno.codigoInep = "";
     const p = pendenciasDoHistorico(h, MODELO_HISTORICO_PADRAO);
     expect(p.some((x) => x.includes("cadastro do aluno"))).toBe(true);
-    expect(p.some((x) => x.includes("Secretária Escolar"))).toBe(true);
+    // O modelo padrão já traz quem assina.
+    expect(p.some((x) => x.includes("Secretária Escolar"))).toBe(false);
+    const semNome = {
+      ...MODELO_HISTORICO_PADRAO,
+      assinantes: MODELO_HISTORICO_PADRAO.assinantes.map((a) => ({ ...a, nome: "" })),
+    };
+    expect(pendenciasDoHistorico(h, semNome).some((x) => x.includes("Secretária Escolar"))).toBe(true);
+  });
+
+  it("modelo padrão: endereço na Rua e assinantes da escola", () => {
+    expect(MODELO_HISTORICO_PADRAO.cabecalho.some((l) => l.startsWith("Rua Professor Carlos Nelson"))).toBe(true);
+    expect(MODELO_HISTORICO_PADRAO.assinantes).toEqual([
+      { cargo: "Secretária Escolar", nome: "Kamilla de Sousa Rangel", registro: "" },
+      { cargo: "Diretor Pedagógico", nome: "Francis Wagner de Queiroz Ribeiro", registro: "" },
+    ]);
   });
 
   it("nome do arquivo sem acento", () => {
