@@ -45,3 +45,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# leitor de PDF (copiado de node_modules no postinstall — scripts/copiar-pdfjs.mjs)
+/public/pdfjs

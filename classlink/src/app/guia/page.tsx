@@ -68,7 +68,7 @@ const INSTALACAO = [
 const AREAS = [
   {
     titulo: "Mural",
-    texto: "Fotos e novidades da turma. Toque em uma foto para ver no tamanho original e em \"Confirmar leitura\" para avisar a escola que você viu.",
+    texto: "Fotos, vídeos, circulares e novidades da escola e da turma. Toque em uma foto ou página para ampliar e em \"Confirmar leitura\" para avisar a escola que você viu.",
     path: "M4 4h16v16H4z M8 9h8 M8 13h8 M8 17h4",
   },
   {

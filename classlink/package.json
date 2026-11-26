@@ -12,7 +12,7 @@
     "test": "vitest run",
     "db:seed": "tsx prisma/seed.ts",
     "sync:matriculas": "tsx scripts/sync-matriculas.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && node scripts/copiar-pdfjs.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -25,6 +25,7 @@
     "jose": "^6.2.12",
     "next": "16.4.6",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "6.5.438",
     "pg": "^8.23.1",
     "prisma": "^7.10.0",
     "react": "19.2.4",

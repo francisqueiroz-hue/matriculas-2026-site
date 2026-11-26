@@ -396,7 +396,10 @@ model Post {
   title     String
   body      String
   mediaUrl  String?
-  mediaType String? // "image" | "video"
+  mediaType String? // "image" | "video" | "pdf" (PDF convertido em imagens no navegador)
+  // PDF: caminhos das imagens de cada página, em ordem (mediaUrl = 1ª página). Vazio nos demais.
+  mediaPaginas String[] @default([])
+  mediaNome    String? // nome do PDF original, para o texto alternativo das páginas
   audience  PostAudience
 
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)

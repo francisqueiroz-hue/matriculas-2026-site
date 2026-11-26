@@ -10,14 +10,19 @@ import { filtroDeVisibilidade, turmasVisiveisNoMural } from "@/lib/visibilidade-
 import { SELECT_PESSOA, pessoaParaQuemVe } from "@/lib/nome-institucional";
 import { exigirTurmaPublicavel } from "@/lib/turmas-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
+import { validarMidiaDoAviso } from "@/lib/midia-aviso";
 
-/** Troca o caminho interno do arquivo por uma URL assinada de leitura (temporária). */
-async function withSignedMedia<T extends { mediaUrl: string | null }>(post: T): Promise<T> {
+/**
+ * Troca os caminhos internos dos arquivos (foto/vídeo ou páginas do PDF) por URLs assinadas
+ * de leitura (temporárias).
+ */
+async function withSignedMedia<T extends { mediaUrl: string | null; mediaPaginas?: string[] }>(post: T): Promise<T> {
   if (!post.mediaUrl) return post;
   try {
-    return { ...post, mediaUrl: await getSignedMediaUrl(post.mediaUrl) };
+    const paginas = post.mediaPaginas?.length ? await Promise.all(post.mediaPaginas.map((p) => getSignedMediaUrl(p))) : [];
+    return { ...post, mediaUrl: paginas[0] ?? (await getSignedMediaUrl(post.mediaUrl)), mediaPaginas: paginas };
   } catch {
-    return { ...post, mediaUrl: null };
+    return { ...post, mediaUrl: null, mediaPaginas: [] };
   }
 }
 
@@ -73,6 +78,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: MENSAGEM_SO_GESTAO_ESCOLA }, { status: 403 });
     }
 
+    const midia = validarMidiaDoAviso(body, session.schoolId);
+
     let classId: string | null = null;
     if (body.audience === "CLASS") {
       if (!body.classId) return NextResponse.json({ error: "classId obrigatório" }, { status: 400 });
@@ -86,8 +93,10 @@ export async function POST(request: NextRequest) {
         body: body.body,
         audience: body.audience,
         classId,
-        mediaUrl: body.mediaUrl,
-        mediaType: body.mediaType,
+        mediaUrl: midia.mediaUrl,
+        mediaType: midia.mediaType,
+        mediaPaginas: midia.mediaPaginas,
+        mediaNome: midia.mediaNome,
         schoolId: session.schoolId,
         authorId: session.sub,
       },
@@ -113,7 +122,11 @@ export async function POST(request: NextRequest) {
       ).catch((err) => console.error("push notify failed", err)),
     );
 
-    return NextResponse.json({ post: await withSignedMedia(post) }, { status: 201 });
+    // Mesmo formato da lista (GET): o cartão novo aparece no topo sem recarregar a página.
+    return NextResponse.json(
+      { post: await withSignedMedia({ ...post, _count: { reads: 0 }, readByMe: false }) },
+      { status: 201 },
+    );
   } catch (error) {
     return handleApiError(error);
   }
