@@ -6,6 +6,7 @@ import {
   alunoDaEscola,
   carregarModeloHistorico,
   exigirQuemEmiteHistorico,
+  exigirQuemVeHistorico,
   historicoDoAluno,
   mediasDoAno,
   validar,
@@ -14,7 +15,7 @@ import {
 const SEM_CACHE = { "Cache-Control": "private, no-store" };
 
 /**
- * Histórico escolar (direção, secretaria e coordenação).
+ * Histórico escolar: direção, secretaria e coordenação veem; só direção e coordenação salvam.
  *  - sem parâmetros: lista os alunos ativos da escola, com a turma e se já há histórico salvo;
  *  - ?aluno=<id>: o modelo da escola e o histórico do aluno (o salvo ou um já preenchido com o
  *    que o app sabe);
@@ -22,7 +23,7 @@ const SEM_CACHE = { "Cache-Control": "private, no-store" };
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await exigirQuemEmiteHistorico();
+    const session = await exigirQuemVeHistorico();
     const id = request.nextUrl.searchParams.get("aluno");
     if (!id) {
       const alunos = await prisma.student.findMany({
@@ -54,7 +55,9 @@ export async function PUT(request: NextRequest) {
     const session = await exigirQuemEmiteHistorico();
     const historico = validar(historicoAlunoSchema, await request.json());
     await alunoDaEscola(session.schoolId, historico.studentId);
-    const { studentId, ...dados } = historico;
+    // O código INEP mora no cadastro do aluno: não é gravado no histórico.
+    const { studentId, ...resto } = historico;
+    const dados = { ...resto, aluno: { ...resto.aluno, codigoInep: "" } };
     const salvo = await prisma.historicoEscolar.upsert({
       where: { studentId },
       create: { schoolId: session.schoolId, studentId, dados, editadoPorId: session.sub },

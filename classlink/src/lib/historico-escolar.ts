@@ -216,11 +216,10 @@ export function localDataHistorico(cidade: string, agora: Date = new Date()): st
 /** Avisos (não bloqueiam o PDF): o que costuma faltar num histórico. */
 export function pendenciasDoHistorico(h: HistoricoAluno, modelo: ModeloHistorico): string[] {
   const p: string[] = [];
-  if (!h.aluno.codigoInep) p.push("Código Censo INEP do aluno em branco.");
+  if (!h.aluno.codigoInep) p.push("Código Censo INEP do aluno em branco: a direção ou a secretaria preenche no cadastro do aluno (Alunos > Editar nome e INEP).");
   if (!h.aluno.nascimento) p.push("Data de nascimento em branco.");
   if (!h.aluno.naturalidade) p.push("Naturalidade em branco.");
   if (!h.aluno.filiacao) p.push("Filiação em branco.");
-  if (h.aluno.codigoInep && !/^\d{12}$/.test(h.aluno.codigoInep)) p.push("O código INEP do aluno costuma ter 12 dígitos: confira.");
   if (h.aluno.nascimento && !/^\d{2}\/\d{2}\/\d{4}$/.test(h.aluno.nascimento)) p.push("Data de nascimento: use dd/mm/aaaa.");
   if (!h.estudos.length) p.push("Nenhum estudo realizado informado (série, ano e escola).");
   modelo.assinantes.forEach((a) => {

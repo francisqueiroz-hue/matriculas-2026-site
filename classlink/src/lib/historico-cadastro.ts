@@ -16,6 +16,7 @@ export const ROTULO_CAMPO: Record<string, string> = {
   nome: "Nome",
   turma: "Turma",
   nascimento: "Data de nascimento",
+  codigoInep: "Código Censo INEP",
   mensalidade: "Mensalidade (R$)",
   bolsista: "Isento de mensalidade (bolsista)",
   responsavelFinanceiro: "Responsável financeiro (assina o contrato)",
@@ -30,6 +31,8 @@ export interface DadosAluno {
   nome: string;
   turma: { id: string; name: string; year: number };
   nascimento: Date | null;
+  /** Opcional: chamadas antigas sem o campo não registram mudança nele. */
+  codigoInep?: string | null;
 }
 
 const dataIso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
@@ -43,6 +46,9 @@ export function alteracoesAluno(antes: DadosAluno, depois: DadosAluno): Alteraca
   }
   const [nascAntes, nascDepois] = [dataIso(antes.nascimento), dataIso(depois.nascimento)];
   if (nascAntes !== nascDepois) alteracoes.push({ campo: "nascimento", valorAnterior: nascAntes, valorNovo: nascDepois });
+  if (depois.codigoInep !== undefined && (antes.codigoInep ?? null) !== (depois.codigoInep ?? null)) {
+    alteracoes.push({ campo: "codigoInep", valorAnterior: antes.codigoInep ?? null, valorNovo: depois.codigoInep ?? null });
+  }
   return alteracoes;
 }
 

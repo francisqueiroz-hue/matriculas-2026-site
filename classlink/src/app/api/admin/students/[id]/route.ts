@@ -29,9 +29,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
       if (!existing) return null;
 
       const novoNascimento = body.birthDate ? new Date(body.birthDate) : existing.birthDate;
+      const novoInep = body.codigoInep === undefined ? existing.codigoInep : body.codigoInep || null;
       const alteracoes = alteracoesAluno(
-        { nome: existing.name, turma: existing.class, nascimento: existing.birthDate },
-        { nome: body.name || existing.name, turma: novaTurma ?? existing.class, nascimento: novoNascimento },
+        { nome: existing.name, turma: existing.class, nascimento: existing.birthDate, codigoInep: existing.codigoInep },
+        { nome: body.name || existing.name, turma: novaTurma ?? existing.class, nascimento: novoNascimento, codigoInep: novoInep },
       );
 
       const atualizado = await tx.student.update({
@@ -40,6 +41,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
           ...(body.name ? { name: body.name } : {}),
           ...(body.classId ? { classId: body.classId } : {}),
           ...(body.birthDate ? { birthDate: novoNascimento } : {}),
+          ...(body.codigoInep !== undefined ? { codigoInep: novoInep } : {}),
         },
       });
       if (alteracoes.length > 0) {

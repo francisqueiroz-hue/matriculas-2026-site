@@ -340,6 +340,9 @@ model Student {
   id        String    @id @default(cuid())
   name      String
   birthDate DateTime?
+  // Código do aluno no Censo Escolar (INEP, 12 dígitos). Preenchido no cadastro pela direção ou
+  // secretaria; sai no histórico escolar.
+  codigoInep String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?

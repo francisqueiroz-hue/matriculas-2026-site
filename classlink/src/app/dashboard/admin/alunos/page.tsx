@@ -27,6 +27,7 @@ interface HistoricoItem {
 interface StudentItem {
   id: string;
   name: string;
+  codigoInep?: string | null;
   class: { id: string; name: string };
   guardians: {
     responsavelFinanceiro?: boolean;
@@ -62,6 +63,7 @@ function AlunosContent() {
   const [editGuardianError, setEditGuardianError] = useState<string | null>(null);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [editStudentName, setEditStudentName] = useState("");
+  const [editStudentInep, setEditStudentInep] = useState("");
   const [editStudentError, setEditStudentError] = useState<string | null>(null);
   // Histórico de alterações aberto (um aluno por vez); null = carregando.
   const [historicoAlunoId, setHistoricoAlunoId] = useState<string | null>(null);
@@ -258,6 +260,7 @@ function AlunosContent() {
   function startEditStudent(student: StudentItem) {
     setEditingStudentId(student.id);
     setEditStudentName(student.name);
+    setEditStudentInep(student.codigoInep ?? "");
     setEditStudentError(null);
   }
 
@@ -268,9 +271,9 @@ function AlunosContent() {
     try {
       await apiJson(`/api/admin/students/${editingStudentId}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: editStudentName }),
+        body: JSON.stringify({ name: editStudentName, codigoInep: editStudentInep }),
       });
-      setFeedback((prev) => ({ ...prev, [editingStudentId]: "Nome do aluno atualizado." }));
+      setFeedback((prev) => ({ ...prev, [editingStudentId]: "Cadastro do aluno atualizado." }));
       setEditingStudentId(null);
       if (historicoAlunoId === editingStudentId) {
         historicoPedido.current = null;
@@ -453,6 +456,17 @@ function AlunosContent() {
                         className="mt-1 block w-64 rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
                       />
                     </label>
+                    <label className="text-xs text-slate-500">
+                      Código Censo INEP (12 dígitos, sai no histórico escolar)
+                      <input
+                        inputMode="numeric"
+                        maxLength={20}
+                        placeholder="000000000000"
+                        value={editStudentInep}
+                        onChange={(e) => setEditStudentInep(e.target.value)}
+                        className="mt-1 block w-48 rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-800"
+                      />
+                    </label>
                     <button type="submit" className="rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700">
                       Salvar
                     </button>
@@ -466,10 +480,11 @@ function AlunosContent() {
               <div className="flex items-center justify-between">
                 <span className="font-medium">
                   {s.name} <span className="text-xs text-slate-500">({s.class.name})</span>
+                  {s.codigoInep && <span className="ml-2 text-xs text-slate-500">INEP {s.codigoInep}</span>}
                 </span>
                 <span className="flex items-center gap-3">
                   <button type="button" onClick={() => startEditStudent(s)} className="text-xs text-indigo-600 hover:underline">
-                    Editar nome
+                    Editar nome e INEP
                   </button>
                   <button
                     type="button"

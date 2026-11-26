@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/UserContext";
 import { apiJson } from "@/lib/api-client";
-import { podeEmitirHistorico } from "@/lib/equipe";
+import { podeEmitirHistorico, podeVerHistorico } from "@/lib/equipe";
 import { PdfErro, abrirArquivo, obterPdf, salvarArquivo } from "@/lib/pdf-client";
 import { normalizarBusca } from "@/lib/busca-aluno";
 import {
@@ -30,8 +30,8 @@ type AlunoLista = { id: string; nome: string; turma: string; salvoEm: string | n
 export default function HistoricoEscolarPage() {
   const user = useCurrentUser();
   const perfil = { role: user.role, funcao: user.funcao ?? null, isCoordenacao: Boolean(user.isCoordenacao) };
-  if (!podeEmitirHistorico(perfil)) {
-    return <p className="text-sm text-slate-500">Somente a direção, a secretaria e a coordenação emitem o histórico escolar.</p>;
+  if (!podeVerHistorico(perfil)) {
+    return <p className="text-sm text-slate-500">Somente a direção, a secretaria e a coordenação acessam o histórico escolar.</p>;
   }
   return (
     <Suspense fallback={<p className="text-sm text-slate-500">Carregando...</p>}>
@@ -42,8 +42,11 @@ export default function HistoricoEscolarPage() {
 
 function Historico() {
   const params = useSearchParams();
+  const user = useCurrentUser();
+  // Direção e coordenação emitem; a secretaria só visualiza (o servidor também bloqueia).
+  const podeEditar = podeEmitirHistorico({ role: user.role, funcao: user.funcao ?? null, isCoordenacao: Boolean(user.isCoordenacao) });
   const aluno = params.get("aluno");
-  return aluno ? <EditorHistorico key={aluno} studentId={aluno} /> : <EscolherAluno />;
+  return aluno ? <EditorHistorico key={aluno} studentId={aluno} podeEditar={podeEditar} /> : <EscolherAluno />;
 }
 
 function EscolherAluno() {
@@ -101,7 +104,7 @@ function EscolherAluno() {
   );
 }
 
-function EditorHistorico({ studentId }: { studentId: string }) {
+function EditorHistorico({ studentId, podeEditar }: { studentId: string; podeEditar: boolean }) {
   const [modelo, setModelo] = useState<ModeloHistorico | null>(null);
   const [h, setH] = useState<HistoricoAluno | null>(null);
   const [turma, setTurma] = useState("");
@@ -227,6 +230,13 @@ function EditorHistorico({ studentId }: { studentId: string }) {
         </p>
       </div>
 
+      {!podeEditar && (
+        <p role="note" className="rounded-md bg-sky-50 p-3 text-sm text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+          Somente visualização: a direção e a coordenação preenchem e emitem o histórico.
+        </p>
+      )}
+
+      <fieldset disabled={!podeEditar} className="min-w-0 space-y-5">
       <details className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
         <summary className="cursor-pointer font-semibold">Modelo da escola (cabeçalho, assinaturas, componentes e anos)</summary>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -286,7 +296,8 @@ function EditorHistorico({ studentId }: { studentId: string }) {
         </label>
         <label className="block text-sm">
           Código Censo INEP do aluno
-          <input className={entrada} inputMode="numeric" maxLength={20} placeholder="12 dígitos" value={h.aluno.codigoInep} onChange={(e) => mudarAluno("codigoInep", e.target.value)} />
+          <input className={`${entrada} bg-slate-50`} readOnly value={h.aluno.codigoInep} placeholder="Em branco no cadastro" />
+          <span className="text-xs text-slate-500">Vem do cadastro do aluno (Alunos &gt; Editar nome e INEP).</span>
         </label>
         <label className="block text-sm">
           Natural de (cidade/UF)
@@ -450,7 +461,9 @@ function EditorHistorico({ studentId }: { studentId: string }) {
         </label>
       </section>
 
-      {pendencias.length > 0 && (
+      </fieldset>
+
+      {podeEditar && pendencias.length > 0 && (
         <ul className="list-disc space-y-1 rounded-md bg-amber-50 p-3 pl-6 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300">
           {pendencias.map((p) => (
             <li key={p}>{p}</li>
@@ -459,6 +472,7 @@ function EditorHistorico({ studentId }: { studentId: string }) {
       )}
       {aviso && <p role="status" className="text-sm text-slate-700 dark:text-slate-300">{aviso}</p>}
 
+      {podeEditar && (
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" disabled={ocupado !== null} onClick={gerarPdf} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
           {ocupado === "pdf" ? "Gerando PDF..." : "Salvar e gerar PDF"}
@@ -468,6 +482,7 @@ function EditorHistorico({ studentId }: { studentId: string }) {
         </button>
         {alterado && <span className="text-xs text-amber-700 dark:text-amber-400">Alterações ainda não salvas.</span>}
       </div>
+      )}
     </div>
   );
 }

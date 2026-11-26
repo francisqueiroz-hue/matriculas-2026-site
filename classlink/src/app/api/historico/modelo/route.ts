@@ -6,7 +6,7 @@ import { exigirQuemEmiteHistorico, validar } from "@/lib/historico-server";
 
 /**
  * Salva o modelo do histórico para os próximos (cabeçalho, título, cidade, escola, quem assina,
- * componentes e anos padrão). Direção, secretaria e coordenação. Não mexe em históricos salvos.
+ * componentes e anos padrão). Só direção e coordenação. Não mexe em históricos salvos.
  */
 export async function PUT(request: NextRequest) {
   try {

@@ -12,6 +12,10 @@ const prismaMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/visibilidade-server", () => ({ exigirArea: async () => {} }));
+vi.mock("@/lib/historico-pdf", async (orig) => {
+  const real = await orig<typeof import("@/lib/historico-pdf")>();
+  return { ...real, gerarHistoricoPdf: vi.fn(real.gerarHistoricoPdf) };
+});
 
 type Perfil = { role: "ADMIN" | "STAFF" | "GUARDIAN"; funcao: string | null; isCoordenacao: boolean };
 const PERFIS: Record<string, Perfil> = {
@@ -54,6 +58,7 @@ const ALUNO = {
   id: "al1",
   name: "Hugo Teste da Silva",
   birthDate: new Date("2010-09-03T00:00:00Z"),
+  codigoInep: "213335095969",
   class: { name: "4º Ano A", year: 2026 },
   guardians: [
     { relation: "Pai", guardian: { name: "Rodrigo Teste" } },
@@ -103,8 +108,19 @@ beforeEach(() => {
 });
 
 describe("histórico escolar: quem emite", () => {
-  it("direção, secretaria e coordenação abrem, salvam e geram o PDF", async () => {
-    for (const sub of ["dir", "sec", "coord"]) {
+  it("secretaria só visualiza: abre a lista e o histórico, mas não salva, não muda o modelo e não gera PDF", async () => {
+    atual.sub = "sec";
+    expect((await get()).status).toBe(200);
+    expect((await get("?aluno=al1")).status).toBe(200);
+    expect((await PUT(corpo("http://t/api/historico", exemplo()))).status).toBe(403);
+    expect((await salvarModelo(corpo("http://t/api/historico/modelo", MODELO_HISTORICO_PADRAO))).status).toBe(403);
+    expect((await pdf(corpo("http://t/api/historico/pdf", { modelo: MODELO_HISTORICO_PADRAO, historico: exemplo() }, "POST"))).status).toBe(403);
+    expect(prismaMock.historicoEscolar.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.historicoModelo.upsert).not.toHaveBeenCalled();
+  });
+
+  it("direção e coordenação abrem, salvam e geram o PDF", async () => {
+    for (const sub of ["dir", "coord"]) {
       atual.sub = sub;
       expect((await get()).status).toBe(200);
       expect((await get("?aluno=al1")).status).toBe(200);
@@ -142,7 +158,7 @@ describe("histórico preenchido com o que o app sabe", () => {
   it("nome, nascimento, filiação (mãe primeiro), ano em curso e médias fechadas", async () => {
     const d = await (await get("?aluno=al1")).json();
     const h = d.historico as HistoricoAluno;
-    expect(h.aluno).toMatchObject({ nome: "Hugo Teste da Silva", nascimento: "03/09/2010", filiacao: "Carolina Teste e Rodrigo Teste", codigoInep: "" });
+    expect(h.aluno).toMatchObject({ nome: "Hugo Teste da Silva", nascimento: "03/09/2010", filiacao: "Carolina Teste e Rodrigo Teste", codigoInep: "213335095969" });
     expect(h.estudos).toEqual([{ serie: "4º ano", ano: "2026", estabelecimento: "Instituto Fokus", municipio: "Niterói" }]);
     const mat = h.disciplinas.find((x) => x.nome === "Matemática")!;
     expect(mat.notas).toEqual(["", "", "", "9,0", ""]);
@@ -156,7 +172,8 @@ describe("histórico preenchido com o que o app sabe", () => {
     void _s;
     prismaMock.historicoEscolar.findUnique.mockResolvedValue({ dados, updatedAt: new Date("2026-11-20T10:00:00Z") });
     const d = await (await get("?aluno=al1")).json();
-    expect(d.historico.aluno.codigoInep).toBe("123456789012");
+    // O INEP vem sempre do cadastro, mesmo que o histórico salvo tenha outro.
+    expect(d.historico.aluno.codigoInep).toBe("213335095969");
     expect(d.historico.estudos).toHaveLength(2);
     expect(d.salvoEm).toBeTruthy();
   });
@@ -167,6 +184,16 @@ describe("histórico preenchido com o que o app sabe", () => {
     expect(arg.where).toEqual({ studentId: "al1" });
     expect(arg.create).toMatchObject({ schoolId: "s1", studentId: "al1", editadoPorId: "dir" });
     expect(arg.create.dados.studentId).toBeUndefined();
+    expect(arg.create.dados.aluno.codigoInep).toBe(""); // o INEP mora no cadastro do aluno
+  });
+
+  it("o PDF usa o INEP do cadastro, não o que veio da tela", async () => {
+    const h = exemplo();
+    h.aluno.codigoInep = "999999999999";
+    const r = await pdf(corpo("http://t/api/historico/pdf", { modelo: MODELO_HISTORICO_PADRAO, historico: h }, "POST"));
+    expect(r.status).toBe(200);
+    const usado = vi.mocked(gerarHistoricoPdf).mock.calls[0][1];
+    expect(usado.aluno.codigoInep).toBe("213335095969");
   });
 
   it("dados com quantidade de anos diferente da tabela são recusados com mensagem clara", async () => {
@@ -215,9 +242,9 @@ describe("regras do histórico", () => {
 
   it("pendências avisam o que costuma faltar", () => {
     const h = exemplo();
-    h.aluno.codigoInep = "123";
+    h.aluno.codigoInep = "";
     const p = pendenciasDoHistorico(h, MODELO_HISTORICO_PADRAO);
-    expect(p.some((x) => x.includes("12 dígitos"))).toBe(true);
+    expect(p.some((x) => x.includes("cadastro do aluno"))).toBe(true);
     expect(p.some((x) => x.includes("Secretária Escolar"))).toBe(true);
   });
 
@@ -244,5 +271,24 @@ describe("PDF do histórico", () => {
     };
     const doc = await PDFDocument.load(await gerarHistoricoPdf(MODELO_HISTORICO_PADRAO, h));
     expect(doc.getPageCount()).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("código INEP no cadastro do aluno", () => {
+  it("aceita 12 dígitos (com ou sem pontuação) ou vazio; recusa outro tamanho", async () => {
+    const { updateStudentSchema } = await import("@/lib/validators");
+    expect(updateStudentSchema.parse({ codigoInep: "2133.3509.5969" }).codigoInep).toBe("213335095969");
+    expect(updateStudentSchema.parse({ codigoInep: "" }).codigoInep).toBe("");
+    expect(updateStudentSchema.safeParse({ codigoInep: "123" }).success).toBe(false);
+  });
+
+  it("mudança do INEP entra no histórico de alterações do cadastro", async () => {
+    const { alteracoesAluno } = await import("@/lib/historico-cadastro");
+    const turma = { id: "t1", name: "4º Ano A", year: 2026 };
+    const base = { nome: "Hugo", turma, nascimento: null };
+    expect(alteracoesAluno({ ...base, codigoInep: null }, { ...base, codigoInep: "213335095969" })).toEqual([
+      { campo: "codigoInep", valorAnterior: null, valorNovo: "213335095969" },
+    ]);
+    expect(alteracoesAluno({ ...base, codigoInep: "1" }, base)).toEqual([]);
   });
 });

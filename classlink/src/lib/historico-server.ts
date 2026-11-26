@@ -1,11 +1,11 @@
 import type { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { AuthError, ehGestaoDaSessao, requireRole } from "@/lib/session";
+import { AuthError, ehGestaoDaSessao, exigirDirecaoOuCoordenacao, requireRole } from "@/lib/session";
 import { ErroDeUsuario } from "@/lib/erros";
 import { exigirArea } from "@/lib/visibilidade-server";
 import { disciplinasDaEscola, linhasDoBoletim } from "@/lib/boletim";
 import { formatarNumero } from "@/lib/boletim-modelo";
-import { MENSAGEM_SO_GESTAO_HISTORICO } from "@/lib/equipe";
+import { MENSAGEM_SO_DIRECAO_COORDENACAO_HISTORICO, MENSAGEM_SO_GESTAO_HISTORICO } from "@/lib/equipe";
 import {
   colunaDaTurma,
   dataBr,
@@ -20,14 +20,21 @@ import {
 } from "@/lib/historico-escolar";
 
 /**
- * Quem emite o histórico: direção, secretaria e coordenação (a gestão). Professores, auxiliares
- * e famílias não acessam. A coordenação também respeita a área "Notas e boletim" desligada pela
+ * Quem vê o histórico: direção, secretaria e coordenação (a gestão). Professores, auxiliares e
+ * famílias não acessam. A coordenação também respeita a área "Notas e boletim" desligada pela
  * direção em Configurações. A função é lida do banco a cada pedido.
  */
-export async function exigirQuemEmiteHistorico() {
+export async function exigirQuemVeHistorico() {
   const session = await requireRole("ADMIN", "STAFF");
   await exigirArea(session, "NOTAS");
   if (!(await ehGestaoDaSessao(session))) throw new AuthError(MENSAGEM_SO_GESTAO_HISTORICO, 403);
+  return session;
+}
+
+/** Quem emite (salva, muda o modelo e gera o PDF): só direção e coordenação; a secretaria só vê. */
+export async function exigirQuemEmiteHistorico() {
+  const session = await exigirQuemVeHistorico();
+  await exigirDirecaoOuCoordenacao(session, MENSAGEM_SO_DIRECAO_COORDENACAO_HISTORICO);
   return session;
 }
 
@@ -47,6 +54,7 @@ const SELECT_ALUNO = {
   id: true,
   name: true,
   birthDate: true,
+  codigoInep: true,
   class: { select: { name: true, year: true } },
   guardians: {
     where: { guardian: { deletedAt: null } },
@@ -101,7 +109,7 @@ export async function historicoInicial(schoolId: string, aluno: Aluno, modelo: M
     studentId: aluno.id,
     aluno: {
       nome: aluno.name,
-      codigoInep: "",
+      codigoInep: aluno.codigoInep ?? "",
       naturalidade: "",
       nacionalidade: "Brasileira",
       nascimento: dataBr(aluno.birthDate),
@@ -124,7 +132,11 @@ export async function historicoDoAluno(schoolId: string, aluno: Aluno, modelo: M
   const salvo = await prisma.historicoEscolar.findUnique({ where: { studentId: aluno.id }, select: { dados: true, updatedAt: true } });
   if (salvo) {
     const r = historicoAlunoSchema.safeParse({ ...(salvo.dados as object), studentId: aluno.id });
-    if (r.success) return { historico: { ...r.data, localData: localDataHistorico(modelo.cidade, agora) }, salvoEm: salvo.updatedAt };
+    if (r.success) {
+      // O código INEP vem sempre do cadastro do aluno (não do que foi salvo no histórico).
+      const historico = { ...r.data, aluno: { ...r.data.aluno, codigoInep: aluno.codigoInep ?? "" }, localData: localDataHistorico(modelo.cidade, agora) };
+      return { historico, salvoEm: salvo.updatedAt };
+    }
   }
   return { historico: await historicoInicial(schoolId, aluno, modelo, agora), salvoEm: null };
 }

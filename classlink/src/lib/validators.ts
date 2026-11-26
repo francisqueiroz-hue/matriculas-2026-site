@@ -15,7 +15,14 @@ export const createStudentSchema = z.object({
   birthDate: z.string().datetime().optional(),
 });
 
-export const updateStudentSchema = createStudentSchema.partial();
+/** Código do aluno no Censo Escolar (INEP): 12 dígitos; vazio apaga. */
+export const codigoInepAlunoSchema = z
+  .string()
+  .trim()
+  .transform((v) => v.replace(/\D/g, ""))
+  .refine((v) => v === "" || /^\d{12}$/.test(v), { message: "O código Censo INEP do aluno tem 12 dígitos." });
+
+export const updateStudentSchema = createStudentSchema.partial().extend({ codigoInep: codigoInepAlunoSchema.optional() });
 
 /** No cadastro: a direção confirma quando o nome parece de aluno já cadastrado (irmão, homônimo). */
 export const novoAlunoSchema = createStudentSchema.extend({ confirmarSemelhante: z.boolean().optional() });
