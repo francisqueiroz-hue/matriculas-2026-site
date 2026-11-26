@@ -6,8 +6,8 @@
  * próximo ano. O texto é editável pela direção; em caso excepcional, a direção também envia à mão.
  *
  * Regras do envio automático:
- *  - vale para as pendências de matrícula (contrato para assinar/reenviar e rematrícula não
- *    confirmada), quando uma delas fica em LIMITE_ATINGIDO e continua pendente;
+ *  - a base são os contratos não assinados (aguardando assinatura ou devolvidos para correção):
+ *    a tela lista todos; o automático sai quando um deles fica em LIMITE_ATINGIDO e continua pendente;
  *  - sai uma única vez por família (responsável), nunca repete;
  *  - respeita o intervalo da família: o aviso ocupa a vez do lembrete que sairia a seguir, e não
  *    sai no mesmo dia de outro lembrete;
@@ -16,8 +16,11 @@
 import type { LembreteTipo } from "@prisma/client";
 import { diasCorridos, primeiroNome, type ConfigLembretes, type PendenciaAvaliada } from "@/lib/lembretes";
 
-/** Pendências de matrícula que levam ao aviso. Mensalidade e autorização ficam de fora. */
-export const TIPOS_AVISO_TURMAS: readonly LembreteTipo[] = ["CONTRATO", "REMATRICULA"];
+/**
+ * Base do aviso (decisão da direção, 26/11/2026): contratos não assinados. Rematrícula sem contrato,
+ * mensalidade e autorização ficam de fora.
+ */
+export const TIPOS_AVISO_TURMAS: readonly LembreteTipo[] = ["CONTRATO"];
 
 /**
  * Texto padrão (proposta para revisão da direção). Marcadores: {alunos} = primeiro nome dos
@@ -79,12 +82,15 @@ export interface AvisoTurmasPlanejado {
 }
 
 export type SituacaoAvisoTurmas =
+  | "EM_LEMBRETES" // contrato não assinado, ainda recebendo lembretes (o aviso vem depois do limite)
   | "PRONTO" // sai no próximo envio automático
   | "AGUARDANDO_INTERVALO" // família recebeu lembrete há pouco; sai quando completar o intervalo
   | "ENVIADO"; // já recebeu (não repete)
 
 export interface FamiliaAvisoTurmas extends AvisoTurmasPlanejado {
   situacao: SituacaoAvisoTurmas;
+  /** Lembretes já enviados (o maior entre os contratos da família). */
+  envios: number;
   /** Data prevista (AGUARDANDO_INTERVALO). */
   proximoEm: Date | null;
 }
@@ -92,7 +98,8 @@ export interface FamiliaAvisoTurmas extends AvisoTurmasPlanejado {
 const DIA_MS = 86_400_000;
 
 /**
- * Famílias com pendência de matrícula no limite de lembretes e a situação do aviso de cada uma.
+ * Famílias com contrato não assinado e a situação do aviso de cada uma (o automático só sai para
+ * PRONTO, isto é, depois do limite de lembretes).
  * `jaAvisados`: responsáveis que já receberam o aviso (automático ou manual, entrega não falhou).
  * `lembradosAgora`: responsáveis que recebem lembrete nesta execução (o aviso fica para depois).
  */
@@ -107,7 +114,7 @@ export function avaliarAvisoTurmas(
   const tipos = new Set(TIPOS_AVISO_TURMAS);
   const porFamilia = new Map<string, PendenciaAvaliada[]>();
   for (const a of avaliadas) {
-    if (!tipos.has(a.tipo) || a.situacao !== "LIMITE_ATINGIDO") continue;
+    if (!tipos.has(a.tipo)) continue;
     const lista = porFamilia.get(a.responsavelId) ?? [];
     lista.push(a);
     porFamilia.set(a.responsavelId, lista);
@@ -115,11 +122,18 @@ export function avaliarAvisoTurmas(
 
   const familias: FamiliaAvisoTurmas[] = [];
   for (const [responsavelId, lista] of porFamilia) {
-    const alunos = [...new Set(lista.map((p) => p.aluno))];
+    const noLimite = lista.filter((p) => p.situacao === "LIMITE_ATINGIDO");
+    // Aviso automático cita os alunos cujo contrato chegou ao limite; antes disso, todos.
+    const alunos = [...new Set((noLimite.length ? noLimite : lista).map((p) => p.aluno))];
     const url = lista.every((p) => p.tipo === "CONTRATO") ? "/dashboard/contratos" : "/dashboard";
-    const base = { responsavelId, alunos, url };
+    const envios = Math.max(...lista.map((p) => p.envios));
+    const base = { responsavelId, alunos, url, envios };
     if (jaAvisados.has(responsavelId)) {
       familias.push({ ...base, situacao: "ENVIADO", proximoEm: null });
+      continue;
+    }
+    if (noLimite.length === 0) {
+      familias.push({ ...base, situacao: "EM_LEMBRETES", proximoEm: null });
       continue;
     }
     // O último lembrete da família, inclusive o que sai agora, conta para o intervalo.

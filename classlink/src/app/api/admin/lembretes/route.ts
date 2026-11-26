@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { configLembretesSchema } from "@/lib/validators";
-import { planejarDaEscola, pendenciasDaEscola } from "@/lib/lembretes-server";
+import { coletarPendencias, planejarDaEscola, pendenciasDaEscola } from "@/lib/lembretes-server";
 import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { ehDomingo } from "@/lib/lembretes";
 import { resumoFalhasRecentes } from "@/lib/whatsapp-falhas";
 import { situacaoEntrega } from "@/lib/lembrete-entrega";
-import { ultimoEnvioPorFamilia } from "@/lib/lembretes";
+import { planejarLembretes, ultimoEnvioPorFamilia } from "@/lib/lembretes";
 import {
+  TIPOS_AVISO_TURMAS,
   avaliarAvisoTurmas,
   LIMITE_TEXTO_AVISO_TURMAS,
   LIMITE_TITULO_AVISO_TURMAS,
@@ -66,22 +67,34 @@ export async function GET() {
       familias.set(a.responsavelId, familia);
     }
 
-    const [escola, entregas, aviso, jaAvisados, ultimosAvisos] = await Promise.all([
+    // Aviso único de definição das turmas: lista com base nos contratos não assinados, mesmo que o
+    // lembrete de contrato esteja desmarcado (a direção pode enviar à mão).
+    const tiposAviso = [...TIPOS_AVISO_TURMAS];
+    const planoContratos = planejarLembretes(
+      await coletarPendencias(session.schoolId, tiposAviso, agora),
+      registrosPlano,
+      { ...config, tipos: tiposAviso },
+      agora,
+    );
+    const idsAviso = [...new Set(planoContratos.avaliadas.map((a) => a.responsavelId))];
+    const [escola, entregas, aviso, jaAvisados, ultimosAvisos, nomesAviso] = await Promise.all([
       pendenciasDaEscola(session.schoolId, config.diasInicio, agora),
       resumoFalhasRecentes(session.schoolId, agora),
       carregarAvisoTurmas(session.schoolId),
       responsaveisJaAvisados(session.schoolId),
-      ultimosAvisosTurmas(session.schoolId, ids),
+      ultimosAvisosTurmas(session.schoolId, idsAviso),
+      prisma.user.findMany({ where: { id: { in: idsAviso } }, select: { id: true, name: true } }),
     ]);
-    // Aviso único de definição das turmas: quem chegou ao limite de lembretes de matrícula.
+    const nomePorId = new Map(nomesAviso.map((p) => [p.id, p.name]));
     const avisoFamilias = avaliarAvisoTurmas(
-      plano.avaliadas,
+      planoContratos.avaliadas,
       ultimoEnvioPorFamilia(registrosPlano),
       jaAvisados,
+      // Quem recebe lembrete no próximo envio (de qualquer tipo) não recebe o aviso no mesmo dia.
       new Set(plano.envios.map((e) => e.responsavelId)),
       config,
       agora,
-    ).map((f) => ({ ...f, nome: porId.get(f.responsavelId)?.name ?? "Responsável" }));
+    ).map((f) => ({ ...f, nome: nomePorId.get(f.responsavelId) ?? "Responsável" }));
 
     return NextResponse.json({
       config,

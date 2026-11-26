@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireDirecao } from "@/lib/session";
 import { handleApiError } from "@/lib/http";
 import { envioAvisoTurmasSchema } from "@/lib/validators";
-import { planejarDaEscola } from "@/lib/lembretes-server";
+import { coletarPendencias } from "@/lib/lembretes-server";
 import { TIPOS_AVISO_TURMAS } from "@/lib/aviso-turmas";
 import { carregarAvisoTurmas, enviarAvisoTurmasManual, responsaveisJaAvisados } from "@/lib/aviso-turmas-server";
 
@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Alunos citados: os que têm a matrícula pendente agora; sem pendência, todos os do responsável.
-    const { plano } = await planejarDaEscola(session.schoolId);
-    const pendentes = plano.avaliadas.filter((a) => a.responsavelId === responsavel.id && TIPOS_AVISO_TURMAS.includes(a.tipo));
+    // Alunos citados: os do responsável com contrato não assinado; sem contrato pendente, todos os dele.
+    const pendentes = (await coletarPendencias(session.schoolId, [...TIPOS_AVISO_TURMAS], new Date())).filter(
+      (p) => p.responsavelId === responsavel.id,
+    );
     const alunos = pendentes.length ? [...new Set(pendentes.map((p) => p.aluno))] : responsavel.studentLinks.map((s) => s.student.name);
     const url = pendentes.length && pendentes.every((p) => p.tipo === "CONTRATO") ? "/dashboard/contratos" : "/dashboard";
 

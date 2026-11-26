@@ -32,8 +32,8 @@ interface AvisoTurmasDados {
   padrao: { titulo: string; texto: string };
   limites: { titulo: number; texto: number };
   ano: number;
-  familias: { responsavelId: string; nome: string; alunos: string[]; situacao: SituacaoAvisoTurmas; proximoEm: string | null }[];
-  ultimos: Record<string, { automatico: boolean; canal: string | null; status: string | null; falha: string | null; enviadoEm: string }>;
+  familias: { responsavelId: string; nome: string; alunos: string[]; envios: number; situacao: SituacaoAvisoTurmas; proximoEm: string | null }[];
+  ultimos: Record<string, { automatico: boolean; titulo: string; texto: string; canal: string | null; status: string | null; falha: string | null; enviadoEm: string }>;
 }
 interface Dados {
   avisoTurmas: AvisoTurmasDados;
@@ -94,11 +94,13 @@ function dataCurta(valor: string | null): string {
 }
 
 const ROTULO_SITUACAO_AVISO: Record<SituacaoAvisoTurmas, string> = {
+  EM_LEMBRETES: "Ainda nos lembretes",
   PRONTO: "Sai no próximo envio",
   AGUARDANDO_INTERVALO: "Aguardando o intervalo",
   ENVIADO: "Aviso enviado",
 };
 const COR_SITUACAO_AVISO: Record<SituacaoAvisoTurmas, string> = {
+  EM_LEMBRETES: "bg-slate-100 text-slate-600",
   PRONTO: "bg-sky-100 text-sky-900",
   AGUARDANDO_INTERVALO: "bg-slate-100 text-slate-700",
   ENVIADO: "bg-emerald-100 text-emerald-900",
@@ -127,11 +129,13 @@ function EnvioManualAviso({
   onFechar: () => void;
   onEnviado: (msg: string) => void;
 }) {
-  const [titulo, setTitulo] = useState(aviso.titulo ?? aviso.padrao.titulo);
-  const [texto, setTexto] = useState(aviso.texto ?? aviso.padrao.texto);
+  // Já enviado: abre com o texto que a família recebeu, para editar e reenviar. Senão, o texto salvo.
+  const ultimo = aviso.ultimos[familia.id];
+  const [titulo, setTitulo] = useState(ultimo?.titulo ?? aviso.titulo ?? aviso.padrao.titulo);
+  const [texto, setTexto] = useState(ultimo?.texto ?? aviso.texto ?? aviso.padrao.texto);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const jaRecebeu = Boolean(aviso.ultimos[familia.id] && aviso.ultimos[familia.id].status !== "FALHOU");
+  const jaRecebeu = Boolean(ultimo && ultimo.status !== "FALHOU");
   const previa = preencherModelo(texto, { alunos: familia.alunos, ano: aviso.ano });
 
   async function enviar() {
@@ -155,7 +159,9 @@ function EnvioManualAviso({
   return (
     <div className="mt-2 space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm">
       <p className="font-medium">Enviar aviso a {familia.nome}</p>
-      <p className="text-xs text-slate-600">O texto abaixo vale só para este envio. O texto salvo para o envio automático não muda.</p>
+      <p className="text-xs text-slate-600">
+        {ultimo ? "Abaixo, a mensagem que a família recebeu. Edite e reenvie se precisar. " : ""}O texto vale só para este envio; o texto salvo para o envio automático não muda.
+      </p>
       <input
         aria-label="Título do aviso para esta família"
         value={titulo}
@@ -188,7 +194,17 @@ function EnvioManualAviso({
 }
 
 /** Configuração e acompanhamento do aviso único de definição das turmas. */
-function SecaoAvisoTurmas({ aviso, lembretesAtivos, onMudou }: { aviso: AvisoTurmasDados; lembretesAtivos: boolean; onMudou: () => void }) {
+function SecaoAvisoTurmas({
+  aviso,
+  lembretesAtivos,
+  lembretesMax,
+  onMudou,
+}: {
+  aviso: AvisoTurmasDados;
+  lembretesAtivos: boolean;
+  lembretesMax: number;
+  onMudou: () => void;
+}) {
   const [ativo, setAtivo] = useState(aviso.ativo);
   const [titulo, setTitulo] = useState(aviso.titulo ?? aviso.padrao.titulo);
   const [texto, setTexto] = useState(aviso.texto ?? aviso.padrao.texto);
@@ -220,8 +236,8 @@ function SecaoAvisoTurmas({ aviso, lembretesAtivos, onMudou }: { aviso: AvisoTur
       <div>
         <h2 className="font-semibold">Aviso de definição das turmas</h2>
         <p className="text-xs text-slate-500">
-          Quando o contrato ou a rematrícula de uma família chega ao máximo de lembretes e continua pendente, o ClassLink manda uma única mensagem avisando que a escola
-          está definindo as turmas do próximo ano. Não repete. Pelo mesmo caminho dos lembretes (app; sem app, WhatsApp), depois do intervalo e nunca aos domingos.
+          A lista abaixo mostra os alunos com contrato não assinado. Quando o contrato chega ao máximo de lembretes e continua sem assinatura, o ClassLink manda uma
+          única mensagem avisando que a escola está definindo as turmas do próximo ano. Não repete. A direção pode enviar à mão, editar e reenviar a qualquer momento. Pelo mesmo caminho dos lembretes (app; sem app, WhatsApp), depois do intervalo e nunca aos domingos.
         </p>
       </div>
       <label className="flex items-center gap-2 text-sm font-medium">
@@ -263,14 +279,17 @@ function SecaoAvisoTurmas({ aviso, lembretesAtivos, onMudou }: { aviso: AvisoTur
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold">Famílias no limite de lembretes da matrícula ({aviso.familias.length})</h3>
-        {aviso.familias.length === 0 && <p className="text-xs text-slate-500">Nenhuma família chegou ao limite.</p>}
+        <h3 className="text-sm font-semibold">Contratos não assinados ({aviso.familias.length} {aviso.familias.length === 1 ? "família" : "famílias"})</h3>
+        {aviso.familias.length === 0 && <p className="text-xs text-slate-500">Nenhum contrato aguardando assinatura.</p>}
         <ul className="space-y-1.5">
           {aviso.familias.map((f) => (
             <li key={f.responsavelId} className="rounded-lg bg-slate-50 px-2 py-1.5 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
                   <span className="font-medium">{f.nome}</span> · {listaAlunos(f.alunos)}
+                  <span className="block text-xs text-slate-500">
+                    {f.envios} de {lembretesMax} lembretes do contrato
+                  </span>
                   <ResumoUltimoAviso u={aviso.ultimos[f.responsavelId]} />
                   {f.situacao === "AGUARDANDO_INTERVALO" && f.proximoEm && (
                     <span className="block text-xs text-slate-500">por volta de {dataCurta(f.proximoEm)}{aviso.ativo ? "" : " (se ligar)"}</span>
@@ -279,7 +298,7 @@ function SecaoAvisoTurmas({ aviso, lembretesAtivos, onMudou }: { aviso: AvisoTur
                 <span className="flex items-center gap-2">
                   <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${COR_SITUACAO_AVISO[f.situacao]}`}>{ROTULO_SITUACAO_AVISO[f.situacao]}</span>
                   <button type="button" onClick={() => setAbertoPara(abertoPara === f.responsavelId ? null : f.responsavelId)} className="text-xs text-indigo-700 underline">
-                    Enviar à mão
+                    {aviso.ultimos[f.responsavelId] ? "Ver, editar e reenviar" : "Enviar à mão"}
                   </button>
                 </span>
               </div>
@@ -455,7 +474,7 @@ function Conteudo() {
             </div>
           </section>
 
-          <SecaoAvisoTurmas key={JSON.stringify(dados.avisoTurmas.ultimos) + dados.avisoTurmas.ativo} aviso={dados.avisoTurmas} lembretesAtivos={dados.config.ativos} onMudou={carregar} />
+          <SecaoAvisoTurmas key={JSON.stringify(dados.avisoTurmas.ultimos) + dados.avisoTurmas.ativo} aviso={dados.avisoTurmas} lembretesAtivos={dados.config.ativos} lembretesMax={dados.config.maxEnvios} onMudou={carregar} />
 
           {pendenciasEscola > 0 && (
             <section className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-4">

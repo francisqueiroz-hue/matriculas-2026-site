@@ -43,7 +43,7 @@ export async function ultimosAvisosTurmas(schoolId: string, responsavelIds: stri
   const linhas = await prisma.avisoTurmasEnvio.findMany({
     where: { schoolId, responsavelId: { in: responsavelIds } },
     orderBy: { enviadoEm: "desc" },
-    select: { responsavelId: true, automatico: true, canal: true, status: true, falha: true, enviadoEm: true },
+    select: { responsavelId: true, automatico: true, titulo: true, texto: true, canal: true, status: true, falha: true, enviadoEm: true },
   });
   const ultimo = new Map<string, UltimoAvisoTurmas>();
   for (const l of linhas) if (!ultimo.has(l.responsavelId)) ultimo.set(l.responsavelId, l);
@@ -52,6 +52,9 @@ export async function ultimosAvisosTurmas(schoolId: string, responsavelIds: stri
 export interface UltimoAvisoTurmas {
   responsavelId: string;
   automatico: boolean;
+  /** Texto como a família recebeu (a direção pode editar e reenviar). */
+  titulo: string;
+  texto: string;
   canal: string | null;
   status: string | null;
   falha: string | null;

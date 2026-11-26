@@ -217,6 +217,17 @@ describe("direção: texto e envio manual", () => {
     expect(prismaMock.avisoTurmasEnvio.create.mock.calls[0][0].data).not.toHaveProperty("chaveAutomatico");
   });
 
+  it("alunos citados vêm dos contratos não assinados; sem contrato pendente, os alunos do responsável", async () => {
+    prismaMock.user.findFirst.mockResolvedValue({ id: "mae", studentLinks: [{ student: { name: "Ana Souza" } }, { student: { name: "Bia Souza" } }] });
+    await enviarManual(req("/api/admin/aviso-turmas/enviar", "POST", { responsavelId: "mae", texto: "Turmas: {alunos}." }));
+    expect(prismaMock.avisoTurmasEnvio.create.mock.calls[0][0].data.texto).toBe("Turmas: Ana.");
+    expect(prismaMock.boleto.findMany).not.toHaveBeenCalled(); // só contratos
+
+    prismaMock.contrato.findMany.mockResolvedValue([]);
+    await enviarManual(req("/api/admin/aviso-turmas/enviar", "POST", { responsavelId: "mae", texto: "Turmas: {alunos}.", repetir: true }));
+    expect(prismaMock.avisoTurmasEnvio.create.mock.calls[1][0].data.texto).toBe("Turmas: Ana e Bia.");
+  });
+
   it("família que já recebeu: pede confirmação antes de repetir", async () => {
     prismaMock.user.findFirst.mockResolvedValue(familia);
     prismaMock.avisoTurmasEnvio.findMany.mockResolvedValue([{ responsavelId: "mae" }]);

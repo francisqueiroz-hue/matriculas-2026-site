@@ -43,8 +43,9 @@ describe("avaliarAvisoTurmas", () => {
     expect(f).toMatchObject({ responsavelId: "mae", alunos: ["Ana Souza"], situacao: "PRONTO", url: "/dashboard/contratos" });
   });
 
-  it("pendência ainda dentro do limite não gera aviso", () => {
-    expect(avaliarAvisoTurmas([pend({ situacao: "AGUARDANDO_INTERVALO", envios: 2 })], new Map(), vazio, vazio, config, QUINTA)).toEqual([]);
+  it("contrato não assinado ainda nos lembretes: aparece na lista, mas o automático espera o limite", () => {
+    const [f] = avaliarAvisoTurmas([pend({ situacao: "AGUARDANDO_INTERVALO", envios: 2 })], new Map(), vazio, vazio, config, QUINTA);
+    expect(f).toMatchObject({ situacao: "EM_LEMBRETES", envios: 2, alunos: ["Ana Souza"] });
   });
 
   it("mensalidade e autorização no limite ficam de fora (não são matrícula)", () => {
@@ -52,9 +53,14 @@ describe("avaliarAvisoTurmas", () => {
     expect(avaliarAvisoTurmas(lista, new Map(), vazio, vazio, config, QUINTA)).toEqual([]);
   });
 
-  it("rematrícula no limite também gera aviso, com link para o painel", () => {
-    const [f] = avaliarAvisoTurmas([pend({ tipo: "REMATRICULA", referenciaId: "2027:a1" })], new Map(), vazio, vazio, config, QUINTA);
-    expect(f).toMatchObject({ situacao: "PRONTO", url: "/dashboard" });
+  it("base são os contratos não assinados: rematrícula sem contrato fica de fora", () => {
+    expect(avaliarAvisoTurmas([pend({ tipo: "REMATRICULA", referenciaId: "2027:a1" })], new Map(), vazio, vazio, config, QUINTA)).toEqual([]);
+  });
+
+  it("família com um contrato no limite e outro ainda nos lembretes: o aviso cita só o do limite", () => {
+    const lista = [pend({}), pend({ referenciaId: "c2", aluno: "Pedro Souza", situacao: "AGUARDANDO_INTERVALO", envios: 1 })];
+    const [f] = avaliarAvisoTurmas(lista, new Map(), vazio, vazio, config, QUINTA);
+    expect(f).toMatchObject({ situacao: "PRONTO", alunos: ["Ana Souza"], envios: 4 });
   });
 
   it("família que já recebeu não recebe de novo", () => {
