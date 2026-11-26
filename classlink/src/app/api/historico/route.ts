@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/http";
-import { historicoAlunoSchema } from "@/lib/historico-escolar";
+import { historicoAlunoSchema, turmaDoFundamental } from "@/lib/historico-escolar";
 import {
   alunoDaEscola,
   carregarModeloHistorico,
@@ -16,7 +16,8 @@ const SEM_CACHE = { "Cache-Control": "private, no-store" };
 
 /**
  * Histórico escolar: direção, secretaria e coordenação veem; só direção e coordenação salvam.
- *  - sem parâmetros: lista os alunos ativos da escola, com a turma e se já há histórico salvo;
+ *  - sem parâmetros: lista os alunos ativos do ensino fundamental, com a turma, o INEP do cadastro
+ *    e se já há histórico salvo;
  *  - ?aluno=<id>: o modelo da escola e o histórico do aluno (o salvo ou um já preenchido com o
  *    que o app sabe);
  *  - ?aluno=<id>&medias=1: só as médias finais do ano em curso, para trazer de novo à coluna do ano.
@@ -28,11 +29,26 @@ export async function GET(request: NextRequest) {
     if (!id) {
       const alunos = await prisma.student.findMany({
         where: { schoolId: session.schoolId, deletedAt: null },
-        select: { id: true, name: true, class: { select: { name: true } }, historicoEscolar: { select: { updatedAt: true } } },
+        select: {
+          id: true,
+          name: true,
+          codigoInep: true,
+          class: { select: { name: true } },
+          historicoEscolar: { select: { updatedAt: true } },
+        },
         orderBy: { name: "asc" },
       });
+      const doFundamental = alunos.filter((a) => turmaDoFundamental(a.class.name));
       return NextResponse.json(
-        { alunos: alunos.map((a) => ({ id: a.id, nome: a.name, turma: a.class.name, salvoEm: a.historicoEscolar?.updatedAt ?? null })) },
+        {
+          alunos: doFundamental.map((a) => ({
+            id: a.id,
+            nome: a.name,
+            turma: a.class.name,
+            codigoInep: a.codigoInep ?? "",
+            salvoEm: a.historicoEscolar?.updatedAt ?? null,
+          })),
+        },
         { headers: SEM_CACHE },
       );
     }

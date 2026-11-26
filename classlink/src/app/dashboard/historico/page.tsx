@@ -25,7 +25,7 @@ const entrada = "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm d
 const celula = "w-16 rounded border border-slate-300 px-1 py-1 text-center text-sm dark:border-slate-700 dark:bg-slate-800";
 const botaoSecundario = "rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800";
 
-type AlunoLista = { id: string; nome: string; turma: string; salvoEm: string | null };
+type AlunoLista = { id: string; nome: string; turma: string; codigoInep: string; salvoEm: string | null };
 
 export default function HistoricoEscolarPage() {
   const user = useCurrentUser();
@@ -46,14 +46,21 @@ function Historico() {
   // Direção e coordenação emitem; a secretaria só visualiza (o servidor também bloqueia).
   const podeEditar = podeEmitirHistorico({ role: user.role, funcao: user.funcao ?? null, isCoordenacao: Boolean(user.isCoordenacao) });
   const aluno = params.get("aluno");
-  return aluno ? <EditorHistorico key={aluno} studentId={aluno} podeEditar={podeEditar} /> : <EscolherAluno />;
+  return aluno ? <EditorHistorico key={aluno} studentId={aluno} podeEditar={podeEditar} /> : <EscolherAluno podeEditar={podeEditar} />;
 }
 
-function EscolherAluno() {
+const cartao = "rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900";
+const campo = "rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800";
+
+/** Lista dos alunos do ensino fundamental, no mesmo formato da tela Alunos. */
+function EscolherAluno({ podeEditar }: { podeEditar: boolean }) {
   const router = useRouter();
   const [alunos, setAlunos] = useState<AlunoLista[] | null>(null);
   const [busca, setBusca] = useState("");
+  const [turma, setTurma] = useState("");
+  const [escolhido, setEscolhido] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const acao = podeEditar ? "Editar dados" : "Ver histórico";
 
   useEffect(() => {
     apiJson<{ alunos: AlunoLista[] }>("/api/historico")
@@ -61,44 +68,114 @@ function EscolherAluno() {
       .catch((err) => setErro(err instanceof Error ? err.message : "Não foi possível carregar os alunos."));
   }, []);
 
+  const turmas = useMemo(() => [...new Set((alunos ?? []).map((a) => a.turma))].sort((x, y) => x.localeCompare(y, "pt-BR", { numeric: true })), [alunos]);
+  const daTurma = useMemo(() => (alunos ?? []).filter((a) => !turma || a.turma === turma), [alunos, turma]);
+
   const filtrados = useMemo(() => {
     if (!alunos) return [];
     const termos = normalizarBusca(busca).split(" ").filter(Boolean);
     if (!termos.length) return alunos;
     return alunos.filter((a) => {
-      const palavras = normalizarBusca(`${a.nome} ${a.turma}`).split(" ");
+      const palavras = normalizarBusca(`${a.nome} ${a.turma} ${a.codigoInep}`).split(" ");
       return termos.every((t) => palavras.some((p) => p.startsWith(t)));
     });
   }, [alunos, busca]);
 
+  const abrir = (id: string) => router.push(`/dashboard/historico?aluno=${encodeURIComponent(id)}`);
+
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold">Histórico escolar</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Escolha o aluno. O histórico já vem com o nome, a data de nascimento, a filiação e as médias do ano que estão no app: complete o código Censo INEP,
-          a naturalidade e os anos anteriores (inclusive de outras escolas, em caso de transferência) e gere o PDF.
+          Só os alunos do ensino fundamental. O histórico já vem com o nome, a data de nascimento, a filiação, o código Censo INEP do cadastro e as médias do
+          ano: complete a naturalidade e os anos anteriores (inclusive de outras escolas, em caso de transferência) e gere o PDF.
         </p>
       </div>
+
+      <div className="rounded-xl border border-indigo-200 bg-white p-3 shadow-sm dark:border-indigo-900 dark:bg-slate-900">
+        <label htmlFor="historico-busca" className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+          Buscar aluno
+        </label>
+        <input
+          id="historico-busca"
+          type="search"
+          className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base dark:border-slate-700 dark:bg-slate-800"
+          placeholder="Nome do aluno, turma ou INEP"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+      </div>
+
+      <form
+        className={`flex flex-wrap items-end gap-3 ${cartao}`}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (escolhido) abrir(escolhido);
+        }}
+      >
+        <div>
+          <label htmlFor="historico-turma" className="mb-1 block text-xs font-medium">Turma</label>
+          <select
+            id="historico-turma"
+            value={turma}
+            onChange={(e) => {
+              setTurma(e.target.value);
+              setEscolhido("");
+            }}
+            className={campo}
+          >
+            <option value="">Todas</option>
+            {turmas.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="historico-aluno" className="mb-1 block text-xs font-medium">Aluno</label>
+          <select id="historico-aluno" required value={escolhido} onChange={(e) => setEscolhido(e.target.value)} className={`${campo} max-w-[16rem]`}>
+            <option value="">Selecione</option>
+            {daTurma.map((a) => (
+              <option key={a.id} value={a.id}>{a.nome}</option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" disabled={!escolhido} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">
+          {acao}
+        </button>
+      </form>
+
       {erro && <p role="alert" className="text-sm text-red-600">{erro}</p>}
-      <input className={entrada} placeholder="Buscar aluno ou turma" aria-label="Buscar aluno ou turma" value={busca} onChange={(e) => setBusca(e.target.value)} />
       {!alunos && !erro && <p className="text-sm text-slate-500">Carregando alunos...</p>}
-      <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-        {filtrados.slice(0, 60).map((a) => (
-          <li key={a.id}>
-            <button
-              type="button"
-              onClick={() => router.push(`/dashboard/historico?aluno=${encodeURIComponent(a.id)}`)}
-              className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-            >
-              <span>
-                <span className="font-medium">{a.nome}</span> <span className="text-sm text-slate-500">· {a.turma}</span>
+      {busca.trim() && alunos && (
+        <p className="text-sm text-slate-500" role="status">
+          Lista abaixo filtrada pela busca: {filtrados.length} de {alunos.length} aluno(s).
+        </p>
+      )}
+
+      <ul className="space-y-3">
+        {filtrados.map((a) => (
+          <li key={a.id} className={cartao}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">
+                {a.nome} <span className="text-xs text-slate-500">({a.turma})</span>
+                {a.codigoInep ? (
+                  <span className="ml-2 text-xs text-slate-500">INEP {a.codigoInep}</span>
+                ) : (
+                  <span className="ml-2 text-xs text-amber-700 dark:text-amber-400">INEP não lançado</span>
+                )}
+                {a.salvoEm && (
+                  <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">Histórico salvo</span>
+                )}
               </span>
-              {a.salvoEm && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">Histórico salvo</span>}
-            </button>
+              <button type="button" onClick={() => abrir(a.id)} className="text-xs font-semibold text-indigo-600 hover:underline">
+                {acao}
+              </button>
+            </div>
           </li>
         ))}
-        {alunos && filtrados.length === 0 && <li className="px-3 py-2 text-sm text-slate-500">Nenhum aluno encontrado.</li>}
+        {alunos && alunos.length === 0 && <li className={`${cartao} text-sm text-slate-500`}>Nenhum aluno do ensino fundamental cadastrado.</li>}
+        {alunos && alunos.length > 0 && filtrados.length === 0 && <li className={`${cartao} text-sm text-slate-500`}>Nenhum aluno encontrado.</li>}
       </ul>
     </div>
   );

@@ -154,6 +154,30 @@ describe("histórico escolar: quem emite", () => {
   });
 });
 
+describe("histórico só do ensino fundamental", () => {
+  it("a lista traz só alunos de turmas do fundamental, com o INEP do cadastro", async () => {
+    prismaMock.student.findMany.mockResolvedValue([
+      { id: "al1", name: ALUNO.name, codigoInep: "123456789012", class: { name: "4º Ano A" }, historicoEscolar: null },
+      { id: "al2", name: "Bia Pequena", codigoInep: null, class: { name: "Maternal II" }, historicoEscolar: null },
+      { id: "al3", name: "Caio Grupo", codigoInep: null, class: { name: "Grupo 5" }, historicoEscolar: null },
+    ]);
+    const r = await get();
+    expect(r.status).toBe(200);
+    const { alunos } = await r.json();
+    expect(alunos).toEqual([{ id: "al1", nome: ALUNO.name, turma: "4º Ano A", codigoInep: "123456789012", salvoEm: null }]);
+  });
+
+  it("aluno da educação infantil: não abre, não salva e não gera PDF", async () => {
+    prismaMock.student.findFirst.mockResolvedValue({ ...ALUNO, class: { name: "Maternal II", year: 2026 } });
+    const r = await get("?aluno=al1");
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toContain("ensino fundamental");
+    expect((await PUT(corpo("http://t/api/historico", exemplo()))).status).toBe(400);
+    expect((await pdf(corpo("http://t/api/historico/pdf", { modelo: MODELO_HISTORICO_PADRAO, historico: exemplo() }, "POST"))).status).toBe(400);
+    expect(prismaMock.historicoEscolar.upsert).not.toHaveBeenCalled();
+  });
+});
+
 describe("histórico preenchido com o que o app sabe", () => {
   it("nome, nascimento, filiação (mãe primeiro), ano em curso e médias fechadas", async () => {
     const d = await (await get("?aluno=al1")).json();
