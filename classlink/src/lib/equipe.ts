@@ -120,3 +120,10 @@ export const podeExportarBoletim = ehDirecaoOuCoordenacao;
 export const MENSAGEM_SO_DIRECAO_COORDENACAO_ENQUETE_INTERNA = "Somente a direção e a coordenação criam enquetes para a equipe.";
 export const MENSAGEM_SO_DIRECAO_COORDENACAO_EQUIPE = "Somente a direção e a coordenação escrevem para toda a equipe.";
 export const MENSAGEM_SO_DIRECAO_COORDENACAO_BOLETIM = "Somente a direção e a coordenação exportam o boletim para impressão.";
+
+/**
+ * Emitir o histórico escolar (PDF): a gestão — direção, secretaria e coordenação. Professores,
+ * auxiliares e famílias não acessam (o histórico traz notas de todos os anos e dados pessoais).
+ */
+export const podeEmitirHistorico = ehGestao;
+export const MENSAGEM_SO_GESTAO_HISTORICO = "Somente a direção, a secretaria e a coordenação emitem o histórico escolar.";

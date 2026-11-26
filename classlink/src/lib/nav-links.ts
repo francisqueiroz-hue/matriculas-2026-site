@@ -149,6 +149,7 @@ const GRUPO_POR_HREF: Record<string, string> = {
   "/dashboard/rotina": "Meu(s) filho(s)",
   "/dashboard/notas": "Pedagógico",
   "/dashboard/fichas": "Secretaria",
+  "/dashboard/historico": "Secretaria",
   "/dashboard/alunos": "Secretaria",
   "/guia": "Ajuda",
 };
@@ -174,6 +175,13 @@ const fichasLink: NavLink = {
   href: "/dashboard/fichas",
   label: "Fichas de matrícula",
   icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2 M9 5a2 2 0 012-2h2a2 2 0 012 2v0a2 2 0 01-2 2h-2a2 2 0 01-2-2z M9 12h6 M9 16h4",
+};
+
+/** Histórico escolar (PDF para transferência): direção, secretaria e coordenação. */
+const historicoLink: NavLink = {
+  href: "/dashboard/historico",
+  label: "Histórico escolar",
+  icon: "M6 3h9l3 3v15H6z M15 3v3h3 M9 10h6 M9 14h6 M9 18h3",
 };
 
 /** Consulta rápida de aluno para a coordenação (a direção usa a tela Alunos da Gestão). */
@@ -211,10 +219,10 @@ function linksDoPerfil(user: Pick<SessionUser, "role" | "isCoordenacao" | "funca
   if (user.role === "ADMIN") {
     const direcao = ehDirecao({ role: user.role, funcao: user.funcao ?? null });
     const admin = direcao ? adminLinks : adminLinks.filter((l) => !ABAS_SO_DIRECAO.includes(l.href));
-    return [...baseLinks, notasLink, ...admin, fichasLink, saudeLink("Secretaria"), rotinaLink("Secretaria"), guiaLink];
+    return [...baseLinks, notasLink, ...admin, fichasLink, historicoLink, saudeLink("Secretaria"), rotinaLink("Secretaria"), guiaLink];
   }
   if (user.role === "GUARDIAN") return [...baseLinks, ...guardianLinks, guiaLink];
-  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, saudeLink("Secretaria"), rotinaLink("Secretaria"), guiaLink];
+  if (user.role === "STAFF" && user.isCoordenacao) return [...baseLinks, notasLink, consultaAlunosLink, fichasLink, historicoLink, saudeLink("Secretaria"), rotinaLink("Secretaria"), guiaLink];
   // Professores veem as notas (só leitura) das próprias turmas; para auxiliares a área é fixa
   // como bloqueada e some pelo filtro de áreas.
   if (user.role === "STAFF") return [...baseLinks, notasLink, fichasLink, guiaLink];
