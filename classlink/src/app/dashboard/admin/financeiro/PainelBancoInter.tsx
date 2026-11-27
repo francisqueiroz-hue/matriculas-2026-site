@@ -8,6 +8,7 @@ interface EstadoInter {
   ambiente: "sandbox" | "producao";
   segredoDefinido: boolean;
   piloto: number | null;
+  familiaEmiteBoletosAno: boolean;
   webhook: { cadastrado: boolean; endereco: string | null; apontaParaEsteApp: boolean } | null;
   erro?: string;
 }
@@ -24,7 +25,7 @@ interface ResultadoEmissao {
  */
 export function PainelBancoInter({ aoMudar }: { aoMudar: () => void }) {
   const [estado, setEstado] = useState<EstadoInter | null>(null);
-  const [ocupado, setOcupado] = useState<null | "webhook" | "emitir">(null);
+  const [ocupado, setOcupado] = useState<null | "webhook" | "emitir" | "familia">(null);
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -60,6 +61,25 @@ export function PainelBancoInter({ aoMudar }: { aoMudar: () => void }) {
       }
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Falha ao falar com o Banco Inter");
+    } finally {
+      setOcupado(null);
+    }
+  }
+
+  async function alternarFamiliaEmite(ativo: boolean) {
+    const pergunta = ativo
+      ? "Liberar para as famílias emitirem sozinhas, em Faturas, os boletos do ano do contrato assinado (uma parcela por mês, vencimento dia 05)? A lista de piloto continua valendo."
+      : "Desligar a emissão dos boletos do ano pelas famílias? Os boletos já emitidos continuam valendo.";
+    if (!window.confirm(pergunta)) return;
+    setOcupado("familia");
+    setErro(null);
+    setMensagem(null);
+    try {
+      await apiJson("/api/admin/billing/inter", { method: "POST", body: JSON.stringify({ acao: "FAMILIA_EMITE_ANO", ativo }) });
+      setMensagem(ativo ? "Famílias já podem emitir os boletos do ano em Faturas." : "Emissão dos boletos do ano pelas famílias desligada.");
+      await carregar();
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Não foi possível salvar");
     } finally {
       setOcupado(null);
     }
@@ -108,6 +128,10 @@ export function PainelBancoInter({ aoMudar }: { aoMudar: () => void }) {
               <strong className="text-red-600">ninguém (no sandbox é preciso a lista de piloto)</strong>
             )}
           </li>
+          <li>
+            Família emite os boletos do ano em Faturas:{" "}
+            {estado.familiaEmiteBoletosAno ? <strong className="text-green-700">ligado</strong> : <strong>desligado</strong>}
+          </li>
           {!estado.segredoDefinido && <li className="text-red-600">Falta BANCO_INTER_WEBHOOK_SECRET na Vercel.</li>}
           {estado.erro && <li className="text-red-600">Erro do Inter: {estado.erro}</li>}
         </ul>
@@ -119,6 +143,18 @@ export function PainelBancoInter({ aoMudar }: { aoMudar: () => void }) {
           </button>
           <button type="button" className={botao} disabled={ocupado !== null} onClick={() => agir("EMITIR_PENDENTES")}>
             {ocupado === "emitir" ? "Emitindo..." : "Emitir no Inter os boletos em aberto"}
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800"
+            disabled={ocupado !== null}
+            onClick={() => alternarFamiliaEmite(!estado.familiaEmiteBoletosAno)}
+          >
+            {ocupado === "familia"
+              ? "Salvando..."
+              : estado.familiaEmiteBoletosAno
+                ? "Desligar emissão do ano pelas famílias"
+                : "Liberar famílias para emitir os boletos do ano"}
           </button>
         </div>
       )}

@@ -131,6 +131,11 @@ model School {
   // scripts/criar-familia-demo.ts.
   demonstracao Boolean @default(false)
 
+  // Família emite sozinha, em Faturas, os boletos do ano do contrato assinado (uma parcela por
+  // mês, vencimento dia 05) no Banco Inter. Desligado até a direção ligar em Financeiro › Banco
+  // Inter; a lista de piloto do Inter continua valendo. Ver src/lib/boletos-do-ano-server.ts.
+  familiaEmiteBoletosAno Boolean @default(false)
+
   users                 User[]
   boletimModelo         BoletimModelo?
   historicoModelo       HistoricoModelo?
