@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiJson } from "@/lib/api-client";
 import { Faturas } from "./Faturas";
+import { BoletosDoAno } from "./BoletosDoAno";
 import type { FaturaEntrada } from "@/lib/faturas-familia";
 
 interface BillingInfo {
@@ -109,6 +110,8 @@ export default function FinanceiroPage() {
           </div>
         </form>
       )}
+
+      {dadosCompletos && <BoletosDoAno aoEmitir={load} />}
 
       <Faturas boletos={boletos} />
     </div>
