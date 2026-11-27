@@ -133,3 +133,44 @@ export function planoDoAno(contrato: ContratoDoAno, existentes: BoletoExistente[
   }
   return { bloqueio: null, parcela: v.parcelaBruta, meses };
 }
+
+/** A partir deste ano letivo, o valor da mensalidade lançada sai do contrato do ano, não do cadastro. */
+export const ANO_VALOR_PELO_CONTRATO = 2027;
+
+export interface ContratoParaValor extends ContratoDoAno {
+  status: string;
+  /** Para desempatar contratos do mesmo ano (o mais recente vale). */
+  atualizadoEm: Date;
+}
+
+export type ValorDoMes =
+  | { tipo: "VALOR"; valor: number; origem: "CONTRATO_ASSINADO" | "CONTRATO_ENVIADO" }
+  | { tipo: "ISENTO" }
+  /** Sem valor confiável: o mês não é lançado automaticamente (a direção resolve). */
+  | { tipo: "SEM_VALOR"; motivo: string };
+
+/**
+ * Valor de um mês de `ANO_VALOR_PELO_CONTRATO` em diante, pelo contrato daquele ano letivo:
+ * vale o contrato assinado (COMPLETO); sem assinado, o contrato enviado mais recente que tenha
+ * valor (é o valor que a escola propôs; DEVOLVIDO conta, porque o valor não muda na devolução).
+ * Mês fora das parcelas do contrato, contrato sem valor ou ausente: SEM_VALOR, nunca o cadastro
+ * (que guarda a mensalidade do ano anterior, sem o reajuste). Com desconto de pontualidade, lança
+ * a parcela com desconto: o boleto ainda não leva o desconto e cobrar o cheio de quem paga em
+ * dia seria cobrar a mais.
+ */
+export function valorDoMesPeloContrato(contratos: ContratoParaValor[], mesReferencia: string): ValorDoMes {
+  const ano = Number(mesReferencia.slice(0, 4));
+  const mes = Number(mesReferencia.slice(5, 7)) - 1;
+  const doAno = contratos.filter((c) => c.anoLetivo === ano).sort((a, b) => b.atualizadoEm.getTime() - a.atualizadoEm.getTime());
+  if (doAno.length === 0) return { tipo: "SEM_VALOR", motivo: `sem contrato de ${ano}` };
+  const assinado = doAno.find((c) => c.status === "COMPLETO");
+  const escolhido = assinado ?? doAno.find((c) => c.valores && (c.valores.bolsista || c.valores.parcelaBruta > 0));
+  if (!escolhido?.valores) return { tipo: "SEM_VALOR", motivo: `contrato de ${ano} sem valor de parcela` };
+  const v = escolhido.valores;
+  if (v.bolsista) return { tipo: "ISENTO" };
+  if (!(v.parcelaBruta > 0)) return { tipo: "SEM_VALOR", motivo: `contrato de ${ano} sem valor de parcela` };
+  const inicio = primeiroMesDasParcelas(escolhido.primeiroUltimo, ano) ?? 0;
+  if (mes < inicio || mes >= inicio + v.parcelas) return { tipo: "SEM_VALOR", motivo: `${mesReferencia} fora das parcelas do contrato` };
+  const valor = v.parcelaLiquida > 0 && v.parcelaLiquida < v.parcelaBruta ? v.parcelaLiquida : v.parcelaBruta;
+  return { tipo: "VALOR", valor, origem: assinado ? "CONTRATO_ASSINADO" : "CONTRATO_ENVIADO" };
+}

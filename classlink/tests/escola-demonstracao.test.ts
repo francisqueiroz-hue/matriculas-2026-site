@@ -26,7 +26,7 @@ describe("escola de demonstração", () => {
     prismaMock.school.findUnique.mockResolvedValue({ demonstracao: true });
     const { gerarBoletosDoMes } = await import("@/lib/boleto-emissao");
     const r = await gerarBoletosDoMes({ id: "demo", diaVencimentoPadrao: 5 }, "2026-12", new Date(2026, 11, 1));
-    expect(r).toEqual({ criados: 0, emitidos: 0, erros: 0, ignorados: 0 });
+    expect(r).toEqual({ criados: 0, emitidos: 0, erros: 0, ignorados: 0, semValorDoContrato: [] });
     expect(prismaMock.student.findMany).not.toHaveBeenCalled();
     expect(emitirCobranca).not.toHaveBeenCalled();
   });

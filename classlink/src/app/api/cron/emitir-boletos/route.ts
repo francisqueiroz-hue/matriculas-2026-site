@@ -46,6 +46,7 @@ async function handle(request: NextRequest) {
     let emitidos = 0;
     let erros = 0;
     let ignorados = 0;
+    let semValorDoContrato = 0;
 
     for (const escola of escolas) {
       const resultado = await gerarBoletosDoMes(escola, mesReferencia, hoje);
@@ -53,9 +54,11 @@ async function handle(request: NextRequest) {
       emitidos += resultado.emitidos;
       erros += resultado.erros;
       ignorados += resultado.ignorados;
+      semValorDoContrato += resultado.semValorDoContrato.length;
+      if (resultado.semValorDoContrato.length > 0) console.warn("boletos sem valor do contrato", escola.id, resultado.semValorDoContrato.length);
     }
 
-    return NextResponse.json({ ok: true, escolasProcessadas: escolas.length, criados, emitidos, erros, ignorados });
+    return NextResponse.json({ ok: true, escolasProcessadas: escolas.length, criados, emitidos, erros, ignorados, semValorDoContrato });
   } catch (error) {
     return handleApiError(error);
   }
