@@ -235,6 +235,12 @@ export const markAttendanceSchema = z.object({
       }),
     )
     .min(1),
+  /**
+   * false (padrão) = primeiro lançamento do dia: recusado (409) se a turma já tem frequência
+   * nesse dia. true = edição consciente do lançamento existente (a tela só manda depois de
+   * mostrar que o dia já foi lançado).
+   */
+  editar: z.boolean().optional().default(false),
 });
 
 // ─── Contratos de matrícula ─────────────────────────────────────────────────────
