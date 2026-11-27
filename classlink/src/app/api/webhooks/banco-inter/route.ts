@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
 
     for (const evento of eventos) {
       if (!evento?.codigoSolicitacao) continue;
+      // Só código e situação no log (sem dados da família), para conferir que o aviso chegou.
+      console.info("inter webhook", evento.codigoSolicitacao, evento.situacao ?? "");
       const boleto = await prisma.boleto.findUnique({ where: { codigoSolicitacao: evento.codigoSolicitacao } });
       if (!boleto) continue;
 
