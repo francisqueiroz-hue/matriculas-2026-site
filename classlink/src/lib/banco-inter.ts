@@ -1,6 +1,7 @@
 import https from "node:https";
 import { ErroDeUsuario } from "@/lib/erros";
 import { readFileSync } from "node:fs";
+import { normalizarParMtls } from "@/lib/pem";
 
 /**
  * Cliente da API Inter Empresas (Cobrança v3, boleto com Pix) — OAuth2 client_credentials
@@ -146,18 +147,15 @@ function baseUrl() {
  * baixados do portal do Inter. Mantém o caminho de arquivo (BANCO_INTER_CERT_PATH/
  * BANCO_INTER_KEY_PATH) como alternativa para desenvolvimento local.
  *
- * Aceita o mesmo formato usado para FIREBASE_PRIVATE_KEY: se a variável de ambiente
- * guardar as quebras de linha escapadas como "\n" (comum em painéis que só aceitam
- * valor de uma linha), elas são desfeitas antes de montar o Buffer do PEM.
+ * O conteúdo passa por normalizarPem: aceita "\n" escrito, tudo numa linha só, BOM, aspas,
+ * base64 do arquivo inteiro ou só o miolo, e destroca certificado e chave colados trocados.
  */
 function lerCertificadoEChave(): { cert: Buffer; key: Buffer } {
   const certConteudo = process.env.BANCO_INTER_CERT;
   const keyConteudo = process.env.BANCO_INTER_KEY;
   if (certConteudo && keyConteudo) {
-    return {
-      cert: Buffer.from(certConteudo.replace(/\\n/g, "\n")),
-      key: Buffer.from(keyConteudo.replace(/\\n/g, "\n")),
-    };
+    const par = normalizarParMtls(certConteudo, keyConteudo);
+    return { cert: Buffer.from(par.cert), key: Buffer.from(par.key) };
   }
   return {
     cert: readFileSync(env("BANCO_INTER_CERT_PATH")),
