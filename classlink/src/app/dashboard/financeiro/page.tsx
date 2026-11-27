@@ -2,62 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { apiJson } from "@/lib/api-client";
-
-interface Boleto {
-  id: string;
-  student: { id: string; name: string };
-  mesReferencia: string;
-  valor: string;
-  vencimento: string;
-  status: "PENDENTE" | "PAGO" | "VENCIDO" | "ERRO";
-  /** Só existe quando o boleto foi realmente emitido no Banco Inter (tem PDF/linha digitável/PIX para pagar). */
-  codigoSolicitacao: string | null;
-  linhaDigitavel: string | null;
-  pixCopiaCola: string | null;
-}
+import { Faturas } from "./Faturas";
+import type { FaturaEntrada } from "@/lib/faturas-familia";
 
 interface BillingInfo {
   cpf: string | null;
   enderecoCobranca: { cep: string; logradouro: string; numero: string; complemento?: string; bairro: string; cidade: string; uf: string } | null;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  PENDENTE: "Pendente",
-  PAGO: "Pago",
-  VENCIDO: "Vencido",
-  ERRO: "Não foi possível emitir",
-};
-const STATUS_COLOR: Record<string, string> = {
-  PENDENTE: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  PAGO: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
-  VENCIDO: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
-  ERRO: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-};
-
-function BotaoCopiar({ texto, rotulo }: { texto: string; rotulo: string }) {
-  const [copiado, setCopiado] = useState(false);
-  async function copiar() {
-    try {
-      await navigator.clipboard.writeText(texto);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    } catch {
-      window.prompt(`Copie ${rotulo.toLowerCase()}:`, texto);
-    }
-  }
-  return (
-    <button
-      type="button"
-      onClick={copiar}
-      className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-    >
-      {copiado ? "Copiado!" : rotulo}
-    </button>
-  );
-}
-
 export default function FinanceiroPage() {
-  const [boletos, setBoletos] = useState<Boleto[] | null>(null);
+  const [boletos, setBoletos] = useState<FaturaEntrada[] | null>(null);
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ cpf: "", cep: "", logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "" });
@@ -65,7 +19,7 @@ export default function FinanceiroPage() {
   const [error, setError] = useState<string | null>(null);
 
   function load() {
-    apiJson<{ boletos: Boleto[] }>("/api/billing/boletos").then((data) => setBoletos(data.boletos));
+    apiJson<{ boletos: FaturaEntrada[] }>("/api/billing/boletos").then((data) => setBoletos(data.boletos));
     apiJson<BillingInfo>("/api/account/billing-info").then((data) => {
       setBillingInfo(data);
       if (data.cpf) setForm((f) => ({ ...f, cpf: data.cpf ?? "" }));
@@ -111,7 +65,7 @@ export default function FinanceiroPage() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <h1 className="text-xl font-bold">Financeiro</h1>
+      <h1 className="text-xl font-bold">Faturas</h1>
 
       {billingInfo && !dadosCompletos && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
@@ -156,43 +110,7 @@ export default function FinanceiroPage() {
         </form>
       )}
 
-      <div>
-        <h2 className="mb-2 font-semibold">Meus boletos</h2>
-        {boletos === null && <p className="text-sm text-slate-500">Carregando...</p>}
-        {boletos?.length === 0 && <p className="text-sm text-slate-500">Nenhum boleto emitido ainda.</p>}
-        <ul className="space-y-2">
-          {boletos?.map((b) => (
-            <li key={b.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-              <div>
-                <p className="font-medium">
-                  {b.student.name} — {b.mesReferencia}
-                </p>
-                <p className="text-xs text-slate-500">
-                  R$ {Number(b.valor).toFixed(2)} · vencimento {new Date(b.vencimento).toLocaleDateString("pt-BR")}
-                </p>
-                {b.status !== "ERRO" && !b.codigoSolicitacao && (
-                  <p className="text-xs text-slate-400">Pagamento online ainda não disponível para este mês</p>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <span className={`rounded-full px-2 py-1 text-xs font-medium ${STATUS_COLOR[b.status]}`}>{STATUS_LABEL[b.status]}</span>
-                {b.status !== "ERRO" && b.status !== "PAGO" && b.pixCopiaCola && <BotaoCopiar texto={b.pixCopiaCola} rotulo="Copiar PIX" />}
-                {b.status !== "ERRO" && b.status !== "PAGO" && b.linhaDigitavel && <BotaoCopiar texto={b.linhaDigitavel} rotulo="Copiar linha digitável" />}
-                {b.status !== "ERRO" && b.codigoSolicitacao && (
-                  <a
-                    href={`/api/billing/boletos/${b.id}/pdf`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-                  >
-                    Ver PDF
-                  </a>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <Faturas boletos={boletos} />
     </div>
   );
 }
