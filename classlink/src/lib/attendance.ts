@@ -78,3 +78,17 @@ export function dataParaMeiaNoiteUtc(data: string): Date {
   if (Number.isNaN(date.getTime())) throw new ErroDeUsuario("Data inválida (use AAAA-MM-DD)");
   return date;
 }
+
+/** Código devolvido pela API quando a frequência da turma naquele dia já foi lançada. */
+export const CODIGO_FREQUENCIA_JA_LANCADA = "FREQUENCIA_JA_LANCADA";
+
+/** Mensagem para quem tenta lançar de novo a frequência de um dia já lançado. dataISO = "AAAA-MM-DD". */
+export function mensagemFrequenciaJaLancada(dataISO: string): string {
+  const [ano, mes, dia] = dataISO.split("-");
+  return `A frequência desta turma em ${dia}/${mes}/${ano} já foi lançada. Para corrigir, use "Salvar alterações" no lançamento existente, que foi carregado na tela.`;
+}
+
+/** true quando o erro é a violação do índice único (aluno, dia) da frequência (Prisma P2002). */
+export function ehDuplicidadeDeFrequencia(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
+}

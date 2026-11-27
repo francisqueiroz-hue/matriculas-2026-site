@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentUser } from "@/components/UserContext";
-import { apiJson } from "@/lib/api-client";
+import { apiFetch, apiJson } from "@/lib/api-client";
 
 type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "JUSTIFIED";
 
@@ -143,6 +143,14 @@ function MarcacaoFrequencia() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
+  // true quando a turma já tem frequência lançada no dia escolhido: a tela passa a editar
+  // o lançamento existente (o servidor recusa um segundo lançamento sem `editar`).
+  const [jaLancada, setJaLancada] = useState(false);
+  // Muda para recarregar a chamada do servidor (ex.: outra pessoa lançou antes).
+  const [recarregar, setRecarregar] = useState(0);
+  // Trava síncrona contra duplo clique: o estado `salvando` só desabilita o botão no
+  // próximo render, e dois cliques rápidos podem chegar antes dele.
+  const enviando = useRef(false);
 
   useEffect(() => {
     apiJson<{ classes: ClassOption[] }>("/api/attendance/classes")
@@ -163,29 +171,43 @@ function MarcacaoFrequencia() {
           marcados[s.id] = registro?.status ?? "PRESENT";
         }
         setMarks(marcados);
-        setErro(null);
+        setJaLancada(data.records.length > 0);
       })
       .catch((err) => setErro(err instanceof Error ? err.message : "Erro ao carregar turma"))
       .finally(() => setCarregando(false));
-  }, [classId, date]);
+  }, [classId, date, recarregar]);
 
   async function handleSalvar() {
+    if (enviando.current) return;
+    enviando.current = true;
     setErro(null);
     setSucesso(null);
     setSalvando(true);
     try {
-      await apiJson("/api/attendance", {
+      const resposta = await apiFetch("/api/attendance", {
         method: "POST",
         body: JSON.stringify({
           classId,
           date,
+          editar: jaLancada,
           marks: students.map((s) => ({ studentId: s.id, status: marks[s.id] ?? "PRESENT" })),
         }),
       });
-      setSucesso("Frequência salva com sucesso.");
+      const data = await resposta.json().catch(() => ({}));
+      if (resposta.status === 409 && data.codigo === "FREQUENCIA_JA_LANCADA") {
+        // Alguém lançou este dia antes (outro aparelho/aba): mostra o que está gravado.
+        setErro(data.error);
+        setCarregando(true);
+        setRecarregar((n) => n + 1);
+        return;
+      }
+      if (!resposta.ok) throw new Error(data.error ?? `Erro ${resposta.status}`);
+      setSucesso(jaLancada ? "Alterações da frequência salvas." : "Frequência lançada com sucesso.");
+      setJaLancada(true);
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Erro ao salvar frequência");
     } finally {
+      enviando.current = false;
       setSalvando(false);
     }
   }
@@ -250,6 +272,12 @@ function MarcacaoFrequencia() {
 
       {classId && !carregando && students.length > 0 && (
         <div className="space-y-2">
+          {jaLancada && (
+            <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              A frequência desta turma neste dia já foi lançada. Você está editando o lançamento existente; nada é
+              lançado em duplicidade.
+            </p>
+          )}
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="w-full min-w-[500px] border-collapse text-left text-sm">
               <thead className="bg-slate-50">
@@ -286,7 +314,7 @@ function MarcacaoFrequencia() {
             disabled={salvando}
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
-            {salvando ? "Salvando..." : "Salvar frequência"}
+            {salvando ? "Salvando..." : jaLancada ? "Salvar alterações" : "Lançar frequência"}
           </button>
         </div>
       )}
