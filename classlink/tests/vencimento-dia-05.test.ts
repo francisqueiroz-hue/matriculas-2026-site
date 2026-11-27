@@ -135,7 +135,7 @@ describe("boletos do mês", () => {
     vi.doMock("@/lib/banco-inter", () => ({ isBancoInterConfigured: () => false, emitirCobranca: vi.fn(), consultarCobranca: vi.fn() }));
     vi.doMock("@/lib/boleto-aviso", () => ({ avisarNovoBoleto: vi.fn() }));
     const { gerarBoletosDoMes } = await import("@/lib/boleto-emissao");
-    await gerarBoletosDoMes({ id: "s1", diaVencimentoPadrao: 23 }, "2026-11", new Date(2026, 10, 1));
+    await gerarBoletosDoMes({ id: "s1", diaVencimentoPadrao: 23 }, "2026-11");
     expect(criar.mock.calls[0][0].data.vencimento.getDate()).toBe(5);
     expect(criar.mock.calls[0][0].data.vencimento.getMonth()).toBe(10);
   });

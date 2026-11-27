@@ -74,7 +74,7 @@ describe("gerarBoletosDoMes com o valor do contrato", () => {
 
   it("janeiro/2027: valor do contrato (não o do cadastro); sem contrato fica de fora e é listado", async () => {
     const { gerarBoletosDoMes } = await import("@/lib/boleto-emissao");
-    const r = await gerarBoletosDoMes({ id: "s1", diaVencimentoPadrao: 5 }, "2027-01", new Date(2027, 0, 2));
+    const r = await gerarBoletosDoMes({ id: "s1", diaVencimentoPadrao: 5 }, "2027-01");
     const valores = Object.fromEntries(criar.mock.calls.map((c) => [c[0].data.studentId, c[0].data.valor]));
     expect(valores).toEqual({ a1: 1638, a3: 1400 });
     expect(r.criados).toBe(2);
@@ -83,10 +83,17 @@ describe("gerarBoletosDoMes com o valor do contrato", () => {
     expect(studentFindMany.mock.calls[0][0].where).not.toHaveProperty("mensalidadeValor");
   });
 
+  it("lançado em 28/12/2026 para janeiro: vence em 05/01/2027", async () => {
+    const { gerarBoletosDoMes } = await import("@/lib/boleto-emissao");
+    await gerarBoletosDoMes({ id: "s1", diaVencimentoPadrao: 5 }, "2027-01");
+    const venc = criar.mock.calls[0][0].data.vencimento as Date;
+    expect([venc.getFullYear(), venc.getMonth(), venc.getDate()]).toEqual([2027, 0, 5]);
+  });
+
   it("dezembro/2026: segue o valor do cadastro, sem ler contrato", async () => {
     studentFindMany.mockResolvedValueOnce(alunos.filter((a) => a.mensalidadeValor !== null));
     const { gerarBoletosDoMes } = await import("@/lib/boleto-emissao");
-    const r = await gerarBoletosDoMes({ id: "s1", diaVencimentoPadrao: 5 }, "2026-12", new Date(2026, 11, 2));
+    const r = await gerarBoletosDoMes({ id: "s1", diaVencimentoPadrao: 5 }, "2026-12");
     expect(contratoFindMany).not.toHaveBeenCalled();
     expect(studentFindMany.mock.calls[0][0].where).toMatchObject({ mensalidadeValor: { not: null } });
     expect(criar.mock.calls.map((c) => [c[0].data.studentId, c[0].data.valor])).toEqual([

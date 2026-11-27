@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { SO_ESCOLAS_REAIS } from "@/lib/escola-demonstracao";
 import { handleApiError } from "@/lib/http";
 import { requireCronSecret } from "@/lib/cron-auth";
-import { mesReferenciaAtual, agoraNoFusoDaEscola } from "@/lib/billing";
+import { mesDoLancamentoAutomatico, agoraNoFusoDaEscola } from "@/lib/billing";
 import { gerarBoletosDoMes } from "@/lib/boleto-emissao";
 
 const DIA_EMISSAO_PADRAO = 1;
@@ -27,7 +27,11 @@ async function handle(request: NextRequest) {
     // Brasília isso pode ser um dia (ou mês) diferente de `new Date()` puro.
     const hoje = agoraNoFusoDaEscola();
     const diaHoje = hoje.getDate();
-    const mesReferencia = mesReferenciaAtual(hoje);
+    // Depois do dia 05, lança o mês seguinte (vence no dia 05 dele), a partir de jan/2027.
+    const mesReferencia = mesDoLancamentoAutomatico(hoje);
+    if (!mesReferencia) {
+      return NextResponse.json({ ok: true, escolasProcessadas: 0, criados: 0, emitidos: 0, erros: 0, ignorados: 0, semValorDoContrato: 0, mesReferencia: null });
+    }
 
     // Roda para escolas com o dia configurado explicitamente, e para as sem configuração
     // apenas quando hoje é o dia padrão (evita disparar todo dia para quem não configurou).
@@ -49,7 +53,7 @@ async function handle(request: NextRequest) {
     let semValorDoContrato = 0;
 
     for (const escola of escolas) {
-      const resultado = await gerarBoletosDoMes(escola, mesReferencia, hoje);
+      const resultado = await gerarBoletosDoMes(escola, mesReferencia);
       criados += resultado.criados;
       emitidos += resultado.emitidos;
       erros += resultado.erros;
@@ -58,7 +62,7 @@ async function handle(request: NextRequest) {
       if (resultado.semValorDoContrato.length > 0) console.warn("boletos sem valor do contrato", escola.id, resultado.semValorDoContrato.length);
     }
 
-    return NextResponse.json({ ok: true, escolasProcessadas: escolas.length, criados, emitidos, erros, ignorados, semValorDoContrato });
+    return NextResponse.json({ ok: true, escolasProcessadas: escolas.length, criados, emitidos, erros, ignorados, semValorDoContrato, mesReferencia });
   } catch (error) {
     return handleApiError(error);
   }

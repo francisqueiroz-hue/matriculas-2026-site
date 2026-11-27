@@ -42,7 +42,6 @@ export interface ResultadoGeracaoBoletos {
 export async function gerarBoletosDoMes(
   escola: { id: string; diaVencimentoPadrao: number | null },
   mesReferencia: string,
-  hoje: Date,
 ): Promise<ResultadoGeracaoBoletos> {
   const resultado: ResultadoGeracaoBoletos = { criados: 0, emitidos: 0, erros: 0, ignorados: 0, semValorDoContrato: [] };
   // Escola de demonstração: nada de boleto gerado, aviso enviado ou chamada ao Banco Inter.
@@ -120,8 +119,9 @@ export async function gerarBoletosDoMes(
       valor = doContrato.valor;
     }
 
-    // Vencimento sempre no dia 05, para todos os alunos (decisão da direção, out/2026).
-    const vencimento = calcularVencimento(DIA_VENCIMENTO_PADRAO, hoje);
+    // Vencimento sempre no dia 05 do mês de referência, para todos os alunos (decisão da
+    // direção, out/2026). O lançamento automático do dia 28 já gera o mês seguinte.
+    const vencimento = calcularVencimento(DIA_VENCIMENTO_PADRAO, inicioDoMes(mesReferencia));
 
     // Sem ninguém que conste como responsável financeiro (dois ou mais responsáveis, nenhum
     // indicado): o boleto é criado, mas sem destinatário e sem aviso; a tela Contratos pede a
@@ -187,6 +187,11 @@ export async function gerarBoletosDoMes(
 
   await executarComLimite(avisos, AVISOS_SIMULTANEOS);
   return resultado;
+}
+
+/** 1º dia do mês de referência "AAAA-MM", ao meio-dia. */
+function inicioDoMes(mesReferencia: string): Date {
+  return new Date(Number(mesReferencia.slice(0, 4)), Number(mesReferencia.slice(5, 7)) - 1, 1, 12, 0, 0);
 }
 
 type EnderecoGuardado = { cep: string; logradouro: string; numero: string; complemento?: string; bairro: string; cidade: string; uf: string };

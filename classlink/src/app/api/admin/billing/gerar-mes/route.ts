@@ -25,7 +25,7 @@ export async function POST() {
 
     const hoje = agoraNoFusoDaEscola();
     const mesReferencia = mesReferenciaAtual(hoje);
-    const resultado = await gerarBoletosDoMes(escola, mesReferencia, hoje);
+    const resultado = await gerarBoletosDoMes(escola, mesReferencia);
 
     return NextResponse.json({ mesReferencia, ...resultado });
   } catch (error) {
