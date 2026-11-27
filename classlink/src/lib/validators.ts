@@ -201,8 +201,14 @@ export const setBillingInfoSchema = z.object({
     numero: z.string().min(1).max(20),
     complemento: z.string().max(100).optional(),
     bairro: z.string().min(1).max(100),
-    cidade: z.string().min(1).max(100),
-    uf: z.string().length(2),
+    cidade: z
+      .string()
+      .trim()
+      .min(2, "Informe a cidade")
+      .max(100)
+      // "null"/"undefined" escritos (vindos de autopreenchimento) saíam impressos no boleto.
+      .refine((v) => !/^(null|undefined|nan|-)$/i.test(v), "Informe a cidade"),
+    uf: z.string().trim().length(2).transform((v) => v.toUpperCase()),
   }),
 });
 

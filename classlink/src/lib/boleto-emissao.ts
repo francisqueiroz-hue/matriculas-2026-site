@@ -148,6 +148,12 @@ type EnderecoGuardado = { cep: string; logradouro: string; numero: string; compl
 /** Marca que um boleto está sendo emitido agora: impede duas emissões do mesmo boleto no Inter. */
 const MARCA_EMITINDO = "Emitindo no Banco Inter…";
 
+/** Campos do endereço vazios ou com "null"/"undefined" escrito, que sairiam impressos no boleto. */
+export function camposFaltandoNoEndereco(e: Partial<Record<"cep" | "logradouro" | "numero" | "bairro" | "cidade" | "uf", unknown>>): string[] {
+  const invalido = (v: unknown) => typeof v !== "string" || v.trim() === "" || /^(null|undefined|nan)$/i.test(v.trim());
+  return (["cep", "logradouro", "numero", "bairro", "cidade", "uf"] as const).filter((c) => invalido(e[c]));
+}
+
 /**
  * Emite no Inter um boleto que já existe no ClassLink (só valor e vencimento) e grava o
  * `codigoSolicitacao`. Em falha, o boleto fica em ERRO com o motivo; pode ser tentado de novo.
@@ -159,8 +165,12 @@ export async function emitirBoletoNoInter(
   responsavel: { name: string; cpf: string | null; enderecoCobranca: unknown },
 ): Promise<{ ok: boolean; erro?: string }> {
   const endereco = responsavel.enderecoCobranca as EnderecoGuardado | null;
-  if (!responsavel.cpf || !endereco) {
-    const erro = "Responsável financeiro sem CPF/endereço de cobrança cadastrado";
+  const faltando = endereco ? camposFaltandoNoEndereco(endereco) : [];
+  if (!responsavel.cpf || !endereco || faltando.length > 0) {
+    const erro =
+      faltando.length > 0 && responsavel.cpf && endereco
+        ? `Endereço de cobrança incompleto (${faltando.join(", ")}). A família deve corrigir em Faturas › Editar dados de cobrança.`
+        : "Responsável financeiro sem CPF/endereço de cobrança cadastrado";
     await prisma.boleto.update({ where: { id: boleto.id }, data: { status: "ERRO", erroDetalhe: erro } });
     return { ok: false, erro };
   }

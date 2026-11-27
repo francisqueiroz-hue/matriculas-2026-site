@@ -42,3 +42,22 @@ describe("mudancaDaConsulta", () => {
     expect(m).toBeNull();
   });
 });
+
+describe("camposFaltandoNoEndereco", () => {
+  it("aponta cidade com 'null' escrito e campos vazios", async () => {
+    const { camposFaltandoNoEndereco } = await import("@/lib/boleto-emissao");
+    const ok = { cep: "24358085", logradouro: "Rua A", numero: "1", bairro: "Piratininga", cidade: "Niterói", uf: "RJ" };
+    expect(camposFaltandoNoEndereco(ok)).toEqual([]);
+    expect(camposFaltandoNoEndereco({ ...ok, cidade: "null" })).toEqual(["cidade"]);
+    expect(camposFaltandoNoEndereco({ ...ok, bairro: " ", uf: undefined })).toEqual(["bairro", "uf"]);
+  });
+});
+
+describe("setBillingInfoSchema", () => {
+  it("recusa cidade 'null' e normaliza UF", async () => {
+    const { setBillingInfoSchema } = await import("@/lib/validators");
+    const base = { cpf: "529.982.247-25", endereco: { cep: "24358-085", logradouro: "Rua A", numero: "1", bairro: "B", cidade: "Niterói", uf: "rj" } };
+    expect(setBillingInfoSchema.parse(base).endereco.uf).toBe("RJ");
+    expect(() => setBillingInfoSchema.parse({ ...base, endereco: { ...base.endereco, cidade: "null" } })).toThrow();
+  });
+});
