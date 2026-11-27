@@ -125,6 +125,12 @@ model School {
   avisoTurmasTitulo String?
   avisoTurmasTexto  String?
 
+  // Escola de demonstração: só dados fictícios, para a direção ver o app como família.
+  // Nunca recebe cron (boletos, lembretes, aviso de turmas), nunca fala com o Banco Inter e
+  // nunca recebe formulário público. Ver src/lib/escola-demonstracao.ts e
+  // scripts/criar-familia-demo.ts.
+  demonstracao Boolean @default(false)
+
   users                 User[]
   boletimModelo         BoletimModelo?
   historicoModelo       HistoricoModelo?

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { SO_ESCOLAS_REAIS } from "@/lib/escola-demonstracao";
 import { handleApiError } from "@/lib/http";
 import { requireCronSecret } from "@/lib/cron-auth";
 import { mesReferenciaAtual, agoraNoFusoDaEscola } from "@/lib/billing";
@@ -33,10 +34,11 @@ async function handle(request: NextRequest) {
     // Note que gerarBoletosDoMes cria o valor mesmo sem o Banco Inter configurado — a
     // emissão real (boleto/PIX pagável) só é tentada quando o Inter estiver configurado.
     const escolas = await prisma.school.findMany({
+      // Escola de demonstração nunca gera boleto (nem chama o Banco Inter).
       where:
         diaHoje === DIA_EMISSAO_PADRAO
-          ? { OR: [{ diaEmissaoBoletos: diaHoje }, { diaEmissaoBoletos: null }] }
-          : { diaEmissaoBoletos: diaHoje },
+          ? { ...SO_ESCOLAS_REAIS, OR: [{ diaEmissaoBoletos: diaHoje }, { diaEmissaoBoletos: null }] }
+          : { ...SO_ESCOLAS_REAIS, diaEmissaoBoletos: diaHoje },
       select: { id: true, diaVencimentoPadrao: true },
     });
 

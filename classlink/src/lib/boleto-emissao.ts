@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { escolaEhDemonstracao } from "@/lib/escola-demonstracao";
 import { isBancoInterConfigured, emitirCobranca, consultarCobranca, seuNumeroDoBoleto, alunoLiberadoNoInter } from "@/lib/banco-inter";
 import { origemPublica } from "@/lib/push";
 import { avisarNovoBoleto } from "@/lib/boleto-aviso";
@@ -37,6 +38,8 @@ export async function gerarBoletosDoMes(
   hoje: Date,
 ): Promise<ResultadoGeracaoBoletos> {
   const resultado: ResultadoGeracaoBoletos = { criados: 0, emitidos: 0, erros: 0, ignorados: 0 };
+  // Escola de demonstração: nada de boleto gerado, aviso enviado ou chamada ao Banco Inter.
+  if (await escolaEhDemonstracao(escola.id)) return resultado;
   const interConfigurado = isBancoInterConfigured();
   // Os avisos são rede lenta: ficam para depois do loop e saem em paralelo limitado.
   const avisos: Array<() => Promise<unknown>> = [];
@@ -225,6 +228,7 @@ export interface ResultadoEmissaoPendentes {
  */
 export async function emitirPendentesNoInter(schoolId: string, hoje: Date): Promise<ResultadoEmissaoPendentes> {
   const resultado: ResultadoEmissaoPendentes = { emitidos: 0, erros: 0, vencidos: 0 };
+  if (await escolaEhDemonstracao(schoolId)) return resultado;
   const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
   const boletos = await prisma.boleto.findMany({
     where: { schoolId, codigoSolicitacao: null, status: { in: ["PENDENTE", "ERRO"] }, student: { deletedAt: null } },

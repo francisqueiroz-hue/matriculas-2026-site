@@ -22,10 +22,12 @@ export interface ConfigAvisoTurmas {
 export async function carregarAvisoTurmas(schoolId: string): Promise<ConfigAvisoTurmas> {
   const escola = await prisma.school.findUnique({
     where: { id: schoolId },
-    select: { avisoTurmasAtivo: true, avisoTurmasTitulo: true, avisoTurmasTexto: true },
+    select: { avisoTurmasAtivo: true, avisoTurmasTitulo: true, avisoTurmasTexto: true, demonstracao: true },
   });
   const salvo = { titulo: escola?.avisoTurmasTitulo ?? null, texto: escola?.avisoTurmasTexto ?? null };
-  return { ativo: escola?.avisoTurmasAtivo ?? false, salvo, modelo: modeloAvisoTurmas(salvo) };
+  // Escola de demonstração: aviso sempre desligado.
+  const ativo = (escola?.avisoTurmasAtivo ?? false) && !escola?.demonstracao;
+  return { ativo, salvo, modelo: modeloAvisoTurmas(salvo) };
 }
 
 /** Entrega que não falhou (ou está em andamento): conta como "já recebeu". */

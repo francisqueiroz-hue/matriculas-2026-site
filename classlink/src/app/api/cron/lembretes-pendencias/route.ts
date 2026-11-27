@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { SO_ESCOLAS_REAIS } from "@/lib/escola-demonstracao";
 import { handleApiError } from "@/lib/http";
 import { requireCronSecret } from "@/lib/cron-auth";
 import { executarLembretesDaEscola, type ResultadoExecucao } from "@/lib/lembretes-server";
@@ -30,7 +31,8 @@ async function handle(request: NextRequest) {
   try {
     requireCronSecret(request);
     const encerrarEm = Date.now() + TEMPO_PARA_NOVOS_ENVIOS_MS;
-    const escolas = await prisma.school.findMany({ select: { id: true } });
+    // Escola de demonstração fica de fora: lá só há família fictícia.
+    const escolas = await prisma.school.findMany({ where: SO_ESCOLAS_REAIS, select: { id: true } });
     const resultados: Array<ResultadoExecucao & { escola: string }> = [];
     for (const escola of escolas) {
       try {
