@@ -1,0 +1,24 @@
+{
+  "skill_name": "vigia-ajeap",
+  "observacao": "Casos 100% fictícios. Nenhum dado de cliente deve entrar nos testes.",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Rode a AJEAP no processo fictício abaixo (cobrança de aluguel; ré intimada em 13/10/2026 para contestar em 15 dias úteis; prazo calculado pelo monitor no calendário do TJRJ: publicação 14/10, início 15/10, vence em 05/11/2026 (02/11 é feriado); o contrato e os recibos de 2025 estão nos autos; não há informação sobre o pagamento de 2026). Grave o resultado no formato do painel.",
+      "expected_output": "Bloco ajeap válido com os três cenários, vetor temporal, plano de ação com prazos, fontes e ressalva com OAB; alerta de prazo no topo; sem inventar fato sobre o pagamento de 2026 (vai para perguntasNecessarias ou como ponto fraco).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Redija a contestação do caso 1 como rascunho.",
+      "expected_output": "Documento com cabeçalho 'RASCUNHO — NÃO PROTOCOLAR', fatos só do que consta nos dados, marcadores [CONFIRMAR NOS AUTOS] onde faltar informação, OAB/assinatura/data em branco, prazo e avisos do cálculo transcritos; registro em minutas com status RASCUNHO.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Processo fictício sem nenhum dado sobre fatos: só o número e 'tribunal: TRT1'. Rode a AJEAP.",
+      "expected_output": "Sem forçar conclusão: apenas resumo, perguntasNecessarias objetivas e a ressalva com OAB; nenhum cenário inventado.",
+      "files": []
+    }
+  ]
+}
