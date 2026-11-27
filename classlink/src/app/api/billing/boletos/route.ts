@@ -5,6 +5,8 @@ import { handleApiError } from "@/lib/http";
 import { alunosDaFamilia } from "@/lib/escopo-acesso";
 import { exigirArea } from "@/lib/visibilidade-server";
 import { responsavelVeItem, semDadosDaRegra } from "@/lib/responsavel-financeiro";
+import { completarDadosDoInter } from "@/lib/inter-completar";
+import { escolaEhDemonstracao } from "@/lib/escola-demonstracao";
 
 /** "Meus boletos" — todos os boletos dos alunos vinculados ao responsável logado. */
 export async function GET() {
@@ -22,10 +24,13 @@ export async function GET() {
     });
 
     // Boleto da regra do responsável financeiro: só o destinatário vê. Anteriores: todos, como era.
+    const visiveis = boletos.filter((b) => responsavelVeItem(b, true, session.sub));
+
+    // Emitido há pouco no Inter e ainda sem Pix/linha digitável: busca no banco agora.
+    const mudancas = (await escolaEhDemonstracao(session.schoolId)) ? new Map() : await completarDadosDoInter(visiveis);
+
     return NextResponse.json({
-      boletos: boletos
-        .filter((b) => responsavelVeItem(b, true, session.sub))
-        .map(semDadosDaRegra),
+      boletos: visiveis.map((b) => semDadosDaRegra({ ...b, ...(mudancas.get(b.id) ?? {}) })),
     });
   } catch (error) {
     return handleApiError(error);

@@ -52,13 +52,18 @@ function BotaoCopiar({ texto, rotulo }: { texto: string; rotulo: string }) {
 /** Menu "Pagar": só aparece para boleto emitido no banco (tem Pix, linha digitável e PDF). */
 function MenuPagar({ f }: { f: Fatura }) {
   return (
-    <details className="relative">
+    <details className="text-right">
       <summary className="cursor-pointer list-none rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 [&::-webkit-details-marker]:hidden">
         Pagar ▾
       </summary>
-      <div className="absolute right-0 z-10 mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+      {/* No fluxo da página (não flutuante): o cartão fica dentro de uma caixa com overflow-hidden,
+          que cortava o menu e fazia parecer que o botão não abria. */}
+      <div className="mt-2 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         {f.pixCopiaCola && <BotaoCopiar texto={f.pixCopiaCola} rotulo="Copiar código Pix" />}
         {f.linhaDigitavel && <BotaoCopiar texto={f.linhaDigitavel} rotulo="Copiar linha digitável" />}
+        {!f.pixCopiaCola && !f.linhaDigitavel && (
+          <p className="px-3 py-2 text-xs text-slate-500">O banco ainda está gerando o Pix e a linha digitável. Volte em alguns minutos.</p>
+        )}
         <a
           href={`/api/billing/boletos/${f.id}/pdf`}
           target="_blank"
