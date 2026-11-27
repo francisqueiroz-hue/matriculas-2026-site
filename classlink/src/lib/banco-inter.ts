@@ -91,8 +91,25 @@ export function seuNumeroDoBoleto(boletoId: string, mesReferencia: string): stri
 export const MULTA_PERCENTUAL = 2;
 export const MORA_PERCENTUAL_MES = 1;
 
+/**
+ * Tira o que a colagem no painel costuma trazer junto: espaços e quebras de linha nas pontas,
+ * aspas em volta e BOM. Um espaço a mais no Client ID/Secret faz o Inter responder 401.
+ */
+export function limparValorEnv(valor: string): string {
+  let v = valor.replace(/^\uFEFF/, "").trim();
+  if (v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")))) {
+    v = v.slice(1, -1).trim();
+  }
+  return v;
+}
+
+/** Conta corrente só com dígitos: aceita "1234567-8" ou "1.234.567-8" colados como aparecem no app. */
+export function contaCorrenteSoDigitos(valor: string): string {
+  return limparValorEnv(valor).replace(/\D/g, "");
+}
+
 function env(name: string): string {
-  const value = process.env[name];
+  const value = limparValorEnv(process.env[name] ?? "");
   if (!value) throw new Error(`${name} não configurado`);
   return value;
 }
@@ -249,7 +266,7 @@ async function authorizedRequest<T>(method: string, path: string, body?: unknown
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
-      "x-conta-corrente": env("BANCO_INTER_CONTA_CORRENTE"),
+      "x-conta-corrente": contaCorrenteSoDigitos(env("BANCO_INTER_CONTA_CORRENTE")),
     },
     body: body ? JSON.stringify(body) : undefined,
   });

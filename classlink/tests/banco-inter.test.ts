@@ -119,3 +119,19 @@ describe("piloto do Inter", () => {
     expect(alunoLiberadoNoInter("a9", { BANCO_INTER_AMBIENTE: "producao" })).toBe(true);
   });
 });
+
+describe("valores colados na Vercel", () => {
+  it("limparValorEnv tira espaços, quebras de linha, aspas e BOM", async () => {
+    const { limparValorEnv } = await import("@/lib/banco-inter");
+    expect(limparValorEnv("  abc-123\n")).toBe("abc-123");
+    expect(limparValorEnv('"abc-123"')).toBe("abc-123");
+    expect(limparValorEnv("﻿abc\r\n")).toBe("abc");
+    expect(limparValorEnv("a b")).toBe("a b");
+  });
+
+  it("contaCorrenteSoDigitos aceita hífen e pontos", async () => {
+    const { contaCorrenteSoDigitos } = await import("@/lib/banco-inter");
+    expect(contaCorrenteSoDigitos(" 1.234.567-8 ")).toBe("12345678");
+    expect(contaCorrenteSoDigitos("12345678")).toBe("12345678");
+  });
+});
