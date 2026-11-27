@@ -444,9 +444,10 @@ com a emissão real, em vez de duplicados.
 
 1. Acesse [developers.bancointer.com.br](https://developers.bancointer.com.br) e faça
    login com as credenciais da conta PJ do Inter que receberá os pagamentos.
-2. Crie uma aplicação em **Minhas aplicações**, habilitando o escopo **Cobrança
-   (Boletos)** — inclua também `webhook-boleto.write`/`webhook-boleto.read` se quiser
-   cadastrar o webhook por lá.
+2. Crie uma aplicação em **Minhas aplicações** (API Cobrança v3, boleto com Pix),
+   habilitando os escopos `boleto-cobranca.read` e `boleto-cobranca.write` (na v3 eles
+   valem também para o webhook; pedir escopo que a aplicação não tem faz o Inter recusar
+   o token).
 3. Gere o **certificado digital** da aplicação: o portal disponibiliza para download o
    certificado (`.crt`) e a chave privada (`.key`) usados na autenticação mTLS. Em
    desenvolvimento local, salve-os fora do controle de versão (ex: `classlink/certs/`,
@@ -469,11 +470,18 @@ com a emissão real, em vez de duplicados.
    `BANCO_INTER_CERT`/`BANCO_INTER_KEY` com o conteúdo dos arquivos (veja o passo 3).
 7. Teste primeiro no **ambiente sandbox** do Inter (dados fictícios) antes de apontar
    para produção.
-8. Cadastre o webhook de pagamento chamando `registrarWebhook` (em
-   `src/lib/banco-inter.ts`) uma vez, apontando para
+8. Cadastre o webhook de pagamento pelo botão **Financeiro › Banco Inter › Cadastrar
+   webhook** (só direção). Ele registra
    `https://SEU_DOMINIO/api/webhooks/banco-inter?secret=BANCO_INTER_WEBHOOK_SECRET`
    — esse `secret` é seu, não do Inter; ele impede que qualquer pessoa chame o seu
-   webhook forjando confirmações de pagamento.
+   webhook forjando confirmações de pagamento. Refaça o cadastro ao trocar de sandbox
+   para produção (cada ambiente tem o seu).
+   **Atenção:** produção e preview usam o mesmo banco de dados. No sandbox, só são emitidos
+   boletos dos alunos listados em `BANCO_INTER_ALUNOS_PILOTO` (ids separados por vírgula);
+   use um aluno fictício. Em produção a mesma lista limita a um piloto; sem ela, todos.
+9. Boletos que já existiam só com o valor (Inter ligado no meio do mês, ou família que
+   completou CPF/endereço depois) são emitidos pelo botão **Emitir no Inter os boletos em
+   aberto** (só vencimento de hoje em diante).
 
 > ⚠️ A API do Inter evolui com o tempo — antes de ir para produção, confira os campos
 > exatos exigidos na documentação oficial e ajuste `buildCobrancaPayload` em
