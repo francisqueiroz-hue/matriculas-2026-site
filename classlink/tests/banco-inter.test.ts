@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCobrancaPayload, lerConsultaCobranca, seuNumeroDoBoleto, type EmitirCobrancaInput } from "@/lib/banco-inter";
+import { alunoLiberadoNoInter, alunosPilotoInter, buildCobrancaPayload, lerConsultaCobranca, seuNumeroDoBoleto, type EmitirCobrancaInput } from "@/lib/banco-inter";
 
 const enderecoValido = {
   cep: "01310-100",
@@ -101,5 +101,21 @@ describe("lerConsultaCobranca", () => {
     const r = lerConsultaCobranca({ cobranca: { situacao: "EM_PROCESSAMENTO" } }, "abc");
     expect(r.linhaDigitavel).toBeUndefined();
     expect(r.codigoSolicitacao).toBe("abc");
+  });
+});
+
+describe("piloto do Inter", () => {
+  it("sandbox sem lista não libera ninguém (banco de dados é o mesmo da produção)", () => {
+    expect(alunoLiberadoNoInter("a1", { BANCO_INTER_AMBIENTE: "sandbox" })).toBe(false);
+    expect(alunoLiberadoNoInter("a1", {})).toBe(false);
+  });
+  it("com lista, só os alunos da lista", () => {
+    const env = { BANCO_INTER_AMBIENTE: "producao", BANCO_INTER_ALUNOS_PILOTO: " a1 , a2 " };
+    expect(alunoLiberadoNoInter("a1", env)).toBe(true);
+    expect(alunoLiberadoNoInter("a3", env)).toBe(false);
+    expect(alunosPilotoInter(env)?.size).toBe(2);
+  });
+  it("produção sem lista libera todos", () => {
+    expect(alunoLiberadoNoInter("a9", { BANCO_INTER_AMBIENTE: "producao" })).toBe(true);
   });
 });

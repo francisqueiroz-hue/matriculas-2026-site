@@ -113,6 +113,26 @@ export function isBancoInterConfigured() {
   );
 }
 
+/**
+ * Piloto: com BANCO_INTER_ALUNOS_PILOTO (ids de alunos separados por vírgula), só esses alunos
+ * têm boleto emitido no Inter; os demais seguem só com o valor e a baixa manual. No sandbox
+ * a lista é obrigatória: produção e preview usam o MESMO banco de dados, então um sandbox sem
+ * lista "emitiria" de mentira os boletos reais das famílias.
+ */
+export function alunosPilotoInter(env: Record<string, string | undefined> = process.env): Set<string> | null {
+  const lista = (env.BANCO_INTER_ALUNOS_PILOTO ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return lista.length > 0 ? new Set(lista) : null;
+}
+
+export function alunoLiberadoNoInter(studentId: string, env: Record<string, string | undefined> = process.env): boolean {
+  const piloto = alunosPilotoInter(env);
+  if (piloto) return piloto.has(studentId);
+  return env.BANCO_INTER_AMBIENTE === "producao";
+}
+
 function baseUrl() {
   return process.env.BANCO_INTER_AMBIENTE === "producao"
     ? "https://cdpj.partners.bancointer.com.br"

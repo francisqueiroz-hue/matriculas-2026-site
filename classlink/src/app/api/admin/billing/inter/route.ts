@@ -5,7 +5,7 @@ import { handleApiError } from "@/lib/http";
 import { ErroDeUsuario } from "@/lib/erros";
 import { origemPublica } from "@/lib/push";
 import { agoraNoFusoDaEscola } from "@/lib/billing";
-import { consultarWebhook, isBancoInterConfigured, registrarWebhook } from "@/lib/banco-inter";
+import { alunosPilotoInter, consultarWebhook, isBancoInterConfigured, registrarWebhook } from "@/lib/banco-inter";
 import { emitirPendentesNoInter } from "@/lib/boleto-emissao";
 
 // Emissão de vários boletos (uma chamada ao Inter por boleto) pode passar do limite padrão.
@@ -35,7 +35,9 @@ export async function GET() {
     const configurado = isBancoInterConfigured();
     const ambiente = process.env.BANCO_INTER_AMBIENTE === "producao" ? "producao" : "sandbox";
     const segredoDefinido = Boolean(process.env.BANCO_INTER_WEBHOOK_SECRET);
-    if (!configurado) return NextResponse.json({ configurado, ambiente, segredoDefinido, webhook: null });
+    // Quantos alunos estão no piloto (null = todos, só em produção). Nunca os ids.
+    const piloto = alunosPilotoInter()?.size ?? null;
+    if (!configurado) return NextResponse.json({ configurado, ambiente, segredoDefinido, piloto, webhook: null });
 
     try {
       const atual = await consultarWebhook();
@@ -47,6 +49,7 @@ export async function GET() {
         configurado,
         ambiente,
         segredoDefinido,
+        piloto,
         webhook: { cadastrado: !!atual, endereco: semSegredo, apontaParaEsteApp: !!esperado && semSegredo === esperado && segredoConfere },
       });
     } catch (err) {
@@ -54,6 +57,7 @@ export async function GET() {
         configurado,
         ambiente,
         segredoDefinido,
+        piloto,
         webhook: null,
         erro: err instanceof Error ? err.message.slice(0, 300) : "Falha ao falar com o Banco Inter",
       });

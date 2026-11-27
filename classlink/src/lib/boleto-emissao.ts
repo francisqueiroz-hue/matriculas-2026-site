@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { isBancoInterConfigured, emitirCobranca, consultarCobranca, seuNumeroDoBoleto } from "@/lib/banco-inter";
+import { isBancoInterConfigured, emitirCobranca, consultarCobranca, seuNumeroDoBoleto, alunoLiberadoNoInter } from "@/lib/banco-inter";
 import { origemPublica } from "@/lib/push";
 import { avisarNovoBoleto } from "@/lib/boleto-aviso";
 import { executarComLimite } from "@/lib/concorrencia";
@@ -108,8 +108,8 @@ export async function gerarBoletosDoMes(
       avisos.push(() => avisarNovoBoleto(dados));
     };
 
-    if (!interConfigurado) {
-      avisar(); // valor já visível; emissão real fica para quando o Inter for configurado
+    if (!interConfigurado || !alunoLiberadoNoInter(aluno.id)) {
+      avisar(); // valor já visível; emissão real fica para quando o Inter for configurado (ou o aluno entrar no piloto)
       continue;
     }
 
@@ -241,6 +241,7 @@ export async function emitirPendentesNoInter(schoolId: string, hoje: Date): Prom
   });
 
   for (const boleto of boletos) {
+    if (!alunoLiberadoNoInter(boleto.studentId)) continue;
     if (boleto.vencimento < inicioHoje) {
       resultado.vencidos++;
       continue;

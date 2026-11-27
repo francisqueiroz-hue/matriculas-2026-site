@@ -7,6 +7,7 @@ interface EstadoInter {
   configurado: boolean;
   ambiente: "sandbox" | "producao";
   segredoDefinido: boolean;
+  piloto: number | null;
   webhook: { cadastrado: boolean; endereco: string | null; apontaParaEsteApp: boolean } | null;
   erro?: string;
 }
@@ -95,6 +96,16 @@ export function PainelBancoInter({ aoMudar }: { aoMudar: () => void }) {
               <strong className="text-amber-700">não cadastrado</strong>
             ) : (
               <span>não consultado</span>
+            )}
+          </li>
+          <li>
+            Quem recebe boleto do Inter:{" "}
+            {estado.piloto !== null ? (
+              <strong className="text-amber-700">só {estado.piloto} aluno(s) do piloto</strong>
+            ) : estado.ambiente === "producao" ? (
+              <strong className="text-green-700">todos os alunos com mensalidade</strong>
+            ) : (
+              <strong className="text-red-600">ninguém (no sandbox é preciso a lista de piloto)</strong>
             )}
           </li>
           {!estado.segredoDefinido && <li className="text-red-600">Falta BANCO_INTER_WEBHOOK_SECRET na Vercel.</li>}

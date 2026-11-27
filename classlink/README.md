@@ -476,6 +476,9 @@ com a emissão real, em vez de duplicados.
    — esse `secret` é seu, não do Inter; ele impede que qualquer pessoa chame o seu
    webhook forjando confirmações de pagamento. Refaça o cadastro ao trocar de sandbox
    para produção (cada ambiente tem o seu).
+   **Atenção:** produção e preview usam o mesmo banco de dados. No sandbox, só são emitidos
+   boletos dos alunos listados em `BANCO_INTER_ALUNOS_PILOTO` (ids separados por vírgula);
+   use um aluno fictício. Em produção a mesma lista limita a um piloto; sem ela, todos.
 9. Boletos que já existiam só com o valor (Inter ligado no meio do mês, ou família que
    completou CPF/endereço depois) são emitidos pelo botão **Emitir no Inter os boletos em
    aberto** (só vencimento de hoje em diante).
