@@ -52,8 +52,8 @@ function BotaoCopiar({ texto, rotulo }: { texto: string; rotulo: string }) {
 /** Menu "Pagar": só aparece para boleto emitido no banco (tem Pix, linha digitável e PDF). */
 function MenuPagar({ f }: { f: Fatura }) {
   return (
-    <details className="text-right">
-      <summary className="cursor-pointer list-none rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 [&::-webkit-details-marker]:hidden">
+    <details className="flex flex-col items-end text-left">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 [&::-webkit-details-marker]:hidden">
         Pagar ▾
       </summary>
       {/* No fluxo da página (não flutuante): o cartão fica dentro de uma caixa com overflow-hidden,
@@ -68,7 +68,7 @@ function MenuPagar({ f }: { f: Fatura }) {
           href={`/api/billing/boletos/${f.id}/pdf`}
           target="_blank"
           rel="noreferrer"
-          className="block rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
         >
           Abrir boleto em PDF
         </a>
