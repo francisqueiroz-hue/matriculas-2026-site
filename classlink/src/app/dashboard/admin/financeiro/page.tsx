@@ -25,6 +25,7 @@ interface ResultadoGeracao {
   emitidos: number;
   erros: number;
   ignorados: number;
+  semValorDoContrato?: { aluno: string; motivo: string }[];
 }
 
 interface Cobranca {
@@ -208,6 +209,18 @@ function FinanceiroContent() {
             {resultadoGeracao.erros > 0 && `, ${resultadoGeracao.erros} com erro na emissão`}
             {resultadoGeracao.ignorados > 0 && ` (${resultadoGeracao.ignorados} já existiam)`}.
           </p>
+        )}
+        {resultadoGeracao && (resultadoGeracao.semValorDoContrato?.length ?? 0) > 0 && (
+          <div className="text-xs text-amber-800 dark:text-amber-300">
+            <p className="font-semibold">Sem lançamento (o valor vem do contrato do ano):</p>
+            <ul className="list-disc pl-4">
+              {resultadoGeracao.semValorDoContrato!.map((s) => (
+                <li key={s.aluno}>
+                  {s.aluno}: {s.motivo}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
 

@@ -43,3 +43,22 @@ export function calcularVencimento(diaVencimento: number, referencia = new Date(
 export function formatarDataISO(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
+
+/**
+ * Primeiro mês que o lançamento automático gera adiantado (decisão da direção, 27/11/2026):
+ * dezembro/2026 é lançado pelo botão, como novembro; o 1º lançamento automático é em 28/12,
+ * para janeiro/2027.
+ */
+export const PRIMEIRO_MES_LANCADO_ADIANTADO = "2027-01";
+
+/**
+ * Mês que o lançamento automático gera hoje. Até o dia do vencimento (05), o próprio mês; depois
+ * dele, o mês seguinte (rodando no dia 28, lança o próximo mês com vencimento no dia 05, em vez
+ * de um mês já vencido). Mês seguinte anterior a PRIMEIRO_MES_LANCADO_ADIANTADO: null (nada a
+ * lançar automaticamente).
+ */
+export function mesDoLancamentoAutomatico(hoje: Date): string | null {
+  if (hoje.getDate() <= DIA_VENCIMENTO_PADRAO) return mesReferenciaAtual(hoje);
+  const seguinte = mesReferenciaAtual(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1));
+  return seguinte < PRIMEIRO_MES_LANCADO_ADIANTADO ? null : seguinte;
+}

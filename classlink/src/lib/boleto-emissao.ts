@@ -5,6 +5,8 @@ import { origemPublica } from "@/lib/push";
 import { avisarNovoBoleto } from "@/lib/boleto-aviso";
 import { executarComLimite } from "@/lib/concorrencia";
 import { destinosDosAlunos } from "@/lib/contratos-server";
+import { ANO_VALOR_PELO_CONTRATO, valorDoMesPeloContrato, type ContratoParaValor } from "@/lib/boletos-do-ano";
+import { valoresDoContrato, type CondicoesContrato } from "@/lib/contrato-modelo/tipos";
 
 /** Avisos (push + WhatsApp) simultâneos: acelera o lote sem estourar limites dos provedores. */
 const AVISOS_SIMULTANEOS = 5;
@@ -18,6 +20,11 @@ export interface ResultadoGeracaoBoletos {
   erros: number;
   /** Alunos que já tinham um boleto para este mês de referência. */
   ignorados: number;
+  /**
+   * De 2027 em diante o valor sai do contrato do ano: alunos que ficaram sem lançamento porque
+   * o contrato não tem valor para o mês (ou não existe). Isentos pelo contrato não entram aqui.
+   */
+  semValorDoContrato: { aluno: string; motivo: string }[];
 }
 
 /**
@@ -35,17 +42,20 @@ export interface ResultadoGeracaoBoletos {
 export async function gerarBoletosDoMes(
   escola: { id: string; diaVencimentoPadrao: number | null },
   mesReferencia: string,
-  hoje: Date,
 ): Promise<ResultadoGeracaoBoletos> {
-  const resultado: ResultadoGeracaoBoletos = { criados: 0, emitidos: 0, erros: 0, ignorados: 0 };
+  const resultado: ResultadoGeracaoBoletos = { criados: 0, emitidos: 0, erros: 0, ignorados: 0, semValorDoContrato: [] };
   // Escola de demonstração: nada de boleto gerado, aviso enviado ou chamada ao Banco Inter.
   if (await escolaEhDemonstracao(escola.id)) return resultado;
   const interConfigurado = isBancoInterConfigured();
   // Os avisos são rede lenta: ficam para depois do loop e saem em paralelo limitado.
   const avisos: Array<() => Promise<unknown>> = [];
 
+  const anoDoMes = Number(mesReferencia.slice(0, 4));
+  const peloContrato = anoDoMes >= ANO_VALOR_PELO_CONTRATO;
   const alunos = await prisma.student.findMany({
-    where: { schoolId: escola.id, deletedAt: null, bolsista: false, mensalidadeValor: { not: null } },
+    // De 2027 em diante quem decide é o contrato do ano (aluno novo pode não ter mensalidade no
+    // cadastro); antes, só quem tem mensalidade cadastrada.
+    where: { schoolId: escola.id, deletedAt: null, bolsista: false, ...(peloContrato ? {} : { mensalidadeValor: { not: null } }) },
     include: {
       guardians: {
         orderBy: { createdAt: "asc" },
@@ -65,6 +75,28 @@ export async function gerarBoletosDoMes(
   const comBoleto = new Set(jaGerados);
   const destinos = await destinosDosAlunos(alunos.filter((a) => !comBoleto.has(a.id)).map((a) => a.id));
 
+  // De 2027 em diante, o valor do mês é o do contrato do ano (o cadastro guarda a mensalidade
+  // do ano anterior, sem o reajuste). Meses de 2026 seguem com o valor do cadastro, como sempre.
+  const contratosPorAluno = new Map<string, ContratoParaValor[]>();
+  if (peloContrato) {
+    const contratos = await prisma.contrato.findMany({
+      where: { studentId: { in: alunos.filter((a) => !comBoleto.has(a.id)).map((a) => a.id) }, anoLetivo: anoDoMes },
+      select: { studentId: true, anoLetivo: true, status: true, condicoes: true, updatedAt: true },
+    });
+    for (const c of contratos) {
+      const condicoes = c.condicoes as Partial<CondicoesContrato> | null;
+      const lista = contratosPorAluno.get(c.studentId) ?? [];
+      lista.push({
+        anoLetivo: c.anoLetivo,
+        status: c.status,
+        atualizadoEm: c.updatedAt,
+        valores: valoresDoContrato(c.condicoes),
+        primeiroUltimo: condicoes?.config?.parcelas?.primeiroUltimo ?? null,
+      });
+      contratosPorAluno.set(c.studentId, lista);
+    }
+  }
+
   for (const aluno of alunos) {
     const jaExiste = await prisma.boleto.findUnique({
       where: { studentId_mesReferencia: { studentId: aluno.id, mesReferencia } },
@@ -74,8 +106,22 @@ export async function gerarBoletosDoMes(
       continue;
     }
 
-    // Vencimento sempre no dia 05, para todos os alunos (decisão da direção, out/2026).
-    const vencimento = calcularVencimento(DIA_VENCIMENTO_PADRAO, hoje);
+    let valor: number = Number(aluno.mensalidadeValor);
+    if (peloContrato) {
+      const doContrato = valorDoMesPeloContrato(contratosPorAluno.get(aluno.id) ?? [], mesReferencia);
+      if (doContrato.tipo === "ISENTO") continue;
+      if (doContrato.tipo === "SEM_VALOR") {
+        // Sem contrato e sem mensalidade no cadastro: não é aluno pagante; nada a avisar.
+        if (!contratosPorAluno.has(aluno.id) && aluno.mensalidadeValor === null) continue;
+        resultado.semValorDoContrato.push({ aluno: aluno.name, motivo: doContrato.motivo });
+        continue;
+      }
+      valor = doContrato.valor;
+    }
+
+    // Vencimento sempre no dia 05 do mês de referência, para todos os alunos (decisão da
+    // direção, out/2026). O lançamento automático do dia 28 já gera o mês seguinte.
+    const vencimento = calcularVencimento(DIA_VENCIMENTO_PADRAO, inicioDoMes(mesReferencia));
 
     // Sem ninguém que conste como responsável financeiro (dois ou mais responsáveis, nenhum
     // indicado): o boleto é criado, mas sem destinatário e sem aviso; a tela Contratos pede a
@@ -86,7 +132,7 @@ export async function gerarBoletosDoMes(
         studentId: aluno.id,
         schoolId: escola.id,
         mesReferencia,
-        valor: aluno.mensalidadeValor!,
+        valor,
         vencimento,
         status: "PENDENTE",
         porResponsavelFinanceiro: true,
@@ -104,7 +150,7 @@ export async function gerarBoletosDoMes(
       const dados = {
         responsavel,
         alunoNome: aluno.name,
-        valor: Number(aluno.mensalidadeValor),
+        valor,
         vencimento,
         origem: origemPublica(),
       };
@@ -141,6 +187,11 @@ export async function gerarBoletosDoMes(
 
   await executarComLimite(avisos, AVISOS_SIMULTANEOS);
   return resultado;
+}
+
+/** 1º dia do mês de referência "AAAA-MM", ao meio-dia. */
+function inicioDoMes(mesReferencia: string): Date {
+  return new Date(Number(mesReferencia.slice(0, 4)), Number(mesReferencia.slice(5, 7)) - 1, 1, 12, 0, 0);
 }
 
 type EnderecoGuardado = { cep: string; logradouro: string; numero: string; complemento?: string; bairro: string; cidade: string; uf: string };
