@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { isBancoInterConfigured, emitirCobranca, consultarCobranca } from "@/lib/banco-inter";
+import { isBancoInterConfigured, emitirCobranca, consultarCobranca, seuNumeroDoBoleto } from "@/lib/banco-inter";
 import { origemPublica } from "@/lib/push";
 import { avisarNovoBoleto } from "@/lib/boleto-aviso";
 import { executarComLimite } from "@/lib/concorrencia";
@@ -27,8 +27,9 @@ export interface ResultadoGeracaoBoletos {
  * O valor é sempre criado primeiro, mesmo sem o Banco Inter configurado: mostrar quanto e
  * quando vencer não depende de emissão real. A emissão de verdade (boleto/PIX pagável) é
  * uma etapa separada, tentada só quando o Inter está configurado, e atualiza o mesmo
- * registro em vez de duplicá-lo — então "ligar" o Inter depois não recria nada, só
- * completa os boletos do mês corrente que ainda estavam só com o valor.
+ * registro em vez de duplicá-lo. Boletos que já existiam só com o valor (Inter ligado no meio
+ * do mês, ou família que completou CPF/endereço depois) são emitidos por
+ * `emitirPendentesNoInter`, pelo botão da direção em Financeiro.
  */
 export async function gerarBoletosDoMes(
   escola: { id: string; diaVencimentoPadrao: number | null },
@@ -126,57 +127,146 @@ export async function gerarBoletosDoMes(
       continue;
     }
 
-    const endereco = responsavel.enderecoCobranca as
-      | { cep: string; logradouro: string; numero: string; complemento?: string; bairro: string; cidade: string; uf: string }
-      | null;
-
-    if (!responsavel.cpf || !endereco) {
-      await prisma.boleto.update({
-        where: { id: boleto.id },
-        data: { status: "ERRO", erroDetalhe: "Responsável financeiro sem CPF/endereço de cobrança cadastrado" },
-      });
-      resultado.erros++;
-      continue;
-    }
-
-    try {
-      const emissao = await emitirCobranca({
-        seuNumero: `${aluno.id}-${mesReferencia}`,
-        valorNominal: Number(aluno.mensalidadeValor),
-        dataVencimento: formatarDataISO(vencimento),
-        pagador: { cpfCnpj: responsavel.cpf, nome: responsavel.name, endereco },
-        mensagem: `Mensalidade ${mesReferencia} — ${aluno.name}`,
-      });
-
-      let detalhes: Awaited<ReturnType<typeof consultarCobranca>> | null = null;
-      try {
-        detalhes = await consultarCobranca(emissao.codigoSolicitacao);
-      } catch {
-        // detalhes ficam disponíveis via webhook/consulta posterior; emissão em si já foi confirmada
-      }
-
-      await prisma.boleto.update({
-        where: { id: boleto.id },
-        data: {
-          codigoSolicitacao: emissao.codigoSolicitacao,
-          nossoNumero: detalhes?.nossoNumero,
-          linhaDigitavel: detalhes?.linhaDigitavel,
-          pixCopiaCola: detalhes?.pixCopiaECola,
-        },
-      });
-
+    const emissao = await emitirBoletoNoInter(boleto, aluno.name, responsavel);
+    if (emissao.ok) {
       avisar();
-
       resultado.emitidos++;
-    } catch (err) {
-      await prisma.boleto.update({
-        where: { id: boleto.id },
-        data: { status: "ERRO", erroDetalhe: err instanceof Error ? err.message : "Falha desconhecida na emissão" },
-      });
+    } else {
       resultado.erros++;
     }
   }
 
   await executarComLimite(avisos, AVISOS_SIMULTANEOS);
+  return resultado;
+}
+
+type EnderecoGuardado = { cep: string; logradouro: string; numero: string; complemento?: string; bairro: string; cidade: string; uf: string };
+
+/** Marca que um boleto está sendo emitido agora: impede duas emissões do mesmo boleto no Inter. */
+const MARCA_EMITINDO = "Emitindo no Banco Inter…";
+
+/**
+ * Emite no Inter um boleto que já existe no ClassLink (só valor e vencimento) e grava o
+ * `codigoSolicitacao`. Em falha, o boleto fica em ERRO com o motivo; pode ser tentado de novo.
+ * A emissão é assíncrona no Inter: linha digitável e Pix podem chegar só pelo webhook.
+ */
+export async function emitirBoletoNoInter(
+  boleto: { id: string; mesReferencia: string; valor: unknown; vencimento: Date },
+  alunoNome: string,
+  responsavel: { name: string; cpf: string | null; enderecoCobranca: unknown },
+): Promise<{ ok: boolean; erro?: string }> {
+  const endereco = responsavel.enderecoCobranca as EnderecoGuardado | null;
+  if (!responsavel.cpf || !endereco) {
+    const erro = "Responsável financeiro sem CPF/endereço de cobrança cadastrado";
+    await prisma.boleto.update({ where: { id: boleto.id }, data: { status: "ERRO", erroDetalhe: erro } });
+    return { ok: false, erro };
+  }
+
+  // Reserva o boleto: só segue quem conseguir marcar um boleto ainda sem emissão.
+  const { count } = await prisma.boleto.updateMany({
+    where: {
+      id: boleto.id,
+      codigoSolicitacao: null,
+      status: { in: ["PENDENTE", "ERRO"] },
+      // Marca de mais de 5 minutos é de uma tentativa interrompida no meio: pode tentar de novo.
+      OR: [{ erroDetalhe: null }, { erroDetalhe: { not: MARCA_EMITINDO } }, { updatedAt: { lt: new Date(Date.now() - 5 * 60_000) } }],
+    },
+    data: { erroDetalhe: MARCA_EMITINDO },
+  });
+  if (count === 0) return { ok: false, erro: "Boleto já emitido ou em emissão" };
+
+  try {
+    const emissao = await emitirCobranca({
+      seuNumero: seuNumeroDoBoleto(boleto.id, boleto.mesReferencia),
+      valorNominal: Number(boleto.valor),
+      dataVencimento: formatarDataISO(boleto.vencimento),
+      pagador: { cpfCnpj: responsavel.cpf, nome: responsavel.name, endereco },
+      mensagem: `Mensalidade ${boleto.mesReferencia} - ${alunoNome}`,
+    });
+
+    // Grava o código antes de qualquer outra coisa: é ele que liga o webhook a este boleto.
+    await prisma.boleto.update({
+      where: { id: boleto.id },
+      data: { codigoSolicitacao: emissao.codigoSolicitacao, status: "PENDENTE", erroDetalhe: null },
+    });
+
+    try {
+      const detalhes = await consultarCobranca(emissao.codigoSolicitacao);
+      await prisma.boleto.update({
+        where: { id: boleto.id },
+        data: {
+          nossoNumero: detalhes.nossoNumero,
+          linhaDigitavel: detalhes.linhaDigitavel,
+          pixCopiaCola: detalhes.pixCopiaECola,
+        },
+      });
+    } catch {
+      // Ainda em processamento no Inter: os dados chegam pelo webhook ou pela próxima consulta.
+    }
+    return { ok: true };
+  } catch (err) {
+    const erro = err instanceof Error ? err.message : "Falha desconhecida na emissão";
+    await prisma.boleto.update({ where: { id: boleto.id }, data: { status: "ERRO", erroDetalhe: erro } });
+    return { ok: false, erro };
+  }
+}
+
+export interface ResultadoEmissaoPendentes {
+  emitidos: number;
+  erros: number;
+  /** Vencimento já passou: o Inter não aceita emitir com vencimento no passado. */
+  vencidos: number;
+}
+
+/**
+ * Emite no Inter os boletos em aberto (PENDENTE ou ERRO, sem emissão) desta escola com
+ * vencimento de hoje em diante. Serve para quando o Inter é ligado com o mês já gerado, e
+ * para tentar de novo depois que a família completa CPF e endereço.
+ */
+export async function emitirPendentesNoInter(schoolId: string, hoje: Date): Promise<ResultadoEmissaoPendentes> {
+  const resultado: ResultadoEmissaoPendentes = { emitidos: 0, erros: 0, vencidos: 0 };
+  const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  const boletos = await prisma.boleto.findMany({
+    where: { schoolId, codigoSolicitacao: null, status: { in: ["PENDENTE", "ERRO"] }, student: { deletedAt: null } },
+    include: { student: { select: { name: true } } },
+    orderBy: { vencimento: "asc" },
+  });
+  if (boletos.length === 0) return resultado;
+
+  const destinos = await destinosDosAlunos([...new Set(boletos.map((b) => b.studentId))]);
+  const vinculos = await prisma.guardianStudent.findMany({
+    where: { studentId: { in: boletos.map((b) => b.studentId) } },
+    orderBy: { createdAt: "asc" },
+    include: { guardian: { select: { id: true, name: true, cpf: true, enderecoCobranca: true, active: true } } },
+  });
+
+  for (const boleto of boletos) {
+    if (boleto.vencimento < inicioHoje) {
+      resultado.vencidos++;
+      continue;
+    }
+    // Regra nova: o destinatário gravado (ou o financeiro atual, se ainda não gravado); boleto
+    // anterior à regra: o primeiro responsável vinculado, como era.
+    const destinatarioId = boleto.porResponsavelFinanceiro
+      ? (boleto.destinatarioId ?? destinos.get(boleto.studentId)?.ids[0] ?? null)
+      : (vinculos.find((v) => v.studentId === boleto.studentId)?.guardianId ?? null);
+    const responsavel = vinculos.find((v) => v.studentId === boleto.studentId && v.guardianId === destinatarioId)?.guardian;
+    if (!responsavel || !responsavel.active) {
+      await prisma.boleto.update({
+        where: { id: boleto.id },
+        data: {
+          status: "ERRO",
+          erroDetalhe: destinatarioId
+            ? "Aluno sem responsável financeiro ativo vinculado"
+            : "Aluno com mais de um responsável: indique o responsável financeiro na tela Contratos",
+        },
+      });
+      resultado.erros++;
+      continue;
+    }
+    const r = await emitirBoletoNoInter(boleto, boleto.student.name, responsavel);
+    if (r.ok) resultado.emitidos++;
+    else resultado.erros++;
+  }
   return resultado;
 }

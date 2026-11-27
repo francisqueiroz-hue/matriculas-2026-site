@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DirecaoGuard } from "@/components/DirecaoGuard";
 import { apiJson } from "@/lib/api-client";
+import { PainelBancoInter } from "./PainelBancoInter";
 
 interface Summary {
   mesReferencia: string;
@@ -181,6 +182,8 @@ function FinanceiroContent() {
           agendado (veja README), no dia de emissão configurado acima.
         </p>
       </form>
+
+      <PainelBancoInter aoMudar={load} />
 
       <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-500">Gerar valores deste mês agora</h2>

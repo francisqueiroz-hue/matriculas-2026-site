@@ -3,13 +3,17 @@ import { ErroDeUsuario } from "@/lib/erros";
 import { readFileSync } from "node:fs";
 
 /**
- * Cliente da API Inter Empresas (Cobrança/Boletos) — OAuth2 client_credentials
- * com mTLS, conforme developers.bancointer.com.br.
+ * Cliente da API Inter Empresas (Cobrança v3, boleto com Pix) — OAuth2 client_credentials
+ * com mTLS. Referência: https://developers.inter.co/references/cobranca-bolepix
+ * (conferida em 27/11/2026; a API Boleto v2 foi descontinuada em 2026).
  *
- * ⚠️ Os nomes de campo do payload seguem a API Cobrança v3 documentada publicamente
- * no momento da implementação. Bancos alteram contratos de API com alguma frequência —
- * confira a documentação oficial antes de usar em produção e ajuste `buildCobrancaPayload`
- * se necessário. Toda a superfície de integração fica isolada neste arquivo de propósito.
+ * Pontos do contrato v3 que este arquivo respeita:
+ * - escopos `boleto-cobranca.read` e `boleto-cobranca.write` (valem também para o webhook);
+ * - `seuNumero` com no máximo 15 caracteres;
+ * - emissão assíncrona: o POST devolve só `codigoSolicitacao`; linha digitável e Pix chegam
+ *   pelo webhook ou pela consulta, que responde em blocos `cobranca`, `boleto` e `pix`;
+ * - token vale 1 hora e o Inter limita a geração a 5 por minuto.
+ * Toda a superfície de integração fica isolada neste arquivo de propósito.
  */
 
 export interface EnderecoCobranca {
@@ -46,6 +50,45 @@ export interface CobrancaDetalhada {
   linhaDigitavel?: string;
   pixCopiaECola?: string;
 }
+
+/** Resposta da consulta v3, em blocos (GET /cobranca/v3/cobrancas/{codigoSolicitacao}). */
+export interface RespostaConsultaV3 {
+  cobranca?: { codigoSolicitacao?: string; situacao?: string };
+  boleto?: { nossoNumero?: string; linhaDigitavel?: string; codigoBarras?: string };
+  pix?: { txid?: string; pixCopiaECola?: string };
+}
+
+/** Achata a resposta da consulta v3 nos campos que o ClassLink guarda. */
+export function lerConsultaCobranca(resposta: RespostaConsultaV3, codigoSolicitacao: string): CobrancaDetalhada {
+  return {
+    codigoSolicitacao: resposta.cobranca?.codigoSolicitacao ?? codigoSolicitacao,
+    situacao: resposta.cobranca?.situacao ?? "",
+    nossoNumero: resposta.boleto?.nossoNumero || undefined,
+    linhaDigitavel: resposta.boleto?.linhaDigitavel || undefined,
+    pixCopiaECola: resposta.pix?.pixCopiaECola || undefined,
+  };
+}
+
+/** Limite do campo `seuNumero` na API v3. */
+export const SEU_NUMERO_MAX = 15;
+
+/**
+ * `seuNumero` do boleto: AAMM do mês de referência + os 11 últimos caracteres do id do boleto
+ * (cuid), 15 no total. Só serve para a escola reconhecer o título no internet banking; a
+ * conciliação usa o `codigoSolicitacao`.
+ */
+export function seuNumeroDoBoleto(boletoId: string, mesReferencia: string): string {
+  const aamm = mesReferencia.replace(/\D/g, "").slice(2, 6);
+  const sufixo = boletoId.replace(/[^A-Za-z0-9]/g, "").slice(-(SEU_NUMERO_MAX - aamm.length));
+  return `${aamm}${sufixo}`.toUpperCase();
+}
+
+/**
+ * Encargos por atraso enviados ao Inter, iguais aos do contrato (Cláusula 9ª: multa de 2% e
+ * juros de 1% ao mês) e aos usados na conferência de baixas (lib/conferencia-baixas.ts).
+ */
+export const MULTA_PERCENTUAL = 2;
+export const MORA_PERCENTUAL_MES = 1;
 
 function env(name: string): string {
   const value = process.env[name];
@@ -164,7 +207,9 @@ async function getAccessToken(): Promise<string> {
     client_id: env("BANCO_INTER_CLIENT_ID"),
     client_secret: env("BANCO_INTER_CLIENT_SECRET"),
     grant_type: "client_credentials",
-    scope: "boleto-cobranca.write boleto-cobranca.read webhook-boleto.write webhook-boleto.read",
+    // Na v3 o webhook de cobrança usa os mesmos escopos da cobrança. Pedir um escopo que a
+    // aplicação não tem faz o Inter recusar o token inteiro.
+    scope: "boleto-cobranca.read boleto-cobranca.write",
   }).toString();
 
   const response = await request<{ access_token: string; expires_in: number }>({
@@ -203,6 +248,9 @@ export function buildCobrancaPayload(input: EmitirCobrancaInput) {
   if (input.valorNominal <= 0) {
     throw new ErroDeUsuario("Valor da mensalidade deve ser maior que zero");
   }
+  if (!input.seuNumero || input.seuNumero.length > SEU_NUMERO_MAX) {
+    throw new Error(`seuNumero precisa ter de 1 a ${SEU_NUMERO_MAX} caracteres`);
+  }
 
   return {
     seuNumero: input.seuNumero,
@@ -221,7 +269,10 @@ export function buildCobrancaPayload(input: EmitirCobrancaInput) {
       uf: input.pagador.endereco.uf,
       cep: input.pagador.endereco.cep.replace(/\D/g, ""),
     },
-    ...(input.mensagem ? { mensagem: { linha1: input.mensagem } } : {}),
+    multa: { codigo: "PERCENTUAL" as const, taxa: MULTA_PERCENTUAL },
+    mora: { codigo: "TAXAMENSAL" as const, taxa: MORA_PERCENTUAL_MES },
+    formasRecebimento: ["BOLETO", "PIX"] as const,
+    ...(input.mensagem ? { mensagem: { linha1: input.mensagem.slice(0, 78) } } : {}),
   };
 }
 
@@ -231,7 +282,11 @@ export async function emitirCobranca(input: EmitirCobrancaInput): Promise<Cobran
 }
 
 export async function consultarCobranca(codigoSolicitacao: string): Promise<CobrancaDetalhada> {
-  return authorizedRequest<CobrancaDetalhada>("GET", `/cobranca/v3/cobrancas/${codigoSolicitacao}`);
+  const resposta = await authorizedRequest<RespostaConsultaV3>(
+    "GET",
+    `/cobranca/v3/cobrancas/${encodeURIComponent(codigoSolicitacao)}`,
+  );
+  return lerConsultaCobranca(resposta, codigoSolicitacao);
 }
 
 export async function baixarPdfCobranca(codigoSolicitacao: string): Promise<Buffer> {
@@ -241,5 +296,18 @@ export async function baixarPdfCobranca(codigoSolicitacao: string): Promise<Buff
 
 /** Registra a URL de webhook para receber confirmações de pagamento. Rodar uma vez na configuração inicial. */
 export async function registrarWebhook(webhookUrl: string): Promise<void> {
+  if (!webhookUrl.startsWith("https://")) throw new ErroDeUsuario("O endereço do webhook precisa começar com https://");
   await authorizedRequest("PUT", "/cobranca/v3/cobrancas/webhook", { webhookUrl });
+}
+
+/** URL do webhook hoje cadastrada no Inter, ou null se não houver. */
+export async function consultarWebhook(): Promise<string | null> {
+  try {
+    const resposta = await authorizedRequest<{ webhookUrl?: string }>("GET", "/cobranca/v3/cobrancas/webhook");
+    return resposta.webhookUrl ?? null;
+  } catch (err) {
+    // Sem webhook cadastrado o Inter responde 404.
+    if (err instanceof Error && /respondeu 404/.test(err.message)) return null;
+    throw err;
+  }
 }
