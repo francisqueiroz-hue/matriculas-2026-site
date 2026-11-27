@@ -68,11 +68,13 @@ export async function carregarConfigLembretes(schoolId: string): Promise<ConfigL
       lembretesDiasInicio: true,
       lembretesIntervaloDias: true,
       lembretesMaxEnvios: true,
+      demonstracao: true,
     },
   });
   if (!escola) return CONFIG_PADRAO;
   return {
-    ativos: escola.lembretesAtivos,
+    // Escola de demonstração: lembretes sempre desligados, mesmo que alguém ligue no painel.
+    ativos: escola.lembretesAtivos && !escola.demonstracao,
     tipos: escola.lembretesTipos,
     diasInicio: escola.lembretesDiasInicio,
     intervaloDias: escola.lembretesIntervaloDias,

@@ -129,6 +129,7 @@ describe("boletos do mês", () => {
         boleto: { findUnique: vi.fn(async () => null), findMany: vi.fn(async () => []), create: criar },
         guardianStudent: { findMany: vi.fn(async () => []) },
         contratoArquivo: { findMany: vi.fn(async () => []) },
+        school: { findUnique: vi.fn(async () => ({ demonstracao: false })) },
       },
     }));
     vi.doMock("@/lib/banco-inter", () => ({ isBancoInterConfigured: () => false, emitirCobranca: vi.fn(), consultarCobranca: vi.fn() }));

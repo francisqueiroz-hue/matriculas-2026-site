@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import { cabecalhosCors } from "@/lib/cors-matriculas";
+import { SO_ESCOLAS_REAIS } from "@/lib/escola-demonstracao";
 import {
   ANO_LETIVO_MATRICULAS,
   JANELA_LIMITE_MS,
@@ -13,11 +14,13 @@ import {
 
 /**
  * Escola que recebe os formulários públicos: MATRICULAS_SCHOOL_ID, ou a única escola
- * cadastrada. Com mais de uma escola e sem a variável, recusa em vez de adivinhar.
+ * cadastrada (a de demonstração não conta). Com mais de uma escola e sem a variável, recusa
+ * em vez de adivinhar.
  */
 async function escolaDasMatriculas(): Promise<string | null> {
   if (process.env.MATRICULAS_SCHOOL_ID) return process.env.MATRICULAS_SCHOOL_ID;
-  const escolas = await prisma.school.findMany({ select: { id: true }, take: 2 });
+  // A escola de demonstração nunca recebe formulário de família de verdade.
+  const escolas = await prisma.school.findMany({ where: SO_ESCOLAS_REAIS, select: { id: true }, take: 2 });
   return escolas.length === 1 ? escolas[0].id : null;
 }
 
